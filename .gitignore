@@ -24,6 +24,8 @@ go.work.sum
 
 # Goreleaser
 /dist
+/artifacts
+/output
 
 # Env Files
 .env/
