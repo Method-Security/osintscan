@@ -1,0 +1,19 @@
+name: 🔨 Build Test
+on:
+  pull_request:
+  push:
+    branches:
+      - develop
+
+jobs:
+  build:
+    name: Test Build
+    uses: ./.github/workflows/reusable-build.yml
+    with:
+      goreleaser_config: goreleaser.yml
+      goreleaser_options: "--clean --snapshot"
+    secrets: inherit
+    permissions:
+      id-token: write # For cosign
+      packages: write # For GHCR
+      contents: read # Not required for public repositories, but for clarity

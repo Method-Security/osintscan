@@ -1,0 +1,19 @@
+name: 🎉 Release
+
+on:
+  push:
+    tags:
+      - "*" # Trigger on all tags
+
+jobs:
+  release:
+    name: Release
+    uses: ./.github/workflows/reusable-build.yml
+    with:
+      goreleaser_config: goreleaser.yml
+      goreleaser_options: "--clean"
+    secrets: inherit
+    permissions:
+      id-token: write # For cosign
+      packages: write # For GHCR
+      contents: write # To upload archives as release assets

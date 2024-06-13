@@ -1,0 +1,33 @@
+products:
+  osintscan:
+    build:
+      main-pkg: .
+      version-var: main.version
+      environment:
+        CGO_ENABLED: "0"
+      os-archs:
+        - os: darwin
+          arch: amd64
+        - os: darwin
+          arch: arm64
+        - os: linux
+          arch: amd64
+        - os: linux
+          arch: arm64
+        - os: windows
+          arch: amd64
+    dist:
+      disters:
+        type: os-arch-bin
+        config:
+          os-archs:
+            - os: darwin
+              arch: amd64
+            - os: darwin
+              arch: arm64
+            - os: linux
+              arch: amd64
+            - os: linux
+              arch: arm64
+            - os: windows
+              arch: amd64
