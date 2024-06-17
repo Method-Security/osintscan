@@ -1,3 +1,6 @@
+// Package cmd implements the CobraCLI commands for the methodaws CLI. Subcommands for the CLI should all live within
+// this package. Logic should be delegated to internal packages and functions to keep the CLI commands clean and
+// focused on CLI I/O.
 package cmd
 
 import (
@@ -13,6 +16,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// OsintScan is the main struct for the CLI. It contains the version, output configuration, output signal, and root flags
+// for the CLI. It also contains all commands and subcommands for the CLI. The output signal is used to write the output
+// of the command to the desired output format after the execution of the invoked command's Run function.
 type OsintScan struct {
 	Version      string
 	OutputConfig writer.OutputConfig
@@ -24,6 +30,9 @@ type OsintScan struct {
 	ShodanCmd    *cobra.Command
 }
 
+// NewOsintScan creates a new OsintScan struct with the given version. It initializes the root command and all subcommands
+// for the CLI. We pass the version command in here from the main.go file, where we set the version string during the
+// build process.
 func NewOsintScan(version string) *OsintScan {
 	osintScan := OsintScan{
 		Version: version,
@@ -37,6 +46,9 @@ func NewOsintScan(version string) *OsintScan {
 	return &osintScan
 }
 
+// InitRootCommand initializes the root command for the osintscan CLI. This function initializes the root command with a
+// PersistentPreRunE function that is responsible for setting the output configuration properly, as well as a
+// PersistentPostRunE function that is responsible for writing the output signal to the desired output format.
 func (a *OsintScan) InitRootCommand() {
 	var outputFormat string
 	var outputFile string

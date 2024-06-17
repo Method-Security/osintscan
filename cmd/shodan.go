@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// InitShodanCommand initializes the Shodan command for the osintscan CLI that deals with querying Shodan for information.
 func (a *OsintScan) InitShodanCommand() {
 	a.ShodanCmd = &cobra.Command{
 		Use:   "shodan",
