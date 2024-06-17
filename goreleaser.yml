@@ -76,6 +76,8 @@ dockers:
   - image_templates:
       - "ghcr.io/method-security/osintscan:{{ .Version }}-amd64"
       - "ghcr.io/method-security/osintscan:latest-amd64"
+      - "docker.io/methodsecurity/osintscan:{{ .Version }}-amd64"
+      - "docker.io/methodsecurity/osintscan:latest-amd64"
     use: buildx
     goos: linux
     goarch: amd64
@@ -95,6 +97,8 @@ dockers:
   - image_templates:
       - "ghcr.io/method-security/osintscan:{{ .Version }}-arm64"
       - "ghcr.io/method-security/osintscan:latest-arm64"
+      - "docker.io/methodsecurity/osintscan:{{ .Version }}-arm64"
+      - "docker.io/methodsecurity/osintscan:latest-arm64"
     use: buildx
     goos: linux
     goarch: arm64
@@ -117,6 +121,18 @@ docker_manifests:
     image_templates:
     - 'ghcr.io/method-security/osintscan:{{ .Version }}-amd64'
     - 'ghcr.io/method-security/osintscan:{{ .Version }}-arm64'
+  - name_template: 'ghcr.io/method-security/osintscan:latest'
+    image_templates:
+    - 'ghcr.io/method-security/osintscan:{{ .Version }}-amd64'
+    - 'ghcr.io/method-security/osintscan:{{ .Version }}-arm64'
+  - name_template: 'methodsecurity/osintscan:{{ .Version }}'
+    image_templates:
+    - 'methodsecurity/osintscan:{{ .Version }}-amd64'
+    - 'methodsecurity/osintscan:{{ .Version }}-arm64'
+  - name_template: 'methodsecurity/osintscan:latest'
+    image_templates:
+    - 'methodsecurity/osintscan:{{ .Version }}-amd64'
+    - 'methodsecurity/osintscan:{{ .Version }}-arm64'
 
 source:
   enabled: true
