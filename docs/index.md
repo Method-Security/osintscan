@@ -1,8 +1,16 @@
-# osintscan
+# osintscan Documentation
+
+Hello and welcome to the osintscan documentation. While we always want to provide the most comprehensive documentation possible, we thought you may find the below sections a helpful place to get started.
+
+- The [Getting Started](./getting-started/basic-usage.md) section provides onboarding material
+- The [Development](./development/setup.md) header is the best place to get started on developing on top of and with osintscan
+- See the [Docs](./docs/index.md) section for a comprehensive rundown of osintscan capabilities
+
+# About osintscan
 
 osintscan has been designed to provide security teams with an easy-to-use yet data-rich suite of open source intelligence (OSINT) capabilities to help them better understand the internet exposure of the networks they defend. Designed with data-modeling and data-integration needs in mind, osintscan can be used on its own as an interactive CLI, orchestrated as part of a broader data pipeline, or leveraged from within the Method Platform.
 
-The types of scans that osintscan can conduct are constantly growing. For the most up to date listing, please see the documentation [here](https://method-security.github.io/osintscan/docs/index.html)
+The types of scans that osintscan can conduct are constantly growing. For the most up to date listing, please see the documentation [here](./docs/index.md)
 
 To learn more about osintscan, please see the [Documentation site](https://method-security.github.io/osintscan/) for the most detailed information.
 
