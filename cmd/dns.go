@@ -5,6 +5,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// InitDNSCommand initializes the DNS command for the osintscan CLI that deals with gathering DNS records, certs, and subdomains.
 func (a *OsintScan) InitDNSCommand() {
 	a.DNSCmd = &cobra.Command{
 		Use:   "dns",

@@ -7,6 +7,7 @@ import (
 	"github.com/projectdiscovery/dnsx/libs/dnsx"
 )
 
+// Record represents a single DNS record.
 type Record struct {
 	Name  string `json:"name" yaml:"name"`
 	TTL   uint32 `json:"ttl" yaml:"ttl"`
@@ -14,6 +15,7 @@ type Record struct {
 	Value string `json:"value" yaml:"value"`
 }
 
+// Records represents all of the DNS records for a given domain.
 type Records struct {
 	A     []Record `json:"a" yaml:"a"`
 	AAAA  []Record `json:"aaaa" yaml:"aaaa"`
@@ -23,6 +25,7 @@ type Records struct {
 	CNAME []Record `json:"cname" yaml:"cname"`
 }
 
+// RecordsReport represents the report of all DNS records for a given domain including all non-fatal errors that occurred.
 type RecordsReport struct {
 	Domain     string   `json:"domain" yaml:"domain"`
 	DNSRecords Records  `json:"dns_records" yaml:"dns_records"`
@@ -70,6 +73,8 @@ func getDNSRecords(domain string) (Records, error) {
 	return dnsRecords, nil
 }
 
+// GetDomainDNSRecords queries DNS for all records for a given domain. It returns a RecordsReport struct containing
+// all records that were and any non-fatal errors that occurred.
 func GetDomainDNSRecords(ctx context.Context, domain string) (RecordsReport, error) {
 	errors := []string{}
 

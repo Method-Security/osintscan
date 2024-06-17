@@ -9,6 +9,7 @@ import (
 	"github.com/projectdiscovery/subfinder/v2/pkg/runner"
 )
 
+// SubdomainsEnumReport represents the report of all subdomains for a given domain including all non-fatal errors that occurred.
 type SubdomainsEnumReport struct {
 	Domain     string   `json:"domain" yaml:"domain"`
 	Subdomains []string `json:"subdomains" yaml:"subdomains"`
@@ -43,6 +44,8 @@ func getSubdomains(ctx context.Context, domain string) ([]string, error) {
 	return subdomains, err
 }
 
+// GetDomainSubdomains queries subfinder for all subdomains for a given domain. It returns a SubdomainsEnumReport struct containing
+// all subdomains and any errors that occurred.
 func GetDomainSubdomains(ctx context.Context, domain string) (SubdomainsEnumReport, error) {
 	errors := []string{}
 

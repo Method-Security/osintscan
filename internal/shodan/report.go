@@ -10,6 +10,7 @@ type shodanTime struct {
 	time.Time
 }
 
+// Record represents a single Shodan record.
 type Record struct {
 	ASN        string                    `json:"asn" yaml:"asn"`
 	CPE        []string                  `json:"cpe" yaml:"cpe"`
@@ -43,6 +44,7 @@ type Record struct {
 	Vulns      map[string]Vulnerability  `json:"vulns" yaml:"vulns"`
 }
 
+// HTTP represents the HTTP information for a Shodan record.
 type HTTP struct {
 	Status      int     `json:"status" yaml:"status"`
 	RobotsHash  *int    `json:"robots_hash" yaml:"robots_hash"`
@@ -52,12 +54,14 @@ type HTTP struct {
 	Robots      *string `json:"robots" yaml:"robots"`
 }
 
+// MacAddressInfo represents the information for a MAC address in a Shodan record.
 type MacAddressInfo struct {
 	Assignment string `json:"assignment" required:"true" yaml:"assignment"`
 	Date       string `json:"date" yaml:"date"`
 	Org        string `json:"org" required:"true" yaml:"org"`
 }
 
+// Tag represents a Shodan tag.
 type Tag string
 
 const (
@@ -87,6 +91,7 @@ const (
 	VPN            Tag = "vpn"
 )
 
+// Vulnerability represents a Shodan vulnerability.
 type Vulnerability struct {
 	CVSS       float64  `json:"cvss" yaml:"cvss"`
 	References []string `json:"references" required:"true" yaml:"references"`
@@ -94,10 +99,12 @@ type Vulnerability struct {
 	Verified   bool     `json:"verified" yaml:"verified"`
 }
 
+// Response represents the response from the Shodan API.
 type Response struct {
 	Matches []json.RawMessage `json:"matches" yaml:"matches"`
 }
 
+// Report represents the report of all Shodan records for a given query including all non-fatal errors that occurred.
 type Report struct {
 	Query         string   `json:"query" yaml:"query"`
 	QueryType     string   `json:"query_type" yaml:"query_type"`

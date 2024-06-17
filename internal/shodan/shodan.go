@@ -1,3 +1,4 @@
+// Package shodan contains all of the data structures and logic required to interact with the Shodan API.
 package shodan
 
 import (

@@ -22,6 +22,7 @@ func filterShodanRecordsByHostname(records []Record, endString string) []Record 
 	return filteredRecords
 }
 
+// QueryShodanHostStrictHostnameMatch queries Shodan for a given query string and ensures that the hostname contains the given hostname string.
 func QueryShodanHostStrictHostnameMatch(ctx context.Context, apiKey string, query string, hostname string) (Report, error) {
 	errors := []string{}
 
