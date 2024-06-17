@@ -26,3 +26,4 @@ USER method
 WORKDIR /opt/method/${CLI_NAME}/
 
 ENV PATH="/opt/method/${CLI_NAME}/service/bin:${PATH}"
+ENTRYPOINT [ "osintscan" ]
