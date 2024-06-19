@@ -71,6 +71,18 @@ func (a *OsintScan) InitRootCommand() {
 			cmd.SetContext(svc1log.WithLogger(cmd.Context(), config.InitializeLogging(cmd, &a.RootFlags)))
 			return nil
 		},
+		PersistentPostRunE: func(cmd *cobra.Command, _ []string) error {
+			completedAt := datetime.DateTime(time.Now())
+			a.OutputSignal.CompletedAt = &completedAt
+			return writer.Write(
+				a.OutputSignal.Content,
+				a.OutputConfig,
+				a.OutputSignal.StartedAt,
+				a.OutputSignal.CompletedAt,
+				a.OutputSignal.Status,
+				a.OutputSignal.ErrorMessage,
+			)
+		},
 	}
 
 	a.RootCmd.PersistentFlags().BoolVarP(&a.RootFlags.Quiet, "quiet", "q", false, "Suppress output")
