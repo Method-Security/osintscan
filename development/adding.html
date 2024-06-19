@@ -841,11 +841,11 @@
 <p>By design, osintscan breaks every unique network scan into its own top level command. If you are looking to add a brand new capability to the tool, you can take the following steps.</p>
 <ol>
 <li>Add a file to <code>cmd/</code> that corresponds to the sub-command name you'd like to add to the <code>osintscan</code> CLI</li>
-<li>You can use <code>cmd/portscan.go</code> as a template</li>
+<li>You can use <code>cmd/dns.go</code> as a template</li>
 <li>Your file needs to be a member function of the <code>osintscan</code> struct and should be of the form <code>Init&lt;cmd&gt;Command</code></li>
 <li>Add a new member to the <code>osintscan</code> struct in <code>cmd/root.go</code> that corresponsds to your command name. Remember, the first letter must be capitalized.</li>
 <li>Call your <code>Init</code> function from <code>main.go</code></li>
-<li>Add logic to your commands runtime and put it in its own package within <code>internal</code> (e.g., <code>internal/portscan</code>)</li>
+<li>Add logic to your commands runtime and put it in its own package within <code>internal</code> (e.g., <code>internal/dns</code>)</li>
 </ol>
 
 

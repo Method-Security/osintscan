@@ -939,12 +939,12 @@
 
 
 <h1 id="getting-started">Getting Started<a class="headerlink" href="#getting-started" title="Permanent link">#</a></h1>
-<p>If you are just getting started with networkscan, welcome! This guide will walk you through the process of going zero to one with the tool.</p>
+<p>If you are just getting started with osintscan, welcome! This guide will walk you through the process of going zero to one with the tool.</p>
 <h2 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">#</a></h2>
-<p>networkscan is provided in several convenient form factors, including statically compiled binary images on a variety of architectures as well as a Docker image for both x86 and ARM machines.</p>
+<p>osintscan is provided in several convenient form factors, including statically compiled binary images on a variety of architectures as well as a Docker image for both x86 and ARM machines.</p>
 <p>If you do not see an architecture that you require, please open a <a href="https://method-security.github.io/community/contribute/discussions.html">Discussion</a> to propose adding it.</p>
 <h3 id="binaries">Binaries<a class="headerlink" href="#binaries" title="Permanent link">#</a></h3>
-<p>networkscan currently supports statically compiled binaries across the following operating systems and architectures:</p>
+<p>osintscan currently supports statically compiled binaries across the following operating systems and architectures:</p>
 <table>
 <thead>
 <tr>
@@ -955,11 +955,23 @@
 <tbody>
 <tr>
 <td>Linux</td>
+<td>386</td>
+</tr>
+<tr>
+<td>Linux</td>
+<td>arm (goarm 7)</td>
+</tr>
+<tr>
+<td>Linux</td>
 <td>amd64</td>
 </tr>
 <tr>
 <td>Linux</td>
 <td>arm64</td>
+</tr>
+<tr>
+<td>MacOS</td>
+<td>amd64</td>
 </tr>
 <tr>
 <td>MacOS</td>
@@ -971,12 +983,12 @@
 </tr>
 </tbody>
 </table>
-<p>The latest binaries can be downloaded directly from <a href="https://github.com/Method-Security/networkscan/releases/latest">Github</a>.</p>
+<p>The latest binaries can be downloaded directly from <a href="https://github.com/Method-Security/osintscan/releases/latest">Github</a>.</p>
 <h3 id="docker">Docker<a class="headerlink" href="#docker" title="Permanent link">#</a></h3>
-<p>Docker images for networkscan are hosted in both Github Container Registry as well as on Docker Hub and can be pulled via:</p>
-<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>pull<span class="w"> </span>ghcr.io/method-security/networkscan
+<p>Docker images for osintscan are hosted in both Github Container Registry as well as on Docker Hub and can be pulled via:</p>
+<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>pull<span class="w"> </span>ghcr.io/method-security/osintscan
 </code></pre></div>
-<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>pull<span class="w"> </span>methodsecurity/networkscan
+<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>pull<span class="w"> </span>methodsecurity/osintscan
 </code></pre></div>
 
 
