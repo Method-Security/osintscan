@@ -1,4 +1,4 @@
-// Package cmd implements the CobraCLI commands for the methodaws CLI. Subcommands for the CLI should all live within
+// Package cmd implements the CobraCLI commands for the osintscan CLI. Subcommands for the CLI should all live within
 // this package. Logic should be delegated to internal packages and functions to keep the CLI commands clean and
 // focused on CLI I/O.
 package cmd
@@ -71,6 +71,18 @@ func (a *OsintScan) InitRootCommand() {
 			cmd.SetContext(svc1log.WithLogger(cmd.Context(), config.InitializeLogging(cmd, &a.RootFlags)))
 			return nil
 		},
+		PersistentPostRunE: func(cmd *cobra.Command, _ []string) error {
+			completedAt := datetime.DateTime(time.Now())
+			a.OutputSignal.CompletedAt = &completedAt
+			return writer.Write(
+				a.OutputSignal.Content,
+				a.OutputConfig,
+				a.OutputSignal.StartedAt,
+				a.OutputSignal.CompletedAt,
+				a.OutputSignal.Status,
+				a.OutputSignal.ErrorMessage,
+			)
+		},
 	}
 
 	a.RootCmd.PersistentFlags().BoolVarP(&a.RootFlags.Quiet, "quiet", "q", false, "Suppress output")
@@ -80,7 +92,7 @@ func (a *OsintScan) InitRootCommand() {
 
 	a.VersionCmd = &cobra.Command{
 		Use:   "version",
-		Short: "Prints the version number of networkscan",
+		Short: "Prints the version number of osintscan",
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
 			return nil
 		},

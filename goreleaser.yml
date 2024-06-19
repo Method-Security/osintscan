@@ -85,7 +85,7 @@ dockers:
       - build-linux
     build_flag_templates:
       - "--label=org.opencontainers.image.title={{ .ProjectName }}"
-      - "--label=org.opencontainers.image.description=An on-rails AWS enumeration tool"
+      - "--label=org.opencontainers.image.description=An on-rails OSINT enumeration tool"
       - "--label=org.opencontainers.image.vendor=Method Security"
       - "--label=org.opencontainers.image.version={{ .Version }}"
       - "--label=org.opencontainers.image.created={{ .Date }}"
@@ -106,7 +106,7 @@ dockers:
       - build-linux
     build_flag_templates:
       - "--label=org.opencontainers.image.title={{ .ProjectName }}"
-      - "--label=org.opencontainers.image.description=An on-rails AWS enumeration tool"
+      - "--label=org.opencontainers.image.description=An on-rails OSINT enumeration tool"
       - "--label=org.opencontainers.image.vendor=Method Security"
       - "--label=org.opencontainers.image.version={{ .Version }}"
       - "--label=org.opencontainers.image.created={{ .Date }}"
