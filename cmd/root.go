@@ -80,7 +80,7 @@ func (a *OsintScan) InitRootCommand() {
 
 	a.VersionCmd = &cobra.Command{
 		Use:   "version",
-		Short: "Prints the version number of networkscan",
+		Short: "Prints the version number of osintscan",
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
 			return nil
 		},

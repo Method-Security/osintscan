@@ -25,12 +25,6 @@ For the full list of available installation options, please see the [Installatio
 - Download the latest binary from the [Github Releases](https://github.com/Method-Security/osintscan/releases/latest) page
 - [Installation documentation](./getting-started/installation.md)
 
-### General Usage
-
-```bash
-osintscan portscan <target>
-```
-
 #### Examples
 
 ```bash
