@@ -1,4 +1,4 @@
-// Package cmd implements the CobraCLI commands for the methodaws CLI. Subcommands for the CLI should all live within
+// Package cmd implements the CobraCLI commands for the osintscan CLI. Subcommands for the CLI should all live within
 // this package. Logic should be delegated to internal packages and functions to keep the CLI commands clean and
 // focused on CLI I/O.
 package cmd
