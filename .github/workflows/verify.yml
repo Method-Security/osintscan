@@ -7,6 +7,7 @@ on:
   push:
     branches:
       - develop
+
 jobs:
   verify:
     name: Verify
@@ -14,5 +15,46 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+
+      - name: Install Dependences
+        run: sudo apt install libpcap-dev
+
       - name: Godel Verify
         run: ./godelw verify
+  check_fern:
+    name: Check Fern Go
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Setup Node
+        uses: actions/setup-node@v4
+      - name: Install Fern
+        run: npm install -g fern-api
+      - name: Generate Fern
+        run: fern generate --group local
+        env:
+          FERN_TOKEN: ${{ secrets.FERN_TOKEN }}
+      - name: Check Git Status
+        run: |
+          if [[ -n $(git status --porcelain) ]]; then
+            echo "Repository is dirty."
+            git status
+            exit 1
+          else
+            echo "Repository is clean."
+          fi
+  check_fern_python:
+    name: Check Fern Python
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Setup Node
+        uses: actions/setup-node@v4
+      - name: Install Fern
+        run: npm install -g fern-api
+      - name: Generate Fern
+        run: fern generate --group pypi-local
+        env:
+          FERN_TOKEN: ${{ secrets.FERN_TOKEN }}

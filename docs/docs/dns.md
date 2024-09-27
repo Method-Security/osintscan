@@ -87,3 +87,34 @@ Global Flags:
   -q, --quiet                Suppress output
   -v, --verbose              Verbose output
 ```
+
+## Takeover
+
+### Usage
+
+```bash
+webscan domain takeover --targets https://example.com
+```
+
+### Help Text
+
+```bash
+webscan domain takeover -h
+Detect domain takeovers given targets
+
+Usage:
+  osintscan dns takeover [flags]
+
+Flags:
+      --files strings     Paths to files containing the list of targets
+  -h, --help              help for takeover
+      --https             Only check sites with secure SSL
+      --targets strings   URL targets to analyze
+      --timeout int       Request timeout in seconds (default 10)
+
+Global Flags:
+  -o, --output string        Output format (signal, json, yaml). Default value is signal (default "signal")
+  -f, --output-file string   Path to output file. If blank, will output to STDOUT
+  -q, --quiet                Suppress output
+  -v, --verbose              Verbose output
+```
