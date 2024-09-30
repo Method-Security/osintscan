@@ -1,6 +1,10 @@
 package cmd
 
 import (
+	"bufio"
+	"errors"
+	"os"
+
 	"github.com/Method-Security/osintscan/internal/dns"
 	"github.com/spf13/cobra"
 )
@@ -85,8 +89,99 @@ func (a *OsintScan) InitDNSCommand() {
 
 	subenumCmd.Flags().String("domain", "", "Domain to get subdomains for")
 
+	takeoverCmd := &cobra.Command{
+		Use:   "takeover",
+		Short: "Detect domain takeovers given targets",
+		Long:  `Detect domain takeovers given targets`,
+		Run: func(cmd *cobra.Command, args []string) {
+			targets, err := cmd.Flags().GetStringSlice("targets")
+			if err != nil {
+				errorMessage := err.Error()
+				a.OutputSignal.ErrorMessage = &errorMessage
+				a.OutputSignal.Status = 1
+				return
+			}
+
+			filePaths, err := cmd.Flags().GetStringSlice("files")
+			if err != nil {
+				errorMessage := err.Error()
+				a.OutputSignal.ErrorMessage = &errorMessage
+				a.OutputSignal.Status = 1
+				return
+			}
+			fileTargets, err := getTargetsFromFiles(filePaths)
+			if err != nil {
+				errorMessage := err.Error()
+				a.OutputSignal.ErrorMessage = &errorMessage
+				a.OutputSignal.Status = 1
+				return
+			}
+
+			allTargets := append(targets, fileTargets...)
+
+			if len(allTargets) == 0 {
+				err = errors.New("no targets specified")
+				errorMessage := err.Error()
+				a.OutputSignal.ErrorMessage = &errorMessage
+				a.OutputSignal.Status = 1
+				return
+			}
+
+			setHTTP, err := cmd.Flags().GetBool("https")
+			if err != nil {
+				errorMessage := err.Error()
+				a.OutputSignal.ErrorMessage = &errorMessage
+				a.OutputSignal.Status = 1
+				return
+			}
+
+			timeout, err := cmd.Flags().GetInt("timeout")
+			if err != nil {
+				errorMessage := err.Error()
+				a.OutputSignal.ErrorMessage = &errorMessage
+				a.OutputSignal.Status = 1
+				return
+			}
+
+			report, err := dns.DetectDomainTakeover(allTargets, setHTTP, timeout)
+			if err != nil {
+				errorMessage := err.Error()
+				a.OutputSignal.ErrorMessage = &errorMessage
+				a.OutputSignal.Status = 1
+			}
+			a.OutputSignal.Content = report
+		},
+	}
+
+	takeoverCmd.Flags().StringSlice("targets", []string{}, "URL targets to analyze")
+	takeoverCmd.Flags().StringSlice("files", []string{}, "Paths to files containing the list of targets")
+	takeoverCmd.Flags().Bool("https", false, "Only check sites with secure SSL")
+	takeoverCmd.Flags().Int("timeout", 10, "Request timeout in seconds")
+
 	a.DNSCmd.AddCommand(recordCmd)
 	a.DNSCmd.AddCommand(certsCmd)
 	a.DNSCmd.AddCommand(subenumCmd)
+	a.DNSCmd.AddCommand(takeoverCmd)
 	a.RootCmd.AddCommand(a.DNSCmd)
+}
+
+func getTargetsFromFiles(paths []string) ([]string, error) {
+	targets := []string{}
+	for _, path := range paths {
+		file, err := os.Open(path)
+		if err != nil {
+			return nil, err
+		}
+		err = file.Close()
+		if err != nil {
+			return nil, err
+		}
+		var lines []string
+		scanner := bufio.NewScanner(file)
+		for scanner.Scan() {
+			lines = append(lines, scanner.Text())
+		}
+		targets = append(targets, lines...)
+	}
+	return targets, nil
 }
