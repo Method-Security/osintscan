@@ -703,6 +703,39 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#takeover" class="md-nav__link">
+    <span class="md-ellipsis">
+      Takeover
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Takeover">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#usage_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      Usage
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#help-text_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      Help Text
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1052,6 +1085,39 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#takeover" class="md-nav__link">
+    <span class="md-ellipsis">
+      Takeover
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Takeover">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#usage_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      Usage
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#help-text_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      Help Text
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1134,6 +1200,31 @@ Usage:
 Flags:
 <span class="w">      </span>--domain<span class="w"> </span>string<span class="w">   </span>Domain<span class="w"> </span>to<span class="w"> </span>get<span class="w"> </span>subdomains<span class="w"> </span><span class="k">for</span>
 <span class="w">  </span>-h,<span class="w"> </span>--help<span class="w">            </span><span class="nb">help</span><span class="w"> </span><span class="k">for</span><span class="w"> </span>subenum
+
+Global<span class="w"> </span>Flags:
+<span class="w">  </span>-o,<span class="w"> </span>--output<span class="w"> </span>string<span class="w">        </span>Output<span class="w"> </span>format<span class="w"> </span><span class="o">(</span>signal,<span class="w"> </span>json,<span class="w"> </span>yaml<span class="o">)</span>.<span class="w"> </span>Default<span class="w"> </span>value<span class="w"> </span>is<span class="w"> </span>signal<span class="w"> </span><span class="o">(</span>default<span class="w"> </span><span class="s2">&quot;signal&quot;</span><span class="o">)</span>
+<span class="w">  </span>-f,<span class="w"> </span>--output-file<span class="w"> </span>string<span class="w">   </span>Path<span class="w"> </span>to<span class="w"> </span>output<span class="w"> </span>file.<span class="w"> </span>If<span class="w"> </span>blank,<span class="w"> </span>will<span class="w"> </span>output<span class="w"> </span>to<span class="w"> </span>STDOUT
+<span class="w">  </span>-q,<span class="w"> </span>--quiet<span class="w">                </span>Suppress<span class="w"> </span>output
+<span class="w">  </span>-v,<span class="w"> </span>--verbose<span class="w">              </span>Verbose<span class="w"> </span>output
+</code></pre></div>
+<h2 id="takeover">Takeover<a class="headerlink" href="#takeover" title="Permanent link">#</a></h2>
+<h3 id="usage_3">Usage<a class="headerlink" href="#usage_3" title="Permanent link">#</a></h3>
+<div class="highlight"><pre><span></span><code>webscan<span class="w"> </span>domain<span class="w"> </span>takeover<span class="w"> </span>--targets<span class="w"> </span>https://example.com
+</code></pre></div>
+<h3 id="help-text_3">Help Text<a class="headerlink" href="#help-text_3" title="Permanent link">#</a></h3>
+<div class="highlight"><pre><span></span><code>webscan<span class="w"> </span>domain<span class="w"> </span>takeover<span class="w"> </span>-h
+Detect<span class="w"> </span>domain<span class="w"> </span>takeovers<span class="w"> </span>given<span class="w"> </span>targets
+
+Usage:
+<span class="w">  </span>osintscan<span class="w"> </span>dns<span class="w"> </span>takeover<span class="w"> </span><span class="o">[</span>flags<span class="o">]</span>
+
+Flags:
+<span class="w">      </span>--files<span class="w"> </span>strings<span class="w">         </span>Paths<span class="w"> </span>to<span class="w"> </span>files<span class="w"> </span>containing<span class="w"> </span>the<span class="w"> </span>list<span class="w"> </span>of<span class="w"> </span>targets
+<span class="w">      </span>--fingerprints<span class="w"> </span>string<span class="w">   </span>Path<span class="w"> </span>to<span class="w"> </span>fingerprints<span class="w"> </span>file<span class="w"> </span><span class="o">(</span>default<span class="w"> </span><span class="s2">&quot;configs/fingerprints.json&quot;</span><span class="o">)</span>
+<span class="w">  </span>-h,<span class="w"> </span>--help<span class="w">                  </span><span class="nb">help</span><span class="w"> </span><span class="k">for</span><span class="w"> </span>takeover
+<span class="w">      </span>--https<span class="w">                 </span>Only<span class="w"> </span>check<span class="w"> </span>sites<span class="w"> </span>with<span class="w"> </span>secure<span class="w"> </span>SSL
+<span class="w">      </span>--targets<span class="w"> </span>strings<span class="w">       </span>URL<span class="w"> </span>targets<span class="w"> </span>to<span class="w"> </span>analyze
+<span class="w">      </span>--timeout<span class="w"> </span>int<span class="w">           </span>Request<span class="w"> </span>timeout<span class="w"> </span><span class="k">in</span><span class="w"> </span>seconds<span class="w"> </span><span class="o">(</span>default<span class="w"> </span><span class="m">10</span><span class="o">)</span>
 
 Global<span class="w"> </span>Flags:
 <span class="w">  </span>-o,<span class="w"> </span>--output<span class="w"> </span>string<span class="w">        </span>Output<span class="w"> </span>format<span class="w"> </span><span class="o">(</span>signal,<span class="w"> </span>json,<span class="w"> </span>yaml<span class="o">)</span>.<span class="w"> </span>Default<span class="w"> </span>value<span class="w"> </span>is<span class="w"> </span>signal<span class="w"> </span><span class="o">(</span>default<span class="w"> </span><span class="s2">&quot;signal&quot;</span><span class="o">)</span>

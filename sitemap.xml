@@ -2,52 +2,52 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://method-security.github.io/osintscan/index.html</loc>
-         <lastmod>2024-06-19</lastmod>
+         <lastmod>2024-10-01</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://method-security.github.io/osintscan/community/community.html</loc>
-         <lastmod>2024-06-19</lastmod>
+         <lastmod>2024-10-01</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://method-security.github.io/osintscan/development/adding.html</loc>
-         <lastmod>2024-06-19</lastmod>
+         <lastmod>2024-10-01</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://method-security.github.io/osintscan/development/principles.html</loc>
-         <lastmod>2024-06-19</lastmod>
+         <lastmod>2024-10-01</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://method-security.github.io/osintscan/development/setup.html</loc>
-         <lastmod>2024-06-19</lastmod>
+         <lastmod>2024-10-01</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://method-security.github.io/osintscan/docs/index.html</loc>
-         <lastmod>2024-06-19</lastmod>
+         <lastmod>2024-10-01</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://method-security.github.io/osintscan/docs/dns.html</loc>
-         <lastmod>2024-06-19</lastmod>
+         <lastmod>2024-10-01</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://method-security.github.io/osintscan/docs/shodan.html</loc>
-         <lastmod>2024-06-19</lastmod>
+         <lastmod>2024-10-01</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://method-security.github.io/osintscan/getting-started/basic-usage.html</loc>
-         <lastmod>2024-06-19</lastmod>
+         <lastmod>2024-10-01</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://method-security.github.io/osintscan/getting-started/installation.html</loc>
-         <lastmod>2024-06-19</lastmod>
+         <lastmod>2024-10-01</lastmod>
          <changefreq>daily</changefreq>
     </url>
 </urlset>
