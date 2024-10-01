@@ -144,8 +144,8 @@ func (a *OsintScan) InitDNSCommand() {
 	}
 
 	takeoverCmd.Flags().StringSlice("targets", []string{}, "URL targets to analyze")
-	takeoverCmd.Flags().String("fingerprints", "configs/fingerprints.json", "Abs path to fingerprints file")
-	takeoverCmd.Flags().StringSlice("files", []string{}, "Abs paths to files containing the list of targets")
+	takeoverCmd.Flags().String("fingerprints", "configs/fingerprints.json", "Absolute path to fingerprints file")
+	takeoverCmd.Flags().StringSlice("files", []string{}, "Absolute paths to files containing the list of targets")
 	takeoverCmd.Flags().Bool("https", false, "Only check sites with secure SSL")
 	takeoverCmd.Flags().Int("timeout", 10, "Request timeout in seconds")
 

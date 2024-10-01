@@ -106,8 +106,8 @@ Usage:
   osintscan dns takeover [flags]
 
 Flags:
-      --files strings         Abs paths to files containing the list of targets
-      --fingerprints string   Abs path to fingerprints file (default "configs/fingerprints.json")
+      --files strings         Absolute paths to files containing the list of targets
+      --fingerprints string   Absolute path to fingerprints file (default "configs/fingerprints.json")
   -h, --help                  help for takeover
       --https                 Only check sites with secure SSL
       --targets strings       URL targets to analyze
