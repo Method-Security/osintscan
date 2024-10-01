@@ -3,6 +3,7 @@ package dns
 import (
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"io"
 	"net"
 	"net/http"
@@ -16,13 +17,13 @@ import (
 	osintscan "github.com/Method-Security/osintscan/generated/go"
 )
 
-func DetectDomainTakeover(targets []string, setHTTP bool, timeout int) (*osintscan.DomainTakeoverReport, error) {
+func DetectDomainTakeover(targets []string, fingerprintsPath string, setHTTP bool, timeout int) (*osintscan.DomainTakeoverReport, error) {
 	resources := osintscan.DomainTakeoverReport{}
 	errs := []string{}
 
 	httpClient := createHTTPClient(setHTTP, timeout)
 
-	fingerprints, err := retrieveFingerprints()
+	fingerprints, err := retrieveFingerprints(fingerprintsPath)
 	if err != nil {
 		return &resources, err
 	}
@@ -68,10 +69,10 @@ func createHTTPClient(setHTTP bool, timeout int) *http.Client {
 	}
 }
 
-func retrieveFingerprints() ([]osintscan.Fingerprint, error) {
+func retrieveFingerprints(fingerprintsPath string) ([]osintscan.Fingerprint, error) {
 	var fingerprints []osintscan.Fingerprint
 
-	absPath, err := filepath.Abs("configs/fingerprints.json")
+	absPath, err := filepath.Abs(fingerprintsPath)
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +84,7 @@ func retrieveFingerprints() ([]osintscan.Fingerprint, error) {
 
 	err = json.Unmarshal(file, &fingerprints)
 	if err != nil {
-		return nil, err
+		return nil, errors.New("could not unmarshal fingerprint file")
 	}
 
 	return fingerprints, nil

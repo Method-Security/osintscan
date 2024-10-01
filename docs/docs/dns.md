@@ -106,11 +106,12 @@ Usage:
   osintscan dns takeover [flags]
 
 Flags:
-      --files strings     Paths to files containing the list of targets
-  -h, --help              help for takeover
-      --https             Only check sites with secure SSL
-      --targets strings   URL targets to analyze
-      --timeout int       Request timeout in seconds (default 10)
+      --files strings         Abs paths to files containing the list of targets
+      --fingerprints string   Abs path to fingerprints file (default "configs/fingerprints.json")
+  -h, --help                  help for takeover
+      --https                 Only check sites with secure SSL
+      --targets strings       URL targets to analyze
+      --timeout int           Request timeout in seconds (default 10)
 
 Global Flags:
   -o, --output string        Output format (signal, json, yaml). Default value is signal (default "signal")
