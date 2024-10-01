@@ -96,58 +96,43 @@ func (a *OsintScan) InitDNSCommand() {
 		Run: func(cmd *cobra.Command, args []string) {
 			targets, err := cmd.Flags().GetStringSlice("targets")
 			if err != nil {
-				errorMessage := err.Error()
-				a.OutputSignal.ErrorMessage = &errorMessage
-				a.OutputSignal.Status = 1
+				a.OutputSignal.AddError(err)
 				return
 			}
 
 			filePaths, err := cmd.Flags().GetStringSlice("files")
 			if err != nil {
-				errorMessage := err.Error()
-				a.OutputSignal.ErrorMessage = &errorMessage
-				a.OutputSignal.Status = 1
+				a.OutputSignal.AddError(err)
 				return
 			}
 			fileTargets, err := getTargetsFromFiles(filePaths)
 			if err != nil {
-				errorMessage := err.Error()
-				a.OutputSignal.ErrorMessage = &errorMessage
-				a.OutputSignal.Status = 1
+				a.OutputSignal.AddError(err)
 				return
 			}
 
 			allTargets := append(targets, fileTargets...)
 
 			if len(allTargets) == 0 {
-				err = errors.New("no targets specified")
-				errorMessage := err.Error()
-				a.OutputSignal.ErrorMessage = &errorMessage
-				a.OutputSignal.Status = 1
+				a.OutputSignal.AddError(errors.New("no targets specified"))
 				return
 			}
 
 			setHTTP, err := cmd.Flags().GetBool("https")
 			if err != nil {
-				errorMessage := err.Error()
-				a.OutputSignal.ErrorMessage = &errorMessage
-				a.OutputSignal.Status = 1
+				a.OutputSignal.AddError(err)
 				return
 			}
 
 			timeout, err := cmd.Flags().GetInt("timeout")
 			if err != nil {
-				errorMessage := err.Error()
-				a.OutputSignal.ErrorMessage = &errorMessage
-				a.OutputSignal.Status = 1
+				a.OutputSignal.AddError(err)
 				return
 			}
 
 			report, err := dns.DetectDomainTakeover(allTargets, setHTTP, timeout)
 			if err != nil {
-				errorMessage := err.Error()
-				a.OutputSignal.ErrorMessage = &errorMessage
-				a.OutputSignal.Status = 1
+				a.OutputSignal.AddError(err)
 			}
 			a.OutputSignal.Content = report
 		},
