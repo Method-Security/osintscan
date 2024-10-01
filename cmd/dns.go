@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"errors"
 	"os"
+	"path/filepath"
 
 	"github.com/Method-Security/osintscan/internal/dns"
 	"github.com/spf13/cobra"
@@ -144,8 +145,8 @@ func (a *OsintScan) InitDNSCommand() {
 	}
 
 	takeoverCmd.Flags().StringSlice("targets", []string{}, "URL targets to analyze")
-	takeoverCmd.Flags().String("fingerprints", "configs/fingerprints.json", "Absolute path to fingerprints file")
-	takeoverCmd.Flags().StringSlice("files", []string{}, "Absolute paths to files containing the list of targets")
+	takeoverCmd.Flags().String("fingerprints", "configs/fingerprints.json", "Path to fingerprints file")
+	takeoverCmd.Flags().StringSlice("files", []string{}, "Paths to files containing the list of targets")
 	takeoverCmd.Flags().Bool("https", false, "Only check sites with secure SSL")
 	takeoverCmd.Flags().Int("timeout", 10, "Request timeout in seconds")
 
@@ -159,7 +160,11 @@ func (a *OsintScan) InitDNSCommand() {
 func getTargetsFromFiles(paths []string) ([]string, error) {
 	targets := []string{}
 	for _, path := range paths {
-		file, err := os.Open(path)
+		absPath, err := filepath.Abs(path)
+		if err != nil {
+			return nil, err
+		}
+		file, err := os.Open(absPath)
 		if err != nil {
 			return nil, err
 		}
