@@ -1,0 +1,30 @@
+types:
+  Fingerprint:
+    properties:
+      cicdPass: boolean
+      cname: list<string>
+      discussion: string
+      documentation: string
+      fingerprint: string
+      httpStatus: optional<integer>
+      nxDomain: boolean
+      service: string
+      status: string
+      vulnerable: boolean
+  Service:
+    properties:
+      name: string
+      fingerprint: string
+      vulnerable: boolean
+  DomainTakeover:
+    properties:
+      target: string
+      statusCode: integer
+      responseBody: string
+      domain: string
+      cname: string
+      services: list<Service>
+  DomainTakeoverReport:
+    properties:
+      domainTakeovers: optional<list<DomainTakeover>>
+      errors: optional<list<string>>

@@ -5,10 +5,13 @@
 package signal
 
 import (
+	"context"
 	"encoding/base64"
+	"fmt"
 
 	"github.com/palantir/pkg/datetime"
 	"github.com/palantir/pkg/safejson"
+	"github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
 type Signal struct {
@@ -37,4 +40,21 @@ func (s *Signal) EncodeContent() error {
 	encoded := base64.StdEncoding.EncodeToString(data)
 	s.Content = encoded
 	return nil
+}
+
+func (s *Signal) AddError(err error) {
+	if s.ErrorMessage == nil {
+		s.ErrorMessage = new(string)
+		*s.ErrorMessage = err.Error()
+	} else {
+		*s.ErrorMessage += fmt.Sprintf(" %s", err.Error())
+	}
+	s.Status = 1
+}
+
+func (s *Signal) PanicHandler(ctx context.Context) {
+	if r := recover(); r != nil {
+		svc1log.FromContext(ctx).Error(fmt.Sprintf("panic: %v", r))
+		s.AddError(fmt.Errorf("panic: %v", r))
+	}
 }

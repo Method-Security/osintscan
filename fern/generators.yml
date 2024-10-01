@@ -1,0 +1,39 @@
+default-group: local
+groups:
+  local:
+    generators:
+      - name: fernapi/fern-go-sdk
+        version: 0.27.0
+        config:
+          importpath: github.com/Method-Security/osintscan/generated/go
+        output:
+          location: local-file-system
+          path: ../generated/go
+  pypi-local:
+    generators:
+      - name: fernapi/fern-pydantic-model
+        version: 1.4.3
+        output:
+          location: local-file-system
+          path: ../generated/python
+  pypi-test:
+    generators:
+      - name: fernapi/fern-pydantic-model
+        version: 1.4.3
+        config:
+          package_name: methodosintscan
+        output:
+          location: pypi
+          package-name: methodosintscan
+          token: ${TEST_PYPI_TOKEN}
+          url: https://test.pypi.org/legacy/
+  pypi:
+    generators:
+      - name: fernapi/fern-pydantic-model
+        version: 1.4.3
+        config:
+          package_name: methodosintscan
+        output:
+          location: pypi
+          package-name: methodosintscan
+          token: ${PYPI_TOKEN}
