@@ -11,7 +11,7 @@ jobs:
     uses: ./.github/workflows/reusable-build.yml
     with:
       goreleaser_config: goreleaser.yml
-      goreleaser_options: ""
+      goreleaser_options: "--clean"
     secrets: inherit
     permissions:
       id-token: write # For cosign
