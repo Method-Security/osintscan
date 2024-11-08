@@ -66,7 +66,7 @@ func (a *OsintScan) InitDNSCommand() {
 
 	certsCmd.Flags().String("domain", "", "Domain to get DNS certs for")
 
-	subenumCmd := &cobra.Command{
+	passiveSubEnumCmd := &cobra.Command{
 		Use:   "subenum",
 		Short: "Passively enumerate subdomains for a given domain",
 		Long:  `Passively enumerate subdomains for a given domain`,
@@ -88,7 +88,31 @@ func (a *OsintScan) InitDNSCommand() {
 		},
 	}
 
-	subenumCmd.Flags().String("domain", "", "Domain to get subdomains for")
+	passiveSubEnumCmd.Flags().String("domain", "", "Domain to get subdomains for")
+
+	activeSubEnumCmd := &cobra.Command{
+		Use:   "brutesubenum",
+		Short: "Actively enumerate subdomains for a given domain using dictionary-based brute force",
+		Long:  `Actively enumerate subdomains for a given domain using dictionary-based brute force`,
+		Run: func(cmd *cobra.Command, args []string) {
+			domain, err := cmd.Flags().GetString("domain")
+			if err != nil {
+				errorMessage := err.Error()
+				a.OutputSignal.ErrorMessage = &errorMessage
+				a.OutputSignal.Status = 1
+				return
+			}
+			report, err := dns.BruteEnumDomainSubdomains(cmd.Context(), domain)
+			if err != nil {
+				errorMessage := err.Error()
+				a.OutputSignal.ErrorMessage = &errorMessage
+				a.OutputSignal.Status = 1
+			}
+			a.OutputSignal.Content = report
+		},
+	}
+
+	activeSubEnumCmd.Flags().String("domain", "", "Domain to get subdomains for")
 
 	takeoverCmd := &cobra.Command{
 		Use:   "takeover",
@@ -152,7 +176,8 @@ func (a *OsintScan) InitDNSCommand() {
 
 	a.DNSCmd.AddCommand(recordCmd)
 	a.DNSCmd.AddCommand(certsCmd)
-	a.DNSCmd.AddCommand(subenumCmd)
+	a.DNSCmd.AddCommand(passiveSubEnumCmd)
+	a.DNSCmd.AddCommand(activeSubEnumCmd)
 	a.DNSCmd.AddCommand(takeoverCmd)
 	a.RootCmd.AddCommand(a.DNSCmd)
 }

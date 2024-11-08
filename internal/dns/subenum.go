@@ -62,5 +62,4 @@ func GetDomainSubdomains(ctx context.Context, domain string) (SubdomainsEnumRepo
 		Errors:     errors,
 	}
 	return report, nil
-
 }
