@@ -232,7 +232,6 @@ func getTargetsFromFiles(paths []string) ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		fmt.Println(targets)
 	}
 	return targets, nil
 }
