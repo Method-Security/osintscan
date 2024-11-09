@@ -2,6 +2,7 @@ package dns
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 )
 
@@ -14,13 +15,12 @@ func BruteEnumDomainSubdomains(ctx context.Context, domain string, words []strin
 		if err != nil {
 			errors = append(errors, err.Error())
 		}
-		fmt.Println(report.DNSRecords.A)
-		fmt.Println(report.DNSRecords.AAAA)
-		fmt.Println(report.DNSRecords.CNAME)
-		fmt.Println(report.DNSRecords.MX)
-		fmt.Println(report.DNSRecords.NS)
-		fmt.Println(report.DNSRecords.TXT)
-		// subdomains = append(subdomains, report)
+		records, err := json.Marshal(report.DNSRecords)
+		if err != nil {
+			errors = append(errors, err.Error())
+		}
+		subdomains = append(subdomains, string(records))
+		fmt.Println(subdomains)
 	}
 
 	report := SubdomainsEnumReport{
