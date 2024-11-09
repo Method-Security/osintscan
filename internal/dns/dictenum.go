@@ -2,6 +2,7 @@ package dns
 
 import (
 	"context"
+	"fmt"
 	"sync"
 )
 
@@ -50,7 +51,9 @@ func BruteEnumDomainSubdomains(ctx context.Context, domain string, words []strin
 	var currentRecursiveDepth = 0
 	for currentRecursiveDepth < maxRecursiveDepth {
 		for _, domain := range domains {
+			fmt.Println(domain)
 			subdomains, errors, err := bruteEnumSubdomains(ctx, domain, words, threads)
+			fmt.Println(subdomains)
 			if err != nil {
 				errors = append(errors, err.Error())
 			}
