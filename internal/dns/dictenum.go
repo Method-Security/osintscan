@@ -5,9 +5,9 @@ import (
 	"sync"
 )
 
-func BruteEnumDomainSubdomains(ctx context.Context, domain string, words []string, threads int) (SubdomainsEnumReport, error) {
-	errors := []string{}
+func bruteEnumSubdomains(ctx context.Context, domain string, words []string, threads int) ([]string, []string, error) {
 	subdomains := []string{}
+	errors := []string{}
 
 	var mu sync.Mutex     // To safely append to shared slices
 	var wg sync.WaitGroup // To wait for all goroutines to finish
@@ -40,11 +40,31 @@ func BruteEnumDomainSubdomains(ctx context.Context, domain string, words []strin
 	}
 
 	wg.Wait()
+	return subdomains, errors, nil
+}
+
+func BruteEnumDomainSubdomains(ctx context.Context, domain string, words []string, threads int, maxRecursiveDepth int) (SubdomainsEnumReport, error) {
+	domains := []string{domain} // Convert the initial domain into a slice to support recursion
+	allSubdomains := []string{}
+	allErrors := []string{}
+	var currentRecursiveDepth = 0
+	for currentRecursiveDepth < maxRecursiveDepth {
+		for _, domain := range domains {
+			subdomains, errors, err := bruteEnumSubdomains(ctx, domain, words, threads)
+			if err != nil {
+				errors = append(errors, err.Error())
+			}
+			allSubdomains = append(allSubdomains, subdomains...)
+			allErrors = append(allErrors, errors...)
+			domains = subdomains // The next recursion cycle will check the wordlist against the domains that we found in this cycle
+		}
+		currentRecursiveDepth += 1
+	}
 
 	report := SubdomainsEnumReport{
 		Domain:     domain,
-		Subdomains: subdomains,
-		Errors:     errors,
+		Subdomains: allSubdomains,
+		Errors:     allErrors,
 	}
 
 	return report, nil

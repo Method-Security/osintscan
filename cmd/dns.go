@@ -123,6 +123,11 @@ func (a *OsintScan) InitDNSCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
+			maxRecursiveDepth, err := cmd.Flags().GetInt("max-recursive-depth")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
 
 			allWords := append(words, fileWords...)
 
@@ -131,7 +136,7 @@ func (a *OsintScan) InitDNSCommand() {
 				return
 			}
 
-			report, err := dns.BruteEnumDomainSubdomains(cmd.Context(), domain, allWords, threads)
+			report, err := dns.BruteEnumDomainSubdomains(cmd.Context(), domain, allWords, threads, maxRecursiveDepth)
 			if err != nil {
 				errorMessage := err.Error()
 				a.OutputSignal.ErrorMessage = &errorMessage
@@ -145,6 +150,7 @@ func (a *OsintScan) InitDNSCommand() {
 	activeSubEnumCmd.Flags().StringSlice("words", []string{}, "Comma-separated wordlist")
 	activeSubEnumCmd.Flags().String("wordlist", "", "Path to local file containing wordlist")
 	activeSubEnumCmd.Flags().Int("threads", 10, "Number of threads used for concurrent DNS lookup of words in wordlist")
+	activeSubEnumCmd.Flags().Int("max-recursive-depth", 1, "Maximum number of times to recursively check wordlist against domains found in previous iteration")
 
 	takeoverCmd := &cobra.Command{
 		Use:   "takeover",
