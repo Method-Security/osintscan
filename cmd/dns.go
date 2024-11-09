@@ -210,10 +210,8 @@ func (a *OsintScan) InitDNSCommand() {
 
 func getTargetsFromFiles(paths []string) ([]string, error) {
 	targets := []string{}
-	fmt.Println(paths)
 	for _, path := range paths {
 		absPath, err := filepath.Abs(path)
-		fmt.Println(absPath)
 		if err != nil {
 			return nil, err
 		}
@@ -230,6 +228,7 @@ func getTargetsFromFiles(paths []string) ([]string, error) {
 		for scanner.Scan() {
 			lines = append(lines, scanner.Text())
 		}
+		fmt.Println(lines)
 		targets = append(targets, lines...)
 		fmt.Println(targets)
 	}
