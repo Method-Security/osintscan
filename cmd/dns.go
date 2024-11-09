@@ -228,7 +228,9 @@ func getTargetsFromFiles(paths []string) ([]string, error) {
 		for scanner.Scan() {
 			lines = append(lines, scanner.Text())
 		}
-		fmt.Println(lines)
+		if err := scanner.Err(); err != nil {
+			fmt.Println("Error scanning:", err)
+		}
 		targets = append(targets, lines...)
 		fmt.Println(targets)
 	}
