@@ -6,12 +6,15 @@ import (
 	"net"
 )
 
-func BruteEnumDomainSubdomains(ctx context.Context, domain string) (RecordsReport, error) {
-	resolveDNS(ctx, domain)
+func BruteEnumDomainSubdomains(ctx context.Context, domain string, words []string) (RecordsReport, error) {
+	for _, word := range words {
+		resolveDNS(ctx, word+"."+domain)
+	}
 	return RecordsReport{}, nil
 }
 
 func resolveDNS(ctx context.Context, url string) {
+	// Next step here is to read wordlist and loop through it.
 	// Perform DNS resolution using net.LookupHost
 	ips, err := net.LookupHost(url)
 	if err != nil {

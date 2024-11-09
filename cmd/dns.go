@@ -102,7 +102,30 @@ func (a *OsintScan) InitDNSCommand() {
 				a.OutputSignal.Status = 1
 				return
 			}
-			report, err := dns.BruteEnumDomainSubdomains(cmd.Context(), domain)
+			words, err := cmd.Flags().GetStringSlice("words")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			filePath, err := cmd.Flags().GetString("wordlist")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			fileWords, err := getTargetsFromFiles([]string{filePath})
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			allWords := append(words, fileWords...)
+
+			if len(allWords) == 0 {
+				a.OutputSignal.AddError(errors.New("no targets specified"))
+				return
+			}
+
+			report, err := dns.BruteEnumDomainSubdomains(cmd.Context(), domain, allWords)
 			if err != nil {
 				errorMessage := err.Error()
 				a.OutputSignal.ErrorMessage = &errorMessage
@@ -113,6 +136,8 @@ func (a *OsintScan) InitDNSCommand() {
 	}
 
 	activeSubEnumCmd.Flags().String("domain", "", "Domain to get subdomains for")
+	activeSubEnumCmd.Flags().StringSlice("words", []string{}, "Comma-separated wordlist")
+	activeSubEnumCmd.Flags().StringSlice("wordlist", []string{}, "Path to local file containing wordlist")
 
 	takeoverCmd := &cobra.Command{
 		Use:   "takeover",
