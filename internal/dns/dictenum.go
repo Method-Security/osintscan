@@ -20,7 +20,7 @@ func BruteEnumDomainSubdomains(ctx context.Context, domain string, words []strin
 			errors = append(errors, err.Error())
 		}
 		subdomains = append(subdomains, string(records))
-		fmt.Println(subdomains)
+		fmt.Println(string(records))
 	}
 
 	report := SubdomainsEnumReport{
@@ -29,5 +29,6 @@ func BruteEnumDomainSubdomains(ctx context.Context, domain string, words []strin
 		Errors:     errors,
 	}
 
+	fmt.Println(subdomains)
 	return report, nil
 }
