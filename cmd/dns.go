@@ -118,6 +118,11 @@ func (a *OsintScan) InitDNSCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
+			threads, err := cmd.Flags().GetInt("threads")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
 
 			allWords := append(words, fileWords...)
 
@@ -126,7 +131,7 @@ func (a *OsintScan) InitDNSCommand() {
 				return
 			}
 
-			report, err := dns.BruteEnumDomainSubdomains(cmd.Context(), domain, allWords)
+			report, err := dns.BruteEnumDomainSubdomains(cmd.Context(), domain, allWords, threads)
 			if err != nil {
 				errorMessage := err.Error()
 				a.OutputSignal.ErrorMessage = &errorMessage
@@ -139,6 +144,7 @@ func (a *OsintScan) InitDNSCommand() {
 	activeSubEnumCmd.Flags().String("domain", "", "Domain to get subdomains for")
 	activeSubEnumCmd.Flags().StringSlice("words", []string{}, "Comma-separated wordlist")
 	activeSubEnumCmd.Flags().String("wordlist", "", "Path to local file containing wordlist")
+	activeSubEnumCmd.Flags().Int("threads", 10, "Number of threads used for concurrent DNS lookup of words in wordlist")
 
 	takeoverCmd := &cobra.Command{
 		Use:   "takeover",
