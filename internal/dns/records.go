@@ -17,12 +17,12 @@ type Record struct {
 
 // Records represents all of the DNS records for a given domain.
 type Records struct {
-	A     []Record `json:"a,omitempty" yaml:"a"`
-	AAAA  []Record `json:"aaaa,omitempty" yaml:"aaaa"`
-	MX    []Record `json:"mx,omitempty" yaml:"mx"`
-	TXT   []Record `json:"txt,omitempty" yaml:"txt"`
-	NS    []Record `json:"ns,omitempty" yaml:"ns"`
-	CNAME []Record `json:"cname,omitempty" yaml:"cname"`
+	A     []Record `json:"a" yaml:"a"`
+	AAAA  []Record `json:"aaaa" yaml:"aaaa"`
+	MX    []Record `json:"mx" yaml:"mx"`
+	TXT   []Record `json:"txt" yaml:"txt"`
+	NS    []Record `json:"ns" yaml:"ns"`
+	CNAME []Record `json:"cname" yaml:"cname"`
 }
 
 // RecordsReport represents the report of all DNS records for a given domain including all non-fatal errors that occurred.
