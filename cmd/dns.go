@@ -3,6 +3,7 @@ package cmd
 import (
 	"bufio"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -121,7 +122,7 @@ func (a *OsintScan) InitDNSCommand() {
 			allWords := append(words, fileWords...)
 
 			if len(allWords) == 0 {
-				a.OutputSignal.AddError(errors.New("no targets specified"))
+				a.OutputSignal.AddError(errors.New("please provide a comma-separated list of words or a path to a wordlist file"))
 				return
 			}
 
@@ -209,6 +210,7 @@ func (a *OsintScan) InitDNSCommand() {
 
 func getTargetsFromFiles(paths []string) ([]string, error) {
 	targets := []string{}
+	fmt.Println(paths)
 	for _, path := range paths {
 		absPath, err := filepath.Abs(path)
 		if err != nil {
