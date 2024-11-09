@@ -219,10 +219,6 @@ func getTargetsFromFiles(paths []string) ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		err = file.Close()
-		if err != nil {
-			return nil, err
-		}
 		var lines []string
 		scanner := bufio.NewScanner(file)
 		for scanner.Scan() {
@@ -232,6 +228,10 @@ func getTargetsFromFiles(paths []string) ([]string, error) {
 			fmt.Println("Error scanning:", err)
 		}
 		targets = append(targets, lines...)
+		err = file.Close()
+		if err != nil {
+			return nil, err
+		}
 		fmt.Println(targets)
 	}
 	return targets, nil
