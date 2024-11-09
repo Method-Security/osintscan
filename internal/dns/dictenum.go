@@ -20,7 +20,7 @@ func BruteEnumDomainSubdomains(ctx context.Context, domain string, words []strin
 			errors = append(errors, err.Error())
 		}
 		if string(records) != "{}" {
-			fmt.Println(records)
+			fmt.Println(string(records))
 			subdomains = append(subdomains, string(records))
 		}
 	}
