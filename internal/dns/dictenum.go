@@ -3,28 +3,31 @@ package dns
 import (
 	"context"
 	"fmt"
-	"net"
 )
 
-func BruteEnumDomainSubdomains(ctx context.Context, domain string, words []string) (RecordsReport, error) {
+func BruteEnumDomainSubdomains(ctx context.Context, domain string, words []string) (SubdomainsEnumReport, error) {
+	errors := []string{}
+	subdomains := []string{}
+
 	for _, word := range words {
-		resolveDNS(ctx, word+"."+domain)
+		report, err := GetDomainDNSRecords(ctx, word+"."+domain)
+		if err != nil {
+			errors = append(errors, err.Error())
+		}
+		fmt.Println(report.DNSRecords.A)
+		fmt.Println(report.DNSRecords.AAAA)
+		fmt.Println(report.DNSRecords.CNAME)
+		fmt.Println(report.DNSRecords.MX)
+		fmt.Println(report.DNSRecords.NS)
+		fmt.Println(report.DNSRecords.TXT)
+		// subdomains = append(subdomains, report)
 	}
-	return RecordsReport{}, nil
-}
 
-func resolveDNS(ctx context.Context, url string) {
-	// Next step here is to read wordlist and loop through it.
-	// Perform DNS resolution using net.LookupHost
-	ips, err := net.LookupHost(url)
-	if err != nil {
-		fmt.Println("Error resolving DNS:", err)
-		return
+	report := SubdomainsEnumReport{
+		Domain:     domain,
+		Subdomains: subdomains,
+		Errors:     errors,
 	}
 
-	// Print the resolved IP addresses
-	fmt.Printf("DNS resolution for %s:\n", url)
-	for _, ip := range ips {
-		fmt.Println(ip)
-	}
+	return report, nil
 }
