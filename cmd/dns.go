@@ -213,6 +213,7 @@ func getTargetsFromFiles(paths []string) ([]string, error) {
 	fmt.Println(paths)
 	for _, path := range paths {
 		absPath, err := filepath.Abs(path)
+		fmt.Println(absPath)
 		if err != nil {
 			return nil, err
 		}
@@ -230,6 +231,7 @@ func getTargetsFromFiles(paths []string) ([]string, error) {
 			lines = append(lines, scanner.Text())
 		}
 		targets = append(targets, lines...)
+		fmt.Println(targets)
 	}
 	return targets, nil
 }
