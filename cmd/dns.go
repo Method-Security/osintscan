@@ -137,7 +137,7 @@ func (a *OsintScan) InitDNSCommand() {
 
 	activeSubEnumCmd.Flags().String("domain", "", "Domain to get subdomains for")
 	activeSubEnumCmd.Flags().StringSlice("words", []string{}, "Comma-separated wordlist")
-	activeSubEnumCmd.Flags().StringSlice("wordlist", []string{}, "Path to local file containing wordlist")
+	activeSubEnumCmd.Flags().String("wordlist", "", "Path to local file containing wordlist")
 
 	takeoverCmd := &cobra.Command{
 		Use:   "takeover",
