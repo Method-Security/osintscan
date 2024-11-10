@@ -88,6 +88,36 @@ Global Flags:
   -v, --verbose              Verbose output
 ```
 
+## Brute force subenum
+
+### Usage
+
+```bash
+osintscan dns brutesubenum --domain example.com
+```
+### Help Text
+
+```bash
+$ osintscan dns brutesubenum -h
+Usage:
+  osintscan dns brutesubenum [flags]
+
+Flags:
+      --domain string             Domain to get subdomains for
+  -h, --help                      help for brutesubenum
+      --max-recursive-depth int   Maximum number of times to recursively check wordlist against domains found in previous iteration (default 1)
+      --threads int               Number of threads used for concurrent DNS lookup of words in wordlist (default 10)
+      --wordlist string           Path to local file containing wordlist
+      --words strings             Comma-separated wordlist
+
+Global Flags:
+  -o, --output string        Output format (signal, json, yaml). Default value is signal (default "signal")
+  -f, --output-file string   Path to output file. If blank, will output to STDOUT
+  -q, --quiet                Suppress output
+  -v, --verbose              Verbose output
+
+```
+
 ## Takeover
 
 ### Usage

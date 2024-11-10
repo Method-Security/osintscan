@@ -32,9 +32,15 @@ type RecordsReport struct {
 	Errors     []string `json:"errors" yaml:"errors"`
 }
 
-func getDNSRecords(domain string) (Records, error) {
+func getDNSRecords(domain string, getAllRecordTypes bool) (Records, error) {
 	options := dnsx.DefaultOptions
-	var questionTypes []uint16 = []uint16{dns.TypeA, dns.TypeAAAA, dns.TypeMX, dns.TypeTXT, dns.TypeNS, dns.TypeCNAME}
+	questionTypes := []uint16{}
+	if getAllRecordTypes {
+		questionTypes = []uint16{dns.TypeA, dns.TypeAAAA, dns.TypeMX, dns.TypeTXT, dns.TypeNS, dns.TypeCNAME}
+	} else {
+		questionTypes = []uint16{dns.TypeA, dns.TypeAAAA, dns.TypeCNAME} // Limiting our query to these types enables faster subdomain enumeration
+	}
+
 	options.QuestionTypes = questionTypes
 	options.MaxRetries = 5
 	client, err := dnsx.New(options)
@@ -75,11 +81,11 @@ func getDNSRecords(domain string) (Records, error) {
 
 // GetDomainDNSRecords queries DNS for all records for a given domain. It returns a RecordsReport struct containing
 // all records that were and any non-fatal errors that occurred.
-func GetDomainDNSRecords(ctx context.Context, domain string) (RecordsReport, error) {
+func GetDomainDNSRecords(ctx context.Context, domain string, getAllRecordTypes bool) (RecordsReport, error) {
 	errors := []string{}
 
 	// 1. Get all the DNS records
-	dnsRecords, err := getDNSRecords(domain)
+	dnsRecords, err := getDNSRecords(domain, getAllRecordTypes)
 	if err != nil {
 		errors = append(errors, err.Error())
 	}
