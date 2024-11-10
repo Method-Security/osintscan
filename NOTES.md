@@ -6,7 +6,7 @@ requests to a DNS server. The code includes the following performance
 considerations in an attempt to address this.
 
 * The obvious/necessary improvement is to parallelize these requests. The
-  code processes the words in the wordlist concurrently using a configurable
+  code processes the words in the wordlist using a configurable
   number of concurrent goroutines (defaults to 10).
 * If network requests are a bottleneck, then we want to make as few of them
   as possible. To that effect, since each DNS record type is checked in a
@@ -62,3 +62,20 @@ recursion depth of 1, and using `google.com` as the input domain are:
 * 22 seconds for 500 words
 * about 38 minutes for 50k words (makes sense, this is roughly 22 seconds
   multiplied by 100)
+
+### Correctness
+
+Checked for false positives via `nslookup` on output and didn't find any.
+
+Finding false negatives is harder; the way I did it was by running
+`dnsrecon -d google.com -t brt` and comparing the results with those of
+`osintscan dns brutesubenum --domain google.com --wordlist /usr/share/dnsrecon/namelist.txt`.
+It's not trivial to know whether both programs found the same domains due to
+differences in output format, but I believe this is the case. Some parsing
+of the `dnsrecon` output gives me 125 domains, whereas my output includes 120
+domains. Drilling down on the differences, `dnsrecon` seems to be following
+CNAMEs and including results for aliases; for example, it includes `books.google.com` even
+though `books` is not in the input wordlist because there's a CNAME record
+for `catalog.google.com` with alias `books.google.com`. I believe this
+explains the discrepancy; unclear whether I should also be including the
+aliases found in CNAME records.
