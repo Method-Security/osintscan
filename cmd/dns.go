@@ -90,7 +90,7 @@ func (a *OsintScan) InitDNSCommand() {
 
 	passiveSubEnumCmd.Flags().String("domain", "", "Domain to get subdomains for")
 
-	activeSubEnumCmd := &cobra.Command{
+	bruteSubEnumCmd := &cobra.Command{
 		Use:   "brutesubenum",
 		Short: "Actively enumerate subdomains for a given domain using dictionary-based brute force",
 		Long:  `Actively enumerate subdomains for a given domain using dictionary-based brute force`,
@@ -145,11 +145,11 @@ func (a *OsintScan) InitDNSCommand() {
 		},
 	}
 
-	activeSubEnumCmd.Flags().String("domain", "", "Domain to get subdomains for")
-	activeSubEnumCmd.Flags().StringSlice("words", []string{}, "Comma-separated wordlist")
-	activeSubEnumCmd.Flags().String("wordlist", "", "Path to local file containing wordlist")
-	activeSubEnumCmd.Flags().Int("threads", 10, "Number of threads used for concurrent DNS lookup of words in wordlist")
-	activeSubEnumCmd.Flags().Int("max-recursive-depth", 1, "Maximum number of times to recursively check wordlist against domains found in previous iteration")
+	bruteSubEnumCmd.Flags().String("domain", "", "Domain to get subdomains for")
+	bruteSubEnumCmd.Flags().StringSlice("words", []string{}, "Comma-separated wordlist")
+	bruteSubEnumCmd.Flags().String("wordlist", "", "Path to local file containing wordlist")
+	bruteSubEnumCmd.Flags().Int("threads", 10, "Number of threads used for concurrent DNS lookup of words in wordlist")
+	bruteSubEnumCmd.Flags().Int("max-recursive-depth", 1, "Maximum number of times to recursively check wordlist against domains found in previous iteration")
 
 	takeoverCmd := &cobra.Command{
 		Use:   "takeover",
@@ -214,7 +214,7 @@ func (a *OsintScan) InitDNSCommand() {
 	a.DNSCmd.AddCommand(recordCmd)
 	a.DNSCmd.AddCommand(certsCmd)
 	a.DNSCmd.AddCommand(passiveSubEnumCmd)
-	a.DNSCmd.AddCommand(activeSubEnumCmd)
+	a.DNSCmd.AddCommand(bruteSubEnumCmd)
 	a.DNSCmd.AddCommand(takeoverCmd)
 	a.RootCmd.AddCommand(a.DNSCmd)
 }
