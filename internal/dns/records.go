@@ -44,7 +44,7 @@ func getDNSRecords(domain string) (Records, error) {
 
 	dnsRecords := Records{}
 
-	results, err := client.QueryMultiple(domain)
+	results, err := client.QueryOne(domain)
 	if err != nil {
 		return Records{}, err
 	}
