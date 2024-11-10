@@ -8,8 +8,18 @@ import (
 	"time"
 )
 
-func bruteEnumSubdomains(ctx context.Context, domain string, words []string, threads int) ([]string, []string, error) {
+// BruteSubEnumReport represents the report of all subdomains for a given domain along with all DNS records located and
+// all non-fatal errors that occurred.
+type BruteSubEnumReport struct {
+	Domain     string   `json:"domain" yaml:"domain"`
+	Subdomains []string `json:"subdomains" yaml:"subdomains"`
+	Records    []Record `json:"records" yaml:"records"`
+	Errors     []string `json:"errors" yaml:"errors"`
+}
+
+func bruteEnumSubdomains(ctx context.Context, domain string, words []string, threads int) ([]string, []Record, []string, error) {
 	subdomains := []string{}
+	records := []Record{}
 	errors := []string{}
 
 	var mu sync.Mutex     // To safely append to shared slices
@@ -37,28 +47,31 @@ func bruteEnumSubdomains(ctx context.Context, domain string, words []string, thr
 			if subdomain != "" {
 				mu.Lock()
 				subdomains = append(subdomains, subdomain)
+				records = append(records, getRecordsFound(report.DNSRecords)...)
 				mu.Unlock()
 			}
 		}(word)
 	}
 
 	wg.Wait()
-	return subdomains, errors, nil
+	return subdomains, records, errors, nil
 }
 
-func BruteEnumDomainSubdomains(ctx context.Context, domain string, words []string, threads int, maxRecursiveDepth int) (SubdomainsEnumReport, error) {
+func BruteEnumDomainSubdomains(ctx context.Context, domain string, words []string, threads int, maxRecursiveDepth int) (BruteSubEnumReport, error) {
 	domains := []string{domain} // Convert the initial domain into a slice to support recursion
 	allSubdomains := []string{}
+	allRecords := []Record{}
 	allErrors := []string{}
 	var currentRecursiveDepth = 0
 	now := time.Now()
 	for currentRecursiveDepth < maxRecursiveDepth {
 		for _, domain := range domains {
-			subdomains, errors, err := bruteEnumSubdomains(ctx, domain, words, threads)
+			subdomains, records, errors, err := bruteEnumSubdomains(ctx, domain, words, threads)
 			if err != nil {
 				errors = append(errors, err.Error())
 			}
 			allSubdomains = append(allSubdomains, subdomains...)
+			allRecords = append(allRecords, records...)
 			allErrors = append(allErrors, errors...)
 			domains = subdomains // The next recursion cycle will check the wordlist against the domains that we found in this cycle
 		}
@@ -71,9 +84,10 @@ func BruteEnumDomainSubdomains(ctx context.Context, domain string, words []strin
 		svc1log.SafeParam("numSubdomainsFound", len(allSubdomains)),
 		svc1log.SafeParam("duration", duration))
 
-	report := SubdomainsEnumReport{
+	report := BruteSubEnumReport{
 		Domain:     domain,
 		Subdomains: allSubdomains,
+		Records:    allRecords,
 		Errors:     allErrors,
 	}
 
@@ -87,17 +101,22 @@ func getSubdomainFromRecords(records Records) string {
 	if len(records.AAAA) > 0 {
 		return records.AAAA[0].Name
 	}
-	if len(records.MX) > 0 {
-		return records.MX[0].Name
-	}
-	if len(records.TXT) > 0 {
-		return records.TXT[0].Name
-	}
-	if len(records.NS) > 0 {
-		return records.NS[0].Name
-	}
 	if len(records.CNAME) > 0 {
 		return records.CNAME[0].Name
 	}
 	return ""
+}
+
+func getRecordsFound(records Records) []Record {
+	recordsFound := []Record{}
+	if len(records.A) > 0 {
+		recordsFound = append(recordsFound, records.A...)
+	}
+	if len(records.AAAA) > 0 {
+		recordsFound = append(recordsFound, records.AAAA...)
+	}
+	if len(records.CNAME) > 0 {
+		recordsFound = append(recordsFound, records.CNAME...)
+	}
+	return recordsFound
 }
