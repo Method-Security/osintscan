@@ -25,7 +25,7 @@ func bruteEnumSubdomains(ctx context.Context, domain string, words []string, thr
 			defer wg.Done()
 			defer func() { <-sem }() // Release the slot
 
-			report, err := GetDomainDNSRecords(ctx, word+"."+domain)
+			report, err := GetDomainDNSRecords(ctx, word+"."+domain, false)
 			if err != nil {
 				mu.Lock()
 				errors = append(errors, err.Error())

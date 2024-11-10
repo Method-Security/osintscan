@@ -30,7 +30,7 @@ func (a *OsintScan) InitDNSCommand() {
 				a.OutputSignal.Status = 1
 				return
 			}
-			report, err := dns.GetDomainDNSRecords(cmd.Context(), domain)
+			report, err := dns.GetDomainDNSRecords(cmd.Context(), domain, true)
 			if err != nil {
 				errorMessage := err.Error()
 				a.OutputSignal.ErrorMessage = &errorMessage
