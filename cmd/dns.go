@@ -3,7 +3,6 @@ package cmd
 import (
 	"bufio"
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 
@@ -237,7 +236,7 @@ func getTargetsFromFiles(paths []string) ([]string, error) {
 			lines = append(lines, scanner.Text())
 		}
 		if err := scanner.Err(); err != nil {
-			fmt.Println("Error scanning:", err)
+			return nil, err
 		}
 		targets = append(targets, lines...)
 		err = file.Close()
