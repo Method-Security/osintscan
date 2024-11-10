@@ -2,7 +2,10 @@ package dns
 
 import (
 	"context"
+	"github.com/hako/durafmt"
+	"github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 	"sync"
+	"time"
 )
 
 func bruteEnumSubdomains(ctx context.Context, domain string, words []string, threads int) ([]string, []string, error) {
@@ -48,6 +51,7 @@ func BruteEnumDomainSubdomains(ctx context.Context, domain string, words []strin
 	allSubdomains := []string{}
 	allErrors := []string{}
 	var currentRecursiveDepth = 0
+	now := time.Now()
 	for currentRecursiveDepth < maxRecursiveDepth {
 		for _, domain := range domains {
 			subdomains, errors, err := bruteEnumSubdomains(ctx, domain, words, threads)
@@ -60,6 +64,12 @@ func BruteEnumDomainSubdomains(ctx context.Context, domain string, words []strin
 		}
 		currentRecursiveDepth += 1
 	}
+	duration := durafmt.Parse(time.Since(now)).LimitFirstN(2).String()
+	logger := svc1log.FromContext(ctx)
+	logger.Info("Finished finding subdomains",
+		svc1log.SafeParam("domain", domain),
+		svc1log.SafeParam("numSubdomainsFound", len(allSubdomains)),
+		svc1log.SafeParam("duration", duration))
 
 	report := SubdomainsEnumReport{
 		Domain:     domain,
