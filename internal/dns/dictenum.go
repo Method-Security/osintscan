@@ -82,7 +82,8 @@ func BruteEnumDomainSubdomains(ctx context.Context, domain string, words []strin
 	logger.Info("Finished finding subdomains",
 		svc1log.SafeParam("domain", domain),
 		svc1log.SafeParam("numSubdomainsFound", len(allSubdomains)),
-		svc1log.SafeParam("numRecordsFound", len(allRecords)),
+		svc1log.SafeParam("numDNSRecordsFound", len(allRecords)),
+		svc1log.SafeParam("recursiveDepth", maxRecursiveDepth),
 		svc1log.SafeParam("duration", duration))
 
 	report := BruteSubEnumReport{
