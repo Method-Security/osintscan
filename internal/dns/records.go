@@ -80,11 +80,25 @@ func GetDomainDNSRecords(ctx context.Context, domain string) (osintscan.DnsRecor
 		errors = append(errors, err.Error())
 	}
 
+	// The DKIM record is always in the _domainkey subdomain (RFC-6376) and therefore must be fetched separately.
+	// To complicate matters, the _domainkey subdomain itself includes a subdomain named after a selector which we
+	// don't know in advance, so we need to check each common selector that we're aware of.
+	dkimRecords := osintscan.DnsRecords{}
+	var selectors []string = []string{"default", "selector1", "selector2", "google", "amazonses", "microsoft"}
+	for _, selector := range selectors {
+		dkimRecordForSelector, err := getDNSRecords(selector+"._domainkey."+domain, []uint16{dns.TypeTXT})
+		if err != nil {
+			errors = append(errors, err.Error())
+		}
+		dkimRecords.Txt = append(dkimRecords.Txt, dkimRecordForSelector.Txt...)
+	}
+
 	// Create report and write to file
 	report := osintscan.DnsRecordsReport{
 		Domain:          domain,
 		DnsRecords:      &dnsRecords,
 		DmarcDnsRecords: &dmarcRecords,
+		DkimDnsRecords:  &dkimRecords,
 		Errors:          errors,
 	}
 	return report, nil

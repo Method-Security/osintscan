@@ -17,8 +17,6 @@ types:
     properties:
       domain: string
       dnsRecords: DnsRecords
-      dmarcDomain: optional<string>
       dmarcDnsRecords: DnsRecords
-      dkimDomain: optional<string>
       dkimDnsRecords: DnsRecords
       errors: optional<list<string>>

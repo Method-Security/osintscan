@@ -101,9 +101,7 @@ func (d *DnsRecords) String() string {
 type DnsRecordsReport struct {
 	Domain          string      `json:"domain" url:"domain"`
 	DnsRecords      *DnsRecords `json:"dnsRecords,omitempty" url:"dnsRecords,omitempty"`
-	DmarcDomain     *string     `json:"dmarcDomain,omitempty" url:"dmarcDomain,omitempty"`
 	DmarcDnsRecords *DnsRecords `json:"dmarcDnsRecords,omitempty" url:"dmarcDnsRecords,omitempty"`
-	DkimDomain      *string     `json:"dkimDomain,omitempty" url:"dkimDomain,omitempty"`
 	DkimDnsRecords  *DnsRecords `json:"dkimDnsRecords,omitempty" url:"dkimDnsRecords,omitempty"`
 	Errors          []string    `json:"errors,omitempty" url:"errors,omitempty"`
 
