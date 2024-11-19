@@ -10,20 +10,6 @@ import (
 	osintscan "github.com/Method-Security/osintscan/generated/go"
 )
 
-func populateRecords(domain string, ttl int, records []string, recordType string) []*osintscan.DnsRecord {
-	var dnsRecordsSlice []*osintscan.DnsRecord
-	for _, record := range records {
-		dnsRecord := osintscan.DnsRecord{
-			Name:  domain,
-			Ttl:   ttl, // This assumes a common TTL for all records; adjust if needed
-			Type:  recordType,
-			Value: record,
-		}
-		dnsRecordsSlice = append(dnsRecordsSlice, &dnsRecord)
-	}
-	return dnsRecordsSlice
-}
-
 func getDNSRecords(domain string, questionTypes []uint16) (osintscan.DnsRecords, error) {
 	options := dnsx.DefaultOptions
 	options.QuestionTypes = questionTypes
@@ -40,23 +26,37 @@ func getDNSRecords(domain string, questionTypes []uint16) (osintscan.DnsRecords,
 		return osintscan.DnsRecords{}, err
 	}
 
+	populateRecords := func(records []string, recordType string) []*osintscan.DnsRecord {
+		var dnsRecordsSlice []*osintscan.DnsRecord
+		for _, record := range records {
+			dnsRecord := osintscan.DnsRecord{
+				Name:  domain,
+				Ttl:   int(results.TTL), // This assumes a common TTL for all records; adjust if needed
+				Type:  recordType,
+				Value: record,
+			}
+			dnsRecordsSlice = append(dnsRecordsSlice, &dnsRecord)
+		}
+		return dnsRecordsSlice
+	}
+
 	if slices.Contains(questionTypes, dns.TypeA) {
-		dnsRecords.A = populateRecords(domain, int(results.TTL), results.A, "A")
+		dnsRecords.A = populateRecords(results.A, "A")
 	}
 	if slices.Contains(questionTypes, dns.TypeAAAA) {
-		dnsRecords.Aaaa = populateRecords(domain, int(results.TTL), results.AAAA, "AAAA")
+		dnsRecords.Aaaa = populateRecords(results.AAAA, "AAAA")
 	}
 	if slices.Contains(questionTypes, dns.TypeCNAME) {
-		dnsRecords.Cname = populateRecords(domain, int(results.TTL), results.CNAME, "CNAME")
+		dnsRecords.Cname = populateRecords(results.CNAME, "CNAME")
 	}
 	if slices.Contains(questionTypes, dns.TypeMX) {
-		dnsRecords.Mx = populateRecords(domain, int(results.TTL), results.MX, "MX")
+		dnsRecords.Mx = populateRecords(results.MX, "MX")
 	}
 	if slices.Contains(questionTypes, dns.TypeNS) {
-		dnsRecords.Ns = populateRecords(domain, int(results.TTL), results.NS, "NS")
+		dnsRecords.Ns = populateRecords(results.NS, "NS")
 	}
 	if slices.Contains(questionTypes, dns.TypeTXT) {
-		dnsRecords.Txt = populateRecords(domain, int(results.TTL), results.TXT, "TXT")
+		dnsRecords.Txt = populateRecords(results.TXT, "TXT")
 	}
 
 	return dnsRecords, nil
