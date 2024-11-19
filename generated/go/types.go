@@ -8,6 +8,143 @@ import (
 	core "github.com/Method-Security/osintscan/generated/go/core"
 )
 
+type DnsRecord struct {
+	Name  string `json:"name" url:"name"`
+	Ttl   int    `json:"ttl" url:"ttl"`
+	Type  string `json:"type" url:"type"`
+	Value string `json:"value" url:"value"`
+
+	extraProperties map[string]interface{}
+	_rawJSON        json.RawMessage
+}
+
+func (d *DnsRecord) GetExtraProperties() map[string]interface{} {
+	return d.extraProperties
+}
+
+func (d *DnsRecord) UnmarshalJSON(data []byte) error {
+	type unmarshaler DnsRecord
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*d = DnsRecord(value)
+
+	extraProperties, err := core.ExtractExtraProperties(data, *d)
+	if err != nil {
+		return err
+	}
+	d.extraProperties = extraProperties
+
+	d._rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (d *DnsRecord) String() string {
+	if len(d._rawJSON) > 0 {
+		if value, err := core.StringifyJSON(d._rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := core.StringifyJSON(d); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", d)
+}
+
+type DnsRecords struct {
+	A     []*DnsRecord `json:"a,omitempty" url:"a,omitempty"`
+	Aaaa  []*DnsRecord `json:"aaaa,omitempty" url:"aaaa,omitempty"`
+	Mx    []*DnsRecord `json:"mx,omitempty" url:"mx,omitempty"`
+	Txt   []*DnsRecord `json:"txt,omitempty" url:"txt,omitempty"`
+	Ns    []*DnsRecord `json:"ns,omitempty" url:"ns,omitempty"`
+	Cname []*DnsRecord `json:"cname,omitempty" url:"cname,omitempty"`
+
+	extraProperties map[string]interface{}
+	_rawJSON        json.RawMessage
+}
+
+func (d *DnsRecords) GetExtraProperties() map[string]interface{} {
+	return d.extraProperties
+}
+
+func (d *DnsRecords) UnmarshalJSON(data []byte) error {
+	type unmarshaler DnsRecords
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*d = DnsRecords(value)
+
+	extraProperties, err := core.ExtractExtraProperties(data, *d)
+	if err != nil {
+		return err
+	}
+	d.extraProperties = extraProperties
+
+	d._rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (d *DnsRecords) String() string {
+	if len(d._rawJSON) > 0 {
+		if value, err := core.StringifyJSON(d._rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := core.StringifyJSON(d); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", d)
+}
+
+type DnsRecordsReport struct {
+	Domain          string       `json:"domain" url:"domain"`
+	DnsRecords      *DnsRecords  `json:"dnsRecords,omitempty" url:"dnsRecords,omitempty"`
+	DmarcDomain     *string      `json:"dmarcDomain,omitempty" url:"dmarcDomain,omitempty"`
+	DmarcDnsRecords []*DnsRecord `json:"dmarcDnsRecords,omitempty" url:"dmarcDnsRecords,omitempty"`
+	DkimDomain      *string      `json:"dkimDomain,omitempty" url:"dkimDomain,omitempty"`
+	DkimDnsRecords  []*DnsRecord `json:"dkimDnsRecords,omitempty" url:"dkimDnsRecords,omitempty"`
+	Errors          []string     `json:"errors,omitempty" url:"errors,omitempty"`
+
+	extraProperties map[string]interface{}
+	_rawJSON        json.RawMessage
+}
+
+func (d *DnsRecordsReport) GetExtraProperties() map[string]interface{} {
+	return d.extraProperties
+}
+
+func (d *DnsRecordsReport) UnmarshalJSON(data []byte) error {
+	type unmarshaler DnsRecordsReport
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*d = DnsRecordsReport(value)
+
+	extraProperties, err := core.ExtractExtraProperties(data, *d)
+	if err != nil {
+		return err
+	}
+	d.extraProperties = extraProperties
+
+	d._rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (d *DnsRecordsReport) String() string {
+	if len(d._rawJSON) > 0 {
+		if value, err := core.StringifyJSON(d._rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := core.StringifyJSON(d); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", d)
+}
+
 type DomainTakeover struct {
 	Target       string     `json:"target" url:"target"`
 	StatusCode   int        `json:"statusCode" url:"statusCode"`
