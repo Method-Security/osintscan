@@ -100,6 +100,15 @@ func GetDomainDNSRecords(ctx context.Context, domain string) (osintscan.DnsRecor
 		DkimDnsRecords:  &dkimRecords,
 		Errors:          errors,
 	}
+
+	// Set the domain for the DMARC and DKIM records if they exist
+	if len(dmarcRecords.Txt) > 0 {
+		report.DmarcDomain = &dmarcRecords.Txt[0].Name
+	}
+	if len(dkimRecords.Txt) > 0 {
+		report.DkimDomain = &dkimRecords.Txt[0].Name
+	}
+
 	return report, nil
 
 }
