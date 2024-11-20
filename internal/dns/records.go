@@ -13,7 +13,6 @@ import (
 func getDNSRecords(domain string, questionTypes []uint16) (osintscan.DnsRecords, error) {
 	options := dnsx.DefaultOptions
 	options.QuestionTypes = questionTypes
-	options.MaxRetries = 5
 	client, err := dnsx.New(options)
 	if err != nil {
 		return osintscan.DnsRecords{}, err
