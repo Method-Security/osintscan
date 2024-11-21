@@ -1,0 +1,24 @@
+types:
+  DnsRecord:
+    properties:
+      name: string
+      ttl: integer
+      type: string
+      value: string
+  DnsRecords:
+    properties:
+      a: optional<list<DnsRecord>>
+      aaaa: optional<list<DnsRecord>>
+      mx: optional<list<DnsRecord>>
+      txt: optional<list<DnsRecord>>
+      ns: optional<list<DnsRecord>>
+      cname: optional<list<DnsRecord>>
+  DnsRecordsReport:
+    properties:
+      domain: string
+      dnsRecords: DnsRecords
+      dmarcDomain: optional<string>
+      dmarcDnsRecords: DnsRecords
+      dkimDomain: optional<string>
+      dkimDnsRecords: DnsRecords
+      errors: optional<list<string>>
