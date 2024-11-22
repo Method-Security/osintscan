@@ -4,10 +4,9 @@ import (
 	"context"
 	"slices"
 
+	osintscan "github.com/Method-Security/osintscan/generated/go"
 	"github.com/miekg/dns"
 	"github.com/projectdiscovery/dnsx/libs/dnsx"
-
-	osintscan "github.com/Method-Security/osintscan/generated/go"
 )
 
 func getDNSRecords(domain string, questionTypes []uint16) (osintscan.DnsRecords, error) {

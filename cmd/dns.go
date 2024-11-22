@@ -124,7 +124,13 @@ func (a *OsintScan) InitDNSCommand() {
 				return
 			}
 
-			setHTTP, err := cmd.Flags().GetBool("https")
+			onlySuccessful, err := cmd.Flags().GetBool("onlysuccessful")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			setHTTPS, err := cmd.Flags().GetBool("https")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -136,7 +142,7 @@ func (a *OsintScan) InitDNSCommand() {
 				return
 			}
 
-			report, err := dns.DetectDomainTakeover(allTargets, fingerprintsPath, setHTTP, timeout)
+			report, err := dns.DetectDomainTakeover(allTargets, fingerprintsPath, onlySuccessful, setHTTPS, timeout)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 			}
@@ -147,6 +153,7 @@ func (a *OsintScan) InitDNSCommand() {
 	takeoverCmd.Flags().StringSlice("targets", []string{}, "URL targets to analyze")
 	takeoverCmd.Flags().String("fingerprints", "configs/fingerprints.json", "Path to fingerprints file")
 	takeoverCmd.Flags().StringSlice("files", []string{}, "Paths to files containing the list of targets")
+	takeoverCmd.Flags().Bool("onlysuccessful", false, "Only check sites with secure SSL")
 	takeoverCmd.Flags().Bool("https", false, "Only check sites with secure SSL")
 	takeoverCmd.Flags().Int("timeout", 10, "Request timeout in seconds")
 
