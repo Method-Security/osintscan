@@ -33,9 +33,6 @@ func GetBruteForceSubdomains(
 
 	subdomains := getBruteForceSubdomains(ctx, domain, wordlist, numWorkers, requestTimeout, maxRecursionDepth)
 
-	println(len(subdomains))
-	println(len(subdomains))
-	println(len(subdomains))
 	// Create report
 	report := BruteSubdomainsEnumReport{
 		RecordsReports: subdomains,
