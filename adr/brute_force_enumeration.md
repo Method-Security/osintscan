@@ -108,6 +108,10 @@ we generally return a result and an error, and generally exactly one of these wi
 
 Miscellaneous
 -------------
+- Go style
+  - I tried to mimic existing conventions, but it's totally possible that I've got some style issues here. Took a
+  quick read of the style guide for thinks like function naming conventions, but I've never written go before so I might
+  have gotten some of the style stuff wrong.
 - Concurrency
   - Go's concurrency model took a bit of getting used to because it introduces named abstractions that map very closely
     onto concurrency primitives (e.g. work groups vs semaphores). This isn't a big deal, but it tripped me up a little at
