@@ -134,7 +134,7 @@ func (a *OsintScan) InitDNSCommand() {
 				return
 			}
 			ctx, _ := context.WithDeadline(cmd.Context(), time.Now().Add(time.Duration(maxEnumerationMinutes)*time.Minute))
-			report, err := dns.GetBruteForceDomainSubdomains(ctx, domain, wordlistFile, numThreads, timeoutSeconds, maxEnumerationMinutes, maxRecursionDepth)
+			report, err := dns.GetBruteForceSubdomains(ctx, domain, wordlistFile, numThreads, time.Duration(timeoutSeconds)*time.Second, maxRecursionDepth)
 			if err != nil {
 				errorMessage := err.Error()
 				a.OutputSignal.ErrorMessage = &errorMessage
