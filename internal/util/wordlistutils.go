@@ -4,7 +4,15 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"strings"
 )
+
+func ParseCommaSeparated(input string) []string {
+	if input == "" {
+		return nil
+	}
+	return strings.Split(input, ",")
+}
 
 func LoadWordlist(wordlistPath string) ([]string, error) {
 	file, err := os.Open(wordlistPath)

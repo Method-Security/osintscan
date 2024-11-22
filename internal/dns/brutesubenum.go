@@ -3,7 +3,6 @@ package dns
 import (
 	"context"
 	"fmt"
-	"github.com/Method-Security/osintscan/internal/util"
 	"log"
 	"net"
 	"sync"
@@ -23,23 +22,20 @@ type enumerationTask struct {
 }
 
 // GetBruteForceSubdomains queries subdomains for a given domain.
-// It returns a BruteSubdomainsEnumReport struct containing all subdomains and any errors that occurred.
+// It returns a BruteSubdomainsEnumReport struct containing reports for all subdomains which include any errors that occurred.
 func GetBruteForceSubdomains(
 	ctx context.Context,
 	domain string,
-	wordlistFile string,
-	numThreads int,
+	wordlist *[]string,
+	numWorkers int,
 	requestTimeout time.Duration,
 	maxRecursionDepth int) (BruteSubdomainsEnumReport, error) {
 
-	wordlist, err := util.LoadWordlist(wordlistFile)
-	if err != nil {
-		return BruteSubdomainsEnumReport{}, err
-	}
+	subdomains := getBruteForceSubdomains(ctx, domain, wordlist, numWorkers, requestTimeout, maxRecursionDepth)
 
-	// Get all valid subdomains
-	subdomains := getBruteForceSubdomains(ctx, domain, &wordlist, numThreads, requestTimeout, maxRecursionDepth)
-
+	println(len(subdomains))
+	println(len(subdomains))
+	println(len(subdomains))
 	// Create report
 	report := BruteSubdomainsEnumReport{
 		RecordsReports: subdomains,
@@ -56,12 +52,12 @@ func getBruteForceSubdomains(
 	requestTimeout time.Duration,
 	maxRecursionDepth int) []RecordsReport {
 
-	tasks := make(chan enumerationTask, 10000) // Adjust the buffer size as needed
+	tasks := make(chan enumerationTask, 10000)
 	results := make(chan RecordsReport, 10000)
 	var mu sync.Mutex
 	var found []RecordsReport
-	var workerWg sync.WaitGroup // WaitGroup for workers
-	var taskWg sync.WaitGroup   // WaitGroup for tasks
+	var workerWg sync.WaitGroup
+	var taskWg sync.WaitGroup
 
 	// Start workers
 	for i := 0; i < numThreads; i++ {
@@ -122,7 +118,7 @@ func processTask(ctx context.Context, taskWg *sync.WaitGroup, task enumerationTa
 		}
 
 		subdomain := fmt.Sprintf("%s.%s", word, task.domain)
-		report, err := validateSubdomain(ctx, subdomain, task.timeout)
+		report, err := getRecordsReport(ctx, subdomain, task.timeout)
 		if err != nil {
 			continue
 		}
@@ -147,8 +143,9 @@ func processTask(ctx context.Context, taskWg *sync.WaitGroup, task enumerationTa
 	}
 }
 
-// Validate if a subdomain resolves
-func validateSubdomain(ctx context.Context, domain string, timeout time.Duration) (RecordsReport, error) {
+// TODO(@jcasale): learn more about error handling -- this pattern of passing back an empty struct alongside an
+// error and relying on the caller to only use one of them feels weird and dangerous.
+func getRecordsReport(ctx context.Context, domain string, timeout time.Duration) (RecordsReport, error) {
 	queryCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	resolver := net.Resolver{}

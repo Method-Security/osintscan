@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"errors"
+	"github.com/Method-Security/osintscan/internal/util"
 	"os"
 	"path/filepath"
 	"time"
@@ -102,12 +103,19 @@ func (a *OsintScan) InitDNSCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
+
+			wordlistArg, err := cmd.Flags().GetString("wordlist")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
 			wordlistFile, err := cmd.Flags().GetString("wordlist-file")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			numThreads, err := cmd.Flags().GetInt("threads")
+			numWorkers, err := cmd.Flags().GetInt("workers")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -134,7 +142,26 @@ func (a *OsintScan) InitDNSCommand() {
 				return
 			}
 			ctx, _ := context.WithDeadline(cmd.Context(), time.Now().Add(time.Duration(maxEnumerationMinutes)*time.Minute))
-			report, err := dns.GetBruteForceSubdomains(ctx, domain, wordlistFile, numThreads, time.Duration(timeoutSeconds)*time.Second, maxRecursionDepth)
+
+			// Validate mutual exclusivity of wordlist and wordlist-file
+			if wordlistArg != "" && wordlistFile != "" || wordlistArg == "" && wordlistFile == "" {
+				err := errors.New("exactly one of --wordlist or --wordlist-file must be specified")
+				a.OutputSignal.AddError(err)
+				return
+			}
+			var wordlist []string
+			if wordlistArg != "" {
+				wordlist = util.ParseCommaSeparated(wordlistArg)
+			} else {
+				wordlist, err = util.LoadWordlist(wordlistFile)
+				if err != nil {
+					errorMessage := err.Error()
+					a.OutputSignal.ErrorMessage = &errorMessage
+					a.OutputSignal.Status = 1
+				}
+			}
+
+			report, err := dns.GetBruteForceSubdomains(ctx, domain, &wordlist, numWorkers, time.Duration(timeoutSeconds)*time.Second, maxRecursionDepth)
 			if err != nil {
 				errorMessage := err.Error()
 				a.OutputSignal.ErrorMessage = &errorMessage
@@ -145,8 +172,9 @@ func (a *OsintScan) InitDNSCommand() {
 	}
 
 	bruteForceSubenumCmd.Flags().String("domain", "", "Number of threads to dedicate to enumeration")
+	bruteForceSubenumCmd.Flags().String("wordlist", "", "Comma-separated string containing a wordlist for enumeration")
 	bruteForceSubenumCmd.Flags().String("wordlist-file", "", "File containing a wordlist for enumeration")
-	bruteForceSubenumCmd.Flags().Int("threads", 10, "Number of threads to dedicate to enumeration")
+	bruteForceSubenumCmd.Flags().Int("workers", 10, "Number of workers to dedicate to enumeration")
 	bruteForceSubenumCmd.Flags().Int("timeout", 30, "Request timeout in seconds")
 	bruteForceSubenumCmd.Flags().Int("max-recursion-depth", 3, "Number of threads to dedicate to enumeration")
 	bruteForceSubenumCmd.Flags().Int("max-enum-minutes", 10, "Maximum amount of time in mins to wait for enumeration")
