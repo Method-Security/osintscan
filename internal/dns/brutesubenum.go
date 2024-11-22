@@ -31,13 +31,14 @@ func GetBruteForceSubdomains(
 	numThreads int,
 	requestTimeout time.Duration,
 	maxRecursionDepth int) (BruteSubdomainsEnumReport, error) {
-	errors := []string{}
+
+	wordlist, err := util.LoadWordlist(wordlistFile)
+	if err != nil {
+		return BruteSubdomainsEnumReport{}, err
+	}
 
 	// Get all valid subdomains
-	subdomains, err := getBruteForceSubdomains(ctx, domain, wordlistFile, numThreads, requestTimeout, maxRecursionDepth)
-	if err != nil {
-		errors = append(errors, err.Error())
-	}
+	subdomains := getBruteForceSubdomains(ctx, domain, &wordlist, numThreads, requestTimeout, maxRecursionDepth)
 
 	// Create report
 	report := BruteSubdomainsEnumReport{
@@ -47,11 +48,13 @@ func GetBruteForceSubdomains(
 	return report, nil
 }
 
-func getBruteForceSubdomains(ctx context.Context, domain string, wordlistFile string, numThreads int, requestTimeout time.Duration, maxRecursionDepth int) ([]RecordsReport, error) {
-	wordlist, err := util.LoadWordlist(wordlistFile)
-	if err != nil {
-		return nil, err
-	}
+func getBruteForceSubdomains(
+	ctx context.Context,
+	domain string,
+	wordlist *[]string,
+	numThreads int,
+	requestTimeout time.Duration,
+	maxRecursionDepth int) []RecordsReport {
 
 	tasks := make(chan enumerationTask, 10000) // Adjust the buffer size as needed
 	results := make(chan RecordsReport, 10000)
@@ -77,7 +80,7 @@ func getBruteForceSubdomains(ctx context.Context, domain string, wordlistFile st
 
 	// Submit the initial task
 	taskWg.Add(1)
-	tasks <- enumerationTask{domain: domain, depth: maxRecursionDepth, wordlist: &wordlist, timeout: requestTimeout}
+	tasks <- enumerationTask{domain: domain, depth: maxRecursionDepth, wordlist: wordlist, timeout: requestTimeout}
 
 	// Close tasks channel when all tasks are done
 	go func() {
@@ -88,17 +91,13 @@ func getBruteForceSubdomains(ctx context.Context, domain string, wordlistFile st
 	// Wait for workers to finish
 	workerWg.Wait()
 	close(results) // Close results when workers are done
-	return found, err
+	return found
 }
 
 func worker(ctx context.Context, tasks chan enumerationTask, results chan<- RecordsReport, workerWg *sync.WaitGroup, taskWg *sync.WaitGroup) {
 	defer workerWg.Done()
 	for {
 		select {
-		case <-ctx.Done():
-			log.Printf("Enumeration timed out")
-			taskWg.Done()
-			return
 		case task, ok := <-tasks:
 			if !ok {
 				return
@@ -117,7 +116,7 @@ func processTask(ctx context.Context, taskWg *sync.WaitGroup, task enumerationTa
 	for _, word := range *task.wordlist {
 		select {
 		case <-ctx.Done():
-			log.Printf("Enumeration timed out")
+			log.Printf("Enumeration timed out during task for domain: %s", task.domain)
 			return
 		default:
 		}
@@ -135,7 +134,7 @@ func processTask(ctx context.Context, taskWg *sync.WaitGroup, task enumerationTa
 		taskWg.Add(1)
 		select {
 		case <-ctx.Done():
-			log.Printf("Enumeration timed out")
+			log.Printf("Enumeration timed out during task for domain: %s", task.domain)
 			taskWg.Done()
 			return
 		case tasks <- enumerationTask{
