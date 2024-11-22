@@ -9,6 +9,8 @@ import (
 	"time"
 )
 
+const DefaultChannelBufferSize = 10000
+
 // BruteSubdomainsEnumReport represents the report of all subdomains for a given domain including all non-fatal errors that occurred.
 type BruteSubdomainsEnumReport struct {
 	RecordsReports []RecordsReport `json:"reports" yaml:"reports"`
@@ -33,7 +35,6 @@ func GetBruteForceSubdomains(
 
 	subdomains := getBruteForceSubdomains(ctx, domain, wordlist, numWorkers, requestTimeout, maxRecursionDepth)
 
-	// Create report
 	report := BruteSubdomainsEnumReport{
 		RecordsReports: subdomains,
 	}
@@ -49,8 +50,10 @@ func getBruteForceSubdomains(
 	requestTimeout time.Duration,
 	maxRecursionDepth int) []RecordsReport {
 
-	tasks := make(chan enumerationTask, 10000)
-	results := make(chan RecordsReport, 10000)
+	//NB: using a buffered channel so that sending new tasks does not block when there are no free workers
+
+	tasks := make(chan enumerationTask, DefaultChannelBufferSize)
+	results := make(chan RecordsReport, DefaultChannelBufferSize)
 	var mu sync.Mutex
 	var found []RecordsReport
 	var workerWg sync.WaitGroup
