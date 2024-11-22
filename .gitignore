@@ -39,3 +39,6 @@ generated/python/**
 
 # Don't ignore vendors
 !vendor/**
+
+# Ignore intellij artifacts
+.idea/*

@@ -2,9 +2,11 @@ package cmd
 
 import (
 	"bufio"
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/Method-Security/osintscan/internal/dns"
 	"github.com/spf13/cobra"
@@ -66,10 +68,10 @@ func (a *OsintScan) InitDNSCommand() {
 
 	certsCmd.Flags().String("domain", "", "Domain to get DNS certs for")
 
-	subenumCmd := &cobra.Command{
-		Use:   "subenum",
-		Short: "Passively enumerate subdomains for a given domain",
-		Long:  `Passively enumerate subdomains for a given domain`,
+	passiveSubenumCmd := &cobra.Command{
+		Use:   "enum",
+		Short: "Enumerate subdomains for a given domain",
+		Long:  `Enumerate subdomains for a given domain`,
 		Run: func(cmd *cobra.Command, args []string) {
 			domain, err := cmd.Flags().GetString("domain")
 			if err != nil {
@@ -88,7 +90,66 @@ func (a *OsintScan) InitDNSCommand() {
 		},
 	}
 
-	subenumCmd.Flags().String("domain", "", "Domain to get subdomains for")
+	passiveSubenumCmd.Flags().String("domain", "", "Domain to get subdomains for")
+
+	bruteForceSubenumCmd := &cobra.Command{
+		Use:   "brutesubenum",
+		Short: "Brute-force enumerate subdomains for a given domain",
+		Long:  `Brute-force enumerate subdomains for a given domain`,
+		Run: func(cmd *cobra.Command, args []string) {
+			domain, err := cmd.Flags().GetString("domain")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			wordlistFile, err := cmd.Flags().GetString("wordlist-file")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			numThreads, err := cmd.Flags().GetInt("threads")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			timeoutSeconds, err := cmd.Flags().GetInt("timeout")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			maxEnumerationMinutes, err := cmd.Flags().GetInt("max-enum-minutes")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			maxRecursionDepth, err := cmd.Flags().GetInt("max-recursion-depth")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			if err != nil {
+				errorMessage := err.Error()
+				a.OutputSignal.ErrorMessage = &errorMessage
+				a.OutputSignal.Status = 1
+				return
+			}
+			ctx, _ := context.WithDeadline(cmd.Context(), time.Now().Add(time.Duration(maxEnumerationMinutes)*time.Minute))
+			report, err := dns.GetBruteForceDomainSubdomains(ctx, domain, wordlistFile, numThreads, timeoutSeconds, maxEnumerationMinutes, maxRecursionDepth)
+			if err != nil {
+				errorMessage := err.Error()
+				a.OutputSignal.ErrorMessage = &errorMessage
+				a.OutputSignal.Status = 1
+			}
+			a.OutputSignal.Content = report
+		},
+	}
+
+	bruteForceSubenumCmd.Flags().String("domain", "", "Number of threads to dedicate to enumeration")
+	bruteForceSubenumCmd.Flags().String("wordlist-file", "", "File containing a wordlist for enumeration")
+	bruteForceSubenumCmd.Flags().Int("threads", 10, "Number of threads to dedicate to enumeration")
+	bruteForceSubenumCmd.Flags().Int("timeout", 30, "Request timeout in seconds")
+	bruteForceSubenumCmd.Flags().Int("max-recursion-depth", 3, "Number of threads to dedicate to enumeration")
+	bruteForceSubenumCmd.Flags().Int("max-enum-minutes", 10, "Maximum amount of time in mins to wait for enumeration")
 
 	takeoverCmd := &cobra.Command{
 		Use:   "takeover",
@@ -152,7 +213,8 @@ func (a *OsintScan) InitDNSCommand() {
 
 	a.DNSCmd.AddCommand(recordCmd)
 	a.DNSCmd.AddCommand(certsCmd)
-	a.DNSCmd.AddCommand(subenumCmd)
+	a.DNSCmd.AddCommand(bruteForceSubenumCmd)
+	a.DNSCmd.AddCommand(passiveSubenumCmd)
 	a.DNSCmd.AddCommand(takeoverCmd)
 	a.RootCmd.AddCommand(a.DNSCmd)
 }
