@@ -635,6 +635,25 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      Usage
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      Commands
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Commands">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
   <a href="#hostname" class="md-nav__link">
     <span class="md-ellipsis">
       Hostname
@@ -645,7 +664,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#usage" class="md-nav__link">
+  <a href="#usage_1" class="md-nav__link">
     <span class="md-ellipsis">
       Usage
     </span>
@@ -654,11 +673,16 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#help-test" class="md-nav__link">
+  <a href="#help-text" class="md-nav__link">
     <span class="md-ellipsis">
-      Help Test
+      Help Text
     </span>
   </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -906,6 +930,25 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      Usage
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      Commands
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Commands">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
   <a href="#hostname" class="md-nav__link">
     <span class="md-ellipsis">
       Hostname
@@ -916,7 +959,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#usage" class="md-nav__link">
+  <a href="#usage_1" class="md-nav__link">
     <span class="md-ellipsis">
       Usage
     </span>
@@ -925,11 +968,16 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#help-test" class="md-nav__link">
+  <a href="#help-text" class="md-nav__link">
     <span class="md-ellipsis">
-      Help Test
+      Help Text
     </span>
   </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -965,11 +1013,15 @@
 <p>The <code>osintscan shodan</code> family of commands leverage the <a href="https://www.shodan.io/">Shodan</a> search engine to provide open source intelligence on exposed internet assets.</p>
 <h2 id="authentication">Authentication<a class="headerlink" href="#authentication" title="Permanent link">#</a></h2>
 <p>All the <code>osintscan shodan</code> commands leverage the Shodan API, which needs an API key in order to authenticate. All commands read from a <code>SHODAN_API_KEY</code> environment variable or from a <code>--apikey</code> flag where you can include your Shodan API key.</p>
-<h2 id="hostname">Hostname<a class="headerlink" href="#hostname" title="Permanent link">#</a></h2>
-<h3 id="usage">Usage<a class="headerlink" href="#usage" title="Permanent link">#</a></h3>
+<h2 id="usage">Usage<a class="headerlink" href="#usage" title="Permanent link">#</a></h2>
+<div class="highlight"><pre><span></span><code>osintscan<span class="w"> </span>shodan<span class="w"> </span><span class="o">[</span>command<span class="o">]</span>
+</code></pre></div>
+<h2 id="commands">Commands<a class="headerlink" href="#commands" title="Permanent link">#</a></h2>
+<h3 id="hostname">Hostname<a class="headerlink" href="#hostname" title="Permanent link">#</a></h3>
+<h4 id="usage_1">Usage<a class="headerlink" href="#usage_1" title="Permanent link">#</a></h4>
 <div class="highlight"><pre><span></span><code>osintscan<span class="w"> </span>shodan<span class="w"> </span>hostname<span class="w"> </span>--hostname<span class="w"> </span>example.com
 </code></pre></div>
-<h3 id="help-test">Help Test<a class="headerlink" href="#help-test" title="Permanent link">#</a></h3>
+<h4 id="help-text">Help Text<a class="headerlink" href="#help-text" title="Permanent link">#</a></h4>
 <div class="highlight"><pre><span></span><code>$<span class="w"> </span>osintscan<span class="w"> </span>shodan<span class="w"> </span>hostname<span class="w"> </span>-h
 Query<span class="w"> </span>Shodan<span class="w"> </span><span class="k">for</span><span class="w"> </span>a<span class="w"> </span>hostname<span class="w"> </span>string<span class="w"> </span>search
 
