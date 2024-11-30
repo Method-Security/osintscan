@@ -18,30 +18,6 @@ func (a *OsintScan) InitDNSCommand() {
 		Long:  `Scan and gather intel on DNS services`,
 	}
 
-	recordCmd := &cobra.Command{
-		Use:   "records",
-		Short: "Gather DNS records for a given domain",
-		Long:  `Gather DNS records for a given domain`,
-		Run: func(cmd *cobra.Command, args []string) {
-			domain, err := cmd.Flags().GetString("domain")
-			if err != nil {
-				errorMessage := err.Error()
-				a.OutputSignal.ErrorMessage = &errorMessage
-				a.OutputSignal.Status = 1
-				return
-			}
-			report, err := dns.GetDomainDNSRecords(cmd.Context(), domain)
-			if err != nil {
-				errorMessage := err.Error()
-				a.OutputSignal.ErrorMessage = &errorMessage
-				a.OutputSignal.Status = 1
-			}
-			a.OutputSignal.Content = report
-		},
-	}
-
-	recordCmd.Flags().String("domain", "", "Domain to get DNS records for")
-
 	certsCmd := &cobra.Command{
 		Use:   "certs",
 		Short: "Gather DNS certs for a given domain",
@@ -65,6 +41,30 @@ func (a *OsintScan) InitDNSCommand() {
 	}
 
 	certsCmd.Flags().String("domain", "", "Domain to get DNS certs for")
+
+	recordCmd := &cobra.Command{
+		Use:   "records",
+		Short: "Gather DNS records for a given domain",
+		Long:  `Gather DNS records for a given domain`,
+		Run: func(cmd *cobra.Command, args []string) {
+			domain, err := cmd.Flags().GetString("domain")
+			if err != nil {
+				errorMessage := err.Error()
+				a.OutputSignal.ErrorMessage = &errorMessage
+				a.OutputSignal.Status = 1
+				return
+			}
+			report, err := dns.GetDomainDNSRecords(cmd.Context(), domain)
+			if err != nil {
+				errorMessage := err.Error()
+				a.OutputSignal.ErrorMessage = &errorMessage
+				a.OutputSignal.Status = 1
+			}
+			a.OutputSignal.Content = report
+		},
+	}
+
+	recordCmd.Flags().String("domain", "", "Domain to get DNS records for")
 
 	subenumCmd := &cobra.Command{
 		Use:   "subenum",
@@ -92,8 +92,8 @@ func (a *OsintScan) InitDNSCommand() {
 
 	takeoverCmd := &cobra.Command{
 		Use:   "takeover",
-		Short: "Detect domain takeovers given targets",
-		Long:  `Detect domain takeovers given targets`,
+		Short: "Detect domain takeovers given a list of targets",
+		Long:  `Detect domain takeovers given a list of targets`,
 		Run: func(cmd *cobra.Command, args []string) {
 			targets, err := cmd.Flags().GetStringSlice("targets")
 			if err != nil {
