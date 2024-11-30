@@ -6,15 +6,23 @@ The `osintscan shodan` family of commands leverage the [Shodan](https://www.shod
 
 All the `osintscan shodan` commands leverage the Shodan API, which needs an API key in order to authenticate. All commands read from a `SHODAN_API_KEY` environment variable or from a `--apikey` flag where you can include your Shodan API key.
 
-## Hostname
+## Usage
 
-### Usage
+```bash
+osintscan shodan [command]
+```
+
+## Commands
+
+### Hostname
+
+#### Usage
 
 ```bash
 osintscan shodan hostname --hostname example.com
 ```
 
-### Help Test
+#### Help Text
 
 ```bash
 $ osintscan shodan hostname -h

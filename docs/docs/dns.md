@@ -2,17 +2,25 @@
 
 The `osintscan dns` family of commands provides security teams with an easy to use mechanism to dig into information available within the DNS infrastructure.
 
-## Certs
+## Usage
+
+```bash
+osintscan dns [command]
+```
+
+## Commands
+
+### Certs
 
 The `osintscan dns certs` command returns information about the certificate chains that are being leveraged by the specified domain.
 
-### Usage
+#### Usage
 
 ```bash
 osintscan dns certs --domain example.com
 ```
 
-### Help Text
+#### Help Text
 
 ```bash
 osintscan dns certs -h
@@ -32,15 +40,15 @@ Global Flags:
   -v, --verbose              Verbose output
 ```
 
-## Records
+### Records
 
-### Usage
+#### Usage
 
 ```bash
 osintscan dns records --domain example.com
 ```
 
-### Help Text
+#### Help Text
 
 ```bash
 $ osintscan dns records -h
@@ -60,15 +68,15 @@ Global Flags:
   -v, --verbose              Verbose output
 ```
 
-## Subenum
+### Subenum
 
-### Usage
+#### Usage
 
 ```bash
 osintscan dns subenum --domain example.com
 ```
-
-### Help Text
+  
+#### Help Text
 
 ```bash
 $ osintscan dns subenum -h
@@ -88,19 +96,19 @@ Global Flags:
   -v, --verbose              Verbose output
 ```
 
-## Takeover
+### Takeover
 
-### Usage
+#### Usage
 
 ```bash
 webscan domain takeover --targets https://example.com
 ```
 
-### Help Text
+#### Help Text
 
 ```bash
 webscan domain takeover -h
-Detect domain takeovers given targets
+Detect domain takeovers given a list of targets
 
 Usage:
   osintscan dns takeover [flags]
