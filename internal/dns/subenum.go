@@ -96,14 +96,29 @@ func getSubdomainsBrute(ctx context.Context, domain string, subdomainList []stri
 
 	resolver := net.Resolver{}
 
-	// Pre-generate all permutations before starting goroutines
-	allPermutations := make([]string, 0)
-	for depth := 1; depth <= recursiveDepth; depth++ {
-		allPermutations = append(allPermutations, generatePermutations(domain, subdomainList, depth)...)
+	// First iteration - test all base subdomains
+	basePermutations := generatePermutations([]string{domain}, subdomainList)
+	validBaseSubdomains := testPermutations(ctx, basePermutations, &resolver, semaphore, &wg, subdomainsMutex, subdomainsSet, &subdomains)
+
+	// For each subsequent depth, only build on valid subdomains from previous iteration
+	currentDepthSubdomains := validBaseSubdomains
+	for depth := 2; depth <= recursiveDepth; depth++ {
+		if len(currentDepthSubdomains) == 0 {
+			break // No valid subdomains to build on
+		}
+
+		newPermutations := generatePermutations(currentDepthSubdomains, subdomainList)
+		currentDepthSubdomains = testPermutations(ctx, newPermutations, &resolver, semaphore, &wg, subdomainsMutex, subdomainsSet, &subdomains)
 	}
 
-	// Process all permutations in parallel
-	for _, testSubdomain := range allPermutations {
+	return subdomains
+}
+
+func testPermutations(ctx context.Context, permutations []string, resolver *net.Resolver, semaphore chan struct{}, wg *sync.WaitGroup, subdomainsMutex *sync.Mutex, subdomainsSet map[string]struct{}, subdomains *[]string) []string {
+	var validSubdomains []string
+	validSubdomainsMutex := &sync.Mutex{}
+
+	for _, testSubdomain := range permutations {
 		wg.Add(1)
 
 		go func(testSubdomain string) {
@@ -121,37 +136,27 @@ func getSubdomainsBrute(ctx context.Context, domain string, subdomainList []stri
 				subdomainsMutex.Lock()
 				if _, exists := subdomainsSet[testSubdomain]; !exists {
 					subdomainsSet[testSubdomain] = struct{}{}
-					subdomains = append(subdomains, testSubdomain)
+					*subdomains = append(*subdomains, testSubdomain)
 				}
 				subdomainsMutex.Unlock()
+
+				validSubdomainsMutex.Lock()
+				validSubdomains = append(validSubdomains, testSubdomain)
+				validSubdomainsMutex.Unlock()
 			}
 		}(testSubdomain)
 	}
 
 	wg.Wait()
-
-	return subdomains
+	return validSubdomains
 }
 
-func generatePermutations(domain string, subdomainList []string, depth int) []string {
-	if depth == 1 {
-		// Pre-allocate results slice for better performance
-		results := make([]string, 0, len(subdomainList))
-		for _, subdomain := range subdomainList {
-			results = append(results, subdomain+"."+domain)
-		}
-		return results
-	}
-
-	basePermutations := generatePermutations(domain, subdomainList, depth-1)
-	// Pre-allocate results slice
-	results := make([]string, 0, len(basePermutations)*len(subdomainList))
-
-	for _, base := range basePermutations {
-		for _, subdomain := range subdomainList {
-			results = append(results, subdomain+"."+base)
+func generatePermutations(validSubdomains []string, subdomainList []string) []string {
+	results := make([]string, 0, len(validSubdomains)*len(subdomainList))
+	for _, subdomain := range subdomainList {
+		for _, validSubdomain := range validSubdomains {
+			results = append(results, subdomain+"."+validSubdomain)
 		}
 	}
-
 	return results
 }

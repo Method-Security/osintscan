@@ -108,19 +108,25 @@ Global Flags:
 ```bash
 osintscan dns subenum brute -h
 
-Bruteforce subdomains for a given domain
+Bruteforce subdomains for a given domain. This tool recursively discovers subdomains by building on previously found valid subdomains. For example, if scanning example.com:
+
+1. First checks base subdomains like sub.example.com
+2. If sub.example.com exists, will then check deeper subdomains like deep.sub.example.com
+3. If sub.example.com does not exist, will not check deep.sub.example.com
+
+This ensures efficient scanning but means some valid deep subdomains may be missed if their parent subdomain does not exist.
 
 Usage:
   osintscan dns subenum brute [flags]
 
 Flags:
-      --domain string                 Domain to get subdomains for
-  -h, --help                          help for brute
-      --timeout int                   Maximum time of enumeration (Minutes)
-      --recursion-depth int           Maximum recursion depth (default 3)
-      --threads int                   Number of parallel threads (default 20)
-      --subdomain strings             List of subdomains to enumerate
-      --subdomainlist-files strings   List of files containing subdomains to enumerate
+      --domain string       Domain to get subdomains for
+      --file strings        List of files containing subdomains to enumerate
+  -h, --help                help for brute
+      --maxdepth int        Maximum recursion depth (default 3)
+      --subdomain strings   List of subdomains to enumerate
+      --threads int         Number of parallel threads (default 20)
+      --timeout int         Maximum time of enumeration (Minutes)
 
 Global Flags:
   -o, --output string        Output format (signal, json, yaml). Default value is signal (default "signal")

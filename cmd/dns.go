@@ -90,7 +90,14 @@ func (a *OsintScan) InitDNSCommand() {
 	subenumbruteCmd := &cobra.Command{
 		Use:   "brute",
 		Short: "Bruteforce subdomains for a given domain",
-		Long:  `Bruteforce subdomains for a given domain`,
+		Long: `
+Bruteforce subdomains for a given domain. This tool recursively discovers subdomains by building on previously found valid subdomains. For example, if scanning example.com:
+
+1. First checks base subdomains like sub.example.com
+2. If sub.example.com exists, will then check deeper subdomains like deep.sub.example.com
+3. If sub.example.com does not exist, will not check deep.sub.example.com
+
+This ensures efficient scanning but means some valid deep subdomains may be missed if their parent subdomain does not exist.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			domain, err := cmd.Flags().GetString("domain")
 			if err != nil {
@@ -104,7 +111,7 @@ func (a *OsintScan) InitDNSCommand() {
 				return
 			}
 
-			subdomainlistFiles, err := cmd.Flags().GetStringSlice("subdomainlist-files")
+			subdomainlistFiles, err := cmd.Flags().GetStringSlice("file")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -126,7 +133,7 @@ func (a *OsintScan) InitDNSCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			recursiveDepth, err := cmd.Flags().GetInt("recursive-depth")
+			recursiveDepth, err := cmd.Flags().GetInt("maxdepth")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -148,9 +155,9 @@ func (a *OsintScan) InitDNSCommand() {
 
 	subenumbruteCmd.Flags().String("domain", "", "Domain to get subdomains for")
 	subenumbruteCmd.Flags().StringSlice("subdomain", []string{}, "List of subdomains to enumerate")
-	subenumbruteCmd.Flags().StringSlice("subdomainlist-files", []string{}, "List of files containing subdomains to enumerate")
+	subenumbruteCmd.Flags().StringSlice("file", []string{}, "List of files containing subdomains to enumerate")
 	subenumbruteCmd.Flags().Int("threads", 20, "Number of parallel threads")
-	subenumbruteCmd.Flags().Int("recursive-depth", 3, "Maximum recursion depth")
+	subenumbruteCmd.Flags().Int("maxdepth", 3, "Maximum recursion depth")
 	subenumbruteCmd.Flags().Int("timeout", 0, "Maximum time of enumeration (Minutes)")
 
 	_ = subenumbruteCmd.MarkFlagRequired("domain")
