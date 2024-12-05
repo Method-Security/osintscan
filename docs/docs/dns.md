@@ -73,17 +73,22 @@ Global Flags:
 #### Usage
 
 ```bash
-osintscan dns subenum --domain example.com
+osintscan dns subenum [command]
+
 ```
-  
-#### Help Text
+
+#### Commands
+
+##### Passive
+
+###### Help Text
 
 ```bash
-$ osintscan dns subenum -h
+$ osintscan dns subenum passive -h
 Passively enumerate subdomains for a given domain
 
 Usage:
-  osintscan dns subenum [flags]
+  osintscan dns subenum passive[flags]
 
 Flags:
       --domain string   Domain to get subdomains for
@@ -94,6 +99,35 @@ Global Flags:
   -f, --output-file string   Path to output file. If blank, will output to STDOUT
   -q, --quiet                Suppress output
   -v, --verbose              Verbose output
+```
+
+##### Brute
+
+###### Help Text
+
+```bash
+osintscan dns subenum brute -h
+
+Bruteforce subdomains for a given domain
+
+Usage:
+  osintscan dns subenum brute [flags]
+
+Flags:
+      --domain string                 Domain to get subdomains for
+  -h, --help                          help for brute
+      --timeout int                   Maximum time of enumeration (Minutes)
+      --recursion-depth int           Maximum recursion depth (default 3)
+      --threads int                   Number of parallel threads (default 20)
+      --subdomain strings             List of subdomains to enumerate
+      --subdomainlist-files strings   List of files containing subdomains to enumerate
+
+Global Flags:
+  -o, --output string        Output format (signal, json, yaml). Default value is signal (default "signal")
+  -f, --output-file string   Path to output file. If blank, will output to STDOUT
+  -q, --quiet                Suppress output
+  -v, --verbose              Verbose output
+
 ```
 
 ### Takeover
