@@ -709,11 +709,65 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#commands_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Commands
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Commands">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#passive" class="md-nav__link">
+    <span class="md-ellipsis">
+      Passive
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Passive">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
   <a href="#help-text_2" class="md-nav__link">
     <span class="md-ellipsis">
       Help Text
     </span>
   </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#brute" class="md-nav__link">
+    <span class="md-ellipsis">
+      Brute
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Brute">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#help-text_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      Help Text
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -742,7 +796,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#help-text_3" class="md-nav__link">
+  <a href="#help-text_4" class="md-nav__link">
     <span class="md-ellipsis">
       Help Text
     </span>
@@ -1115,11 +1169,65 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#commands_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Commands
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Commands">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#passive" class="md-nav__link">
+    <span class="md-ellipsis">
+      Passive
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Passive">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
   <a href="#help-text_2" class="md-nav__link">
     <span class="md-ellipsis">
       Help Text
     </span>
   </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#brute" class="md-nav__link">
+    <span class="md-ellipsis">
+      Brute
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Brute">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#help-text_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      Help Text
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -1148,7 +1256,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#help-text_3" class="md-nav__link">
+  <a href="#help-text_4" class="md-nav__link">
     <span class="md-ellipsis">
       Help Text
     </span>
@@ -1240,14 +1348,16 @@ Global<span class="w"> </span>Flags:
 </code></pre></div>
 <h3 id="subenum">Subenum<a class="headerlink" href="#subenum" title="Permanent link">#</a></h3>
 <h4 id="usage_3">Usage<a class="headerlink" href="#usage_3" title="Permanent link">#</a></h4>
-<div class="highlight"><pre><span></span><code>osintscan<span class="w"> </span>dns<span class="w"> </span>subenum<span class="w"> </span>--domain<span class="w"> </span>example.com
+<div class="highlight"><pre><span></span><code>osintscan<span class="w"> </span>dns<span class="w"> </span>subenum<span class="w"> </span><span class="o">[</span>command<span class="o">]</span>
 </code></pre></div>
-<h4 id="help-text_2">Help Text<a class="headerlink" href="#help-text_2" title="Permanent link">#</a></h4>
-<div class="highlight"><pre><span></span><code>$<span class="w"> </span>osintscan<span class="w"> </span>dns<span class="w"> </span>subenum<span class="w"> </span>-h
+<h4 id="commands_1">Commands<a class="headerlink" href="#commands_1" title="Permanent link">#</a></h4>
+<h5 id="passive">Passive<a class="headerlink" href="#passive" title="Permanent link">#</a></h5>
+<h6 id="help-text_2">Help Text<a class="headerlink" href="#help-text_2" title="Permanent link">#</a></h6>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>osintscan<span class="w"> </span>dns<span class="w"> </span>subenum<span class="w"> </span>passive<span class="w"> </span>-h
 Passively<span class="w"> </span>enumerate<span class="w"> </span>subdomains<span class="w"> </span><span class="k">for</span><span class="w"> </span>a<span class="w"> </span>given<span class="w"> </span>domain
 
 Usage:
-<span class="w">  </span>osintscan<span class="w"> </span>dns<span class="w"> </span>subenum<span class="w"> </span><span class="o">[</span>flags<span class="o">]</span>
+<span class="w">  </span>osintscan<span class="w"> </span>dns<span class="w"> </span>subenum<span class="w"> </span>passive<span class="o">[</span>flags<span class="o">]</span>
 
 Flags:
 <span class="w">      </span>--domain<span class="w"> </span>string<span class="w">   </span>Domain<span class="w"> </span>to<span class="w"> </span>get<span class="w"> </span>subdomains<span class="w"> </span><span class="k">for</span>
@@ -1259,11 +1369,41 @@ Global<span class="w"> </span>Flags:
 <span class="w">  </span>-q,<span class="w"> </span>--quiet<span class="w">                </span>Suppress<span class="w"> </span>output
 <span class="w">  </span>-v,<span class="w"> </span>--verbose<span class="w">              </span>Verbose<span class="w"> </span>output
 </code></pre></div>
+<h5 id="brute">Brute<a class="headerlink" href="#brute" title="Permanent link">#</a></h5>
+<h6 id="help-text_3">Help Text<a class="headerlink" href="#help-text_3" title="Permanent link">#</a></h6>
+<div class="highlight"><pre><span></span><code>osintscan<span class="w"> </span>dns<span class="w"> </span>subenum<span class="w"> </span>brute<span class="w"> </span>-h
+
+Bruteforce<span class="w"> </span>subdomains<span class="w"> </span><span class="k">for</span><span class="w"> </span>a<span class="w"> </span>given<span class="w"> </span>domain.<span class="w"> </span>This<span class="w"> </span>tool<span class="w"> </span>recursively<span class="w"> </span>discovers<span class="w"> </span>subdomains<span class="w"> </span>by<span class="w"> </span>building<span class="w"> </span>on<span class="w"> </span>previously<span class="w"> </span>found<span class="w"> </span>valid<span class="w"> </span>subdomains.<span class="w"> </span>For<span class="w"> </span>example,<span class="w"> </span><span class="k">if</span><span class="w"> </span>scanning<span class="w"> </span>example.com:
+
+<span class="m">1</span>.<span class="w"> </span>First<span class="w"> </span>checks<span class="w"> </span>base<span class="w"> </span>subdomains<span class="w"> </span>like<span class="w"> </span>sub.example.com
+<span class="m">2</span>.<span class="w"> </span>If<span class="w"> </span>sub.example.com<span class="w"> </span>exists,<span class="w"> </span>will<span class="w"> </span><span class="k">then</span><span class="w"> </span>check<span class="w"> </span>deeper<span class="w"> </span>subdomains<span class="w"> </span>like<span class="w"> </span>deep.sub.example.com
+<span class="m">3</span>.<span class="w"> </span>If<span class="w"> </span>sub.example.com<span class="w"> </span>does<span class="w"> </span>not<span class="w"> </span>exist,<span class="w"> </span>will<span class="w"> </span>not<span class="w"> </span>check<span class="w"> </span>deep.sub.example.com
+
+This<span class="w"> </span>ensures<span class="w"> </span>efficient<span class="w"> </span>scanning<span class="w"> </span>but<span class="w"> </span>means<span class="w"> </span>some<span class="w"> </span>valid<span class="w"> </span>deep<span class="w"> </span>subdomains<span class="w"> </span>may<span class="w"> </span>be<span class="w"> </span>missed<span class="w"> </span><span class="k">if</span><span class="w"> </span>their<span class="w"> </span>parent<span class="w"> </span>subdomain<span class="w"> </span>does<span class="w"> </span>not<span class="w"> </span>exist.
+
+Usage:
+<span class="w">  </span>osintscan<span class="w"> </span>dns<span class="w"> </span>subenum<span class="w"> </span>brute<span class="w"> </span><span class="o">[</span>flags<span class="o">]</span>
+
+Flags:
+<span class="w">      </span>--domain<span class="w"> </span>string<span class="w">       </span>Domain<span class="w"> </span>to<span class="w"> </span>get<span class="w"> </span>subdomains<span class="w"> </span><span class="k">for</span>
+<span class="w">      </span>--file<span class="w"> </span>strings<span class="w">        </span>List<span class="w"> </span>of<span class="w"> </span>files<span class="w"> </span>containing<span class="w"> </span>subdomains<span class="w"> </span>to<span class="w"> </span>enumerate
+<span class="w">  </span>-h,<span class="w"> </span>--help<span class="w">                </span><span class="nb">help</span><span class="w"> </span><span class="k">for</span><span class="w"> </span>brute
+<span class="w">      </span>--maxdepth<span class="w"> </span>int<span class="w">        </span>Maximum<span class="w"> </span>recursion<span class="w"> </span>depth<span class="w"> </span><span class="o">(</span>default<span class="w"> </span><span class="m">3</span><span class="o">)</span>
+<span class="w">      </span>--subdomain<span class="w"> </span>strings<span class="w">   </span>List<span class="w"> </span>of<span class="w"> </span>subdomains<span class="w"> </span>to<span class="w"> </span>enumerate
+<span class="w">      </span>--threads<span class="w"> </span>int<span class="w">         </span>Number<span class="w"> </span>of<span class="w"> </span>parallel<span class="w"> </span>threads<span class="w"> </span><span class="o">(</span>default<span class="w"> </span><span class="m">20</span><span class="o">)</span>
+<span class="w">      </span>--timeout<span class="w"> </span>int<span class="w">         </span>Maximum<span class="w"> </span><span class="nb">time</span><span class="w"> </span>of<span class="w"> </span>enumeration<span class="w"> </span><span class="o">(</span>Minutes<span class="o">)</span>
+
+Global<span class="w"> </span>Flags:
+<span class="w">  </span>-o,<span class="w"> </span>--output<span class="w"> </span>string<span class="w">        </span>Output<span class="w"> </span>format<span class="w"> </span><span class="o">(</span>signal,<span class="w"> </span>json,<span class="w"> </span>yaml<span class="o">)</span>.<span class="w"> </span>Default<span class="w"> </span>value<span class="w"> </span>is<span class="w"> </span>signal<span class="w"> </span><span class="o">(</span>default<span class="w"> </span><span class="s2">&quot;signal&quot;</span><span class="o">)</span>
+<span class="w">  </span>-f,<span class="w"> </span>--output-file<span class="w"> </span>string<span class="w">   </span>Path<span class="w"> </span>to<span class="w"> </span>output<span class="w"> </span>file.<span class="w"> </span>If<span class="w"> </span>blank,<span class="w"> </span>will<span class="w"> </span>output<span class="w"> </span>to<span class="w"> </span>STDOUT
+<span class="w">  </span>-q,<span class="w"> </span>--quiet<span class="w">                </span>Suppress<span class="w"> </span>output
+<span class="w">  </span>-v,<span class="w"> </span>--verbose<span class="w">              </span>Verbose<span class="w"> </span>output
+</code></pre></div>
 <h3 id="takeover">Takeover<a class="headerlink" href="#takeover" title="Permanent link">#</a></h3>
 <h4 id="usage_4">Usage<a class="headerlink" href="#usage_4" title="Permanent link">#</a></h4>
 <div class="highlight"><pre><span></span><code>webscan<span class="w"> </span>domain<span class="w"> </span>takeover<span class="w"> </span>--targets<span class="w"> </span>https://example.com
 </code></pre></div>
-<h4 id="help-text_3">Help Text<a class="headerlink" href="#help-text_3" title="Permanent link">#</a></h4>
+<h4 id="help-text_4">Help Text<a class="headerlink" href="#help-text_4" title="Permanent link">#</a></h4>
 <div class="highlight"><pre><span></span><code>webscan<span class="w"> </span>domain<span class="w"> </span>takeover<span class="w"> </span>-h
 Detect<span class="w"> </span>domain<span class="w"> </span>takeovers<span class="w"> </span>given<span class="w"> </span>a<span class="w"> </span>list<span class="w"> </span>of<span class="w"> </span>targets
 
