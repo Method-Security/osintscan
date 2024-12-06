@@ -145,6 +145,72 @@ func (d *DnsRecordsReport) String() string {
 	return fmt.Sprintf("%#v", d)
 }
 
+type DnsSubenumReport struct {
+	Domain          string         `json:"domain" url:"domain"`
+	EnumerationType DnsSubenumType `json:"enumerationType" url:"enumerationType"`
+	Subdomains      []string       `json:"subdomains,omitempty" url:"subdomains,omitempty"`
+	Errors          []string       `json:"errors,omitempty" url:"errors,omitempty"`
+
+	extraProperties map[string]interface{}
+	_rawJSON        json.RawMessage
+}
+
+func (d *DnsSubenumReport) GetExtraProperties() map[string]interface{} {
+	return d.extraProperties
+}
+
+func (d *DnsSubenumReport) UnmarshalJSON(data []byte) error {
+	type unmarshaler DnsSubenumReport
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*d = DnsSubenumReport(value)
+
+	extraProperties, err := core.ExtractExtraProperties(data, *d)
+	if err != nil {
+		return err
+	}
+	d.extraProperties = extraProperties
+
+	d._rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (d *DnsSubenumReport) String() string {
+	if len(d._rawJSON) > 0 {
+		if value, err := core.StringifyJSON(d._rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := core.StringifyJSON(d); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", d)
+}
+
+type DnsSubenumType string
+
+const (
+	DnsSubenumTypeBrute   DnsSubenumType = "BRUTE"
+	DnsSubenumTypePassive DnsSubenumType = "PASSIVE"
+)
+
+func NewDnsSubenumTypeFromString(s string) (DnsSubenumType, error) {
+	switch s {
+	case "BRUTE":
+		return DnsSubenumTypeBrute, nil
+	case "PASSIVE":
+		return DnsSubenumTypePassive, nil
+	}
+	var t DnsSubenumType
+	return "", fmt.Errorf("%s is not a valid %T", s, t)
+}
+
+func (d DnsSubenumType) Ptr() *DnsSubenumType {
+	return &d
+}
+
 type DomainTakeover struct {
 	Target       string     `json:"target" url:"target"`
 	StatusCode   int        `json:"statusCode" url:"statusCode"`

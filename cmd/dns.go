@@ -1,12 +1,10 @@
 package cmd
 
 import (
-	"bufio"
 	"errors"
-	"os"
-	"path/filepath"
 
 	"github.com/Method-Security/osintscan/internal/dns"
+	"github.com/Method-Security/osintscan/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -25,16 +23,13 @@ func (a *OsintScan) InitDNSCommand() {
 		Run: func(cmd *cobra.Command, args []string) {
 			domain, err := cmd.Flags().GetString("domain")
 			if err != nil {
-				errorMessage := err.Error()
-				a.OutputSignal.ErrorMessage = &errorMessage
-				a.OutputSignal.Status = 1
+				a.OutputSignal.AddError(err)
 				return
 			}
 			report, err := dns.GetDomainCerts(cmd.Context(), domain)
 			if err != nil {
-				errorMessage := err.Error()
-				a.OutputSignal.ErrorMessage = &errorMessage
-				a.OutputSignal.Status = 1
+				a.OutputSignal.AddError(err)
+				return
 			}
 			a.OutputSignal.Content = report
 		},
@@ -49,16 +44,13 @@ func (a *OsintScan) InitDNSCommand() {
 		Run: func(cmd *cobra.Command, args []string) {
 			domain, err := cmd.Flags().GetString("domain")
 			if err != nil {
-				errorMessage := err.Error()
-				a.OutputSignal.ErrorMessage = &errorMessage
-				a.OutputSignal.Status = 1
+				a.OutputSignal.AddError(err)
 				return
 			}
 			report, err := dns.GetDomainDNSRecords(cmd.Context(), domain)
 			if err != nil {
-				errorMessage := err.Error()
-				a.OutputSignal.ErrorMessage = &errorMessage
-				a.OutputSignal.Status = 1
+				a.OutputSignal.AddError(err)
+				return
 			}
 			a.OutputSignal.Content = report
 		},
@@ -68,27 +60,109 @@ func (a *OsintScan) InitDNSCommand() {
 
 	subenumCmd := &cobra.Command{
 		Use:   "subenum",
+		Short: "Enumerate subdomains for a given domain",
+		Long:  `Enumerate subdomains for a given domain`,
+	}
+
+	subenumpassiveCmd := &cobra.Command{
+		Use:   "passive",
 		Short: "Passively enumerate subdomains for a given domain",
 		Long:  `Passively enumerate subdomains for a given domain`,
 		Run: func(cmd *cobra.Command, args []string) {
 			domain, err := cmd.Flags().GetString("domain")
 			if err != nil {
-				errorMessage := err.Error()
-				a.OutputSignal.ErrorMessage = &errorMessage
-				a.OutputSignal.Status = 1
+				a.OutputSignal.AddError(err)
 				return
 			}
-			report, err := dns.GetDomainSubdomains(cmd.Context(), domain)
+			report, err := dns.GetDomainSubdomainsPassive(cmd.Context(), domain)
 			if err != nil {
-				errorMessage := err.Error()
-				a.OutputSignal.ErrorMessage = &errorMessage
-				a.OutputSignal.Status = 1
+				a.OutputSignal.AddError(err)
+				return
 			}
 			a.OutputSignal.Content = report
 		},
 	}
 
-	subenumCmd.Flags().String("domain", "", "Domain to get subdomains for")
+	subenumpassiveCmd.Flags().String("domain", "", "Domain to get subdomains for")
+
+	subenumCmd.AddCommand(subenumpassiveCmd)
+
+	subenumbruteCmd := &cobra.Command{
+		Use:   "brute",
+		Short: "Bruteforce subdomains for a given domain",
+		Long: `
+Bruteforce subdomains for a given domain. This tool recursively discovers subdomains by building on previously found valid subdomains. For example, if scanning example.com:
+
+1. First checks base subdomains like sub.example.com
+2. If sub.example.com exists, will then check deeper subdomains like deep.sub.example.com
+3. If sub.example.com does not exist, will not check deep.sub.example.com
+
+This ensures efficient scanning but means some valid deep subdomains may be missed if their parent subdomain does not exist.`,
+		Run: func(cmd *cobra.Command, args []string) {
+			domain, err := cmd.Flags().GetString("domain")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			subdomains, err := cmd.Flags().GetStringSlice("subdomain")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			subdomainlistFiles, err := cmd.Flags().GetStringSlice("file")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			fileSubdomains, err := utils.GetEntriesFromFiles(subdomainlistFiles)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			allSubdomains := append(subdomains, fileSubdomains...)
+			if len(allSubdomains) == 0 {
+				a.OutputSignal.AddError(errors.New("no subdomains provided"))
+				return
+			}
+
+			parallelThreads, err := cmd.Flags().GetInt("threads")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			recursiveDepth, err := cmd.Flags().GetInt("maxdepth")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			timeout, err := cmd.Flags().GetInt("timeout")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			report, err := dns.GetDomainSubdomainsBrute(cmd.Context(), domain, allSubdomains, parallelThreads, recursiveDepth, timeout)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			a.OutputSignal.Content = report
+		},
+	}
+
+	subenumbruteCmd.Flags().String("domain", "", "Domain to get subdomains for")
+	subenumbruteCmd.Flags().StringSlice("subdomain", []string{}, "List of subdomains to enumerate")
+	subenumbruteCmd.Flags().StringSlice("file", []string{}, "List of files containing subdomains to enumerate")
+	subenumbruteCmd.Flags().Int("threads", 20, "Number of parallel threads")
+	subenumbruteCmd.Flags().Int("maxdepth", 3, "Maximum recursion depth")
+	subenumbruteCmd.Flags().Int("timeout", 0, "Maximum time of enumeration (Minutes)")
+
+	_ = subenumbruteCmd.MarkFlagRequired("domain")
+
+	subenumCmd.AddCommand(subenumbruteCmd)
 
 	takeoverCmd := &cobra.Command{
 		Use:   "takeover",
@@ -105,7 +179,7 @@ func (a *OsintScan) InitDNSCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			fileTargets, err := getTargetsFromFiles(filePaths)
+			fileTargets, err := utils.GetEntriesFromFiles(filePaths)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -145,6 +219,7 @@ func (a *OsintScan) InitDNSCommand() {
 			report, err := dns.DetectDomainTakeover(allTargets, fingerprintsPath, onlySuccessful, setHTTPS, timeout)
 			if err != nil {
 				a.OutputSignal.AddError(err)
+				return
 			}
 			a.OutputSignal.Content = report
 		},
@@ -162,29 +237,4 @@ func (a *OsintScan) InitDNSCommand() {
 	a.DNSCmd.AddCommand(subenumCmd)
 	a.DNSCmd.AddCommand(takeoverCmd)
 	a.RootCmd.AddCommand(a.DNSCmd)
-}
-
-func getTargetsFromFiles(paths []string) ([]string, error) {
-	targets := []string{}
-	for _, path := range paths {
-		absPath, err := filepath.Abs(path)
-		if err != nil {
-			return nil, err
-		}
-		file, err := os.Open(absPath)
-		if err != nil {
-			return nil, err
-		}
-		err = file.Close()
-		if err != nil {
-			return nil, err
-		}
-		var lines []string
-		scanner := bufio.NewScanner(file)
-		for scanner.Scan() {
-			lines = append(lines, scanner.Text())
-		}
-		targets = append(targets, lines...)
-	}
-	return targets, nil
 }

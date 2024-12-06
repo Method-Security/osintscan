@@ -1,0 +1,11 @@
+types:
+  DnsSubenumType:
+    enum:
+      - BRUTE
+      - PASSIVE
+  DnsSubenumReport:
+    properties:
+      domain: string
+      enumerationType: DnsSubenumType
+      subdomains: list<string>
+      errors: optional<list<string>>
