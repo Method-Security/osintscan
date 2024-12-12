@@ -73,17 +73,22 @@ Global Flags:
 #### Usage
 
 ```bash
-osintscan dns subenum --domain example.com
+osintscan dns subenum [command]
+
 ```
-  
-#### Help Text
+
+#### Commands
+
+##### Passive
+
+###### Help Text
 
 ```bash
-$ osintscan dns subenum -h
+$ osintscan dns subenum passive -h
 Passively enumerate subdomains for a given domain
 
 Usage:
-  osintscan dns subenum [flags]
+  osintscan dns subenum passive[flags]
 
 Flags:
       --domain string   Domain to get subdomains for
@@ -94,6 +99,41 @@ Global Flags:
   -f, --output-file string   Path to output file. If blank, will output to STDOUT
   -q, --quiet                Suppress output
   -v, --verbose              Verbose output
+```
+
+##### Brute
+
+###### Help Text
+
+```bash
+osintscan dns subenum brute -h
+
+Bruteforce subdomains for a given domain. This tool recursively discovers subdomains by building on previously found valid subdomains. For example, if scanning example.com:
+
+1. First checks base subdomains like sub.example.com
+2. If sub.example.com exists, will then check deeper subdomains like deep.sub.example.com
+3. If sub.example.com does not exist, will not check deep.sub.example.com
+
+This ensures efficient scanning but means some valid deep subdomains may be missed if their parent subdomain does not exist.
+
+Usage:
+  osintscan dns subenum brute [flags]
+
+Flags:
+      --domain string       Domain to get subdomains for
+      --file strings        List of files containing subdomains to enumerate
+  -h, --help                help for brute
+      --maxdepth int        Maximum recursion depth (default 3)
+      --subdomain strings   List of subdomains to enumerate
+      --threads int         Number of parallel threads (default 20)
+      --timeout int         Maximum time of enumeration (Minutes)
+
+Global Flags:
+  -o, --output string        Output format (signal, json, yaml). Default value is signal (default "signal")
+  -f, --output-file string   Path to output file. If blank, will output to STDOUT
+  -q, --quiet                Suppress output
+  -v, --verbose              Verbose output
+
 ```
 
 ### Takeover
