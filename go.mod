@@ -13,7 +13,7 @@ require (
 	github.com/projectdiscovery/dnsx v1.2.1
 	github.com/projectdiscovery/subfinder/v2 v2.6.6
 	github.com/spf13/cobra v1.8.0
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.10.0
 )
 
 require (
