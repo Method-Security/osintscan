@@ -276,18 +276,6 @@
       "vulnerable": false
     },
     {
-      "cicd_pass": true,
-      "cname": ["furyns.com"],
-      "discussion": "[Issue #154](https://github.com/EdOverflow/can-i-take-over-xyz/issues/154)",
-      "documentation": "[Article](https://khaledibnalwalid.wordpress.com/2020/06/25/gemfury-subdomain-takeover/)",
-      "fingerprint": "404: This page could not be found.",
-      "http_status": null,
-      "nxdomain": false,
-      "service": "Gemfury",
-      "status": "Vulnerable",
-      "vulnerable": true
-    },
-    {
       "cicd_pass": false,
       "cname": [],
       "discussion": "[Issue #235](https://github.com/EdOverflow/can-i-take-over-xyz/issues/235)",
