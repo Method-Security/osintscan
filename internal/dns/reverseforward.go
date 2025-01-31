@@ -6,7 +6,6 @@ import (
 	osintscan "github.com/Method-Security/osintscan/generated/go"
 )
 
-// ReverseLookup then ForwardLookup
 func GetReverseForwardDNSLookup(fqdn string) osintscan.DnsReverseForwardReport {
 	report := osintscan.DnsReverseForwardReport{
 		Domain: fqdn,
