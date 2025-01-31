@@ -1,0 +1,10 @@
+types:
+  LookUpDetails:
+    properties:
+      ip: string
+      dnsPtrs: optional<list<string>>
+  DnsReverseForwardReport:
+    properties:
+      domain: string
+      lookUps: optional<list<LookUpDetails>>
+      errors: optional<list<string>>

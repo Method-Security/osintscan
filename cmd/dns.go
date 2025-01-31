@@ -164,6 +164,28 @@ This ensures efficient scanning but means some valid deep subdomains may be miss
 
 	subenumCmd.AddCommand(subenumbruteCmd)
 
+	reverseforwardCmd := &cobra.Command{
+		Use:   "reverseforward",
+		Short: "Reverse and forward lookup a given domain",
+		Long:  `Reverse and forward lookup a given domain`,
+		Run: func(cmd *cobra.Command, args []string) {
+			domain, err := cmd.Flags().GetString("domain")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			report := dns.GetReverseForwardDNSLookup(domain)
+			a.OutputSignal.Content = report
+		},
+	}
+
+	reverseforwardCmd.Flags().String("domain", "", "Domain to get reverse and forward lookup for")
+
+	_ = reverseforwardCmd.MarkFlagRequired("domain")
+
+	subenumCmd.AddCommand(reverseforwardCmd)
+
 	takeoverCmd := &cobra.Command{
 		Use:   "takeover",
 		Short: "Detect domain takeovers given a list of targets",

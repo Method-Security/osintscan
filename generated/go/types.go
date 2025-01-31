@@ -145,6 +145,91 @@ func (d *DnsRecordsReport) String() string {
 	return fmt.Sprintf("%#v", d)
 }
 
+type DnsReverseForwardReport struct {
+	Domain  string           `json:"domain" url:"domain"`
+	LookUps []*LookUpDetails `json:"lookUps,omitempty" url:"lookUps,omitempty"`
+	Errors  []string         `json:"errors,omitempty" url:"errors,omitempty"`
+
+	extraProperties map[string]interface{}
+	_rawJSON        json.RawMessage
+}
+
+func (d *DnsReverseForwardReport) GetExtraProperties() map[string]interface{} {
+	return d.extraProperties
+}
+
+func (d *DnsReverseForwardReport) UnmarshalJSON(data []byte) error {
+	type unmarshaler DnsReverseForwardReport
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*d = DnsReverseForwardReport(value)
+
+	extraProperties, err := core.ExtractExtraProperties(data, *d)
+	if err != nil {
+		return err
+	}
+	d.extraProperties = extraProperties
+
+	d._rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (d *DnsReverseForwardReport) String() string {
+	if len(d._rawJSON) > 0 {
+		if value, err := core.StringifyJSON(d._rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := core.StringifyJSON(d); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", d)
+}
+
+type LookUpDetails struct {
+	Ip      string   `json:"ip" url:"ip"`
+	DnsPtrs []string `json:"dnsPtrs,omitempty" url:"dnsPtrs,omitempty"`
+
+	extraProperties map[string]interface{}
+	_rawJSON        json.RawMessage
+}
+
+func (l *LookUpDetails) GetExtraProperties() map[string]interface{} {
+	return l.extraProperties
+}
+
+func (l *LookUpDetails) UnmarshalJSON(data []byte) error {
+	type unmarshaler LookUpDetails
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*l = LookUpDetails(value)
+
+	extraProperties, err := core.ExtractExtraProperties(data, *l)
+	if err != nil {
+		return err
+	}
+	l.extraProperties = extraProperties
+
+	l._rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (l *LookUpDetails) String() string {
+	if len(l._rawJSON) > 0 {
+		if value, err := core.StringifyJSON(l._rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := core.StringifyJSON(l); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", l)
+}
+
 type DnsSubenumReport struct {
 	Domain          string         `json:"domain" url:"domain"`
 	EnumerationType DnsSubenumType `json:"enumerationType" url:"enumerationType"`
