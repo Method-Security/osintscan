@@ -184,8 +184,6 @@ This ensures efficient scanning but means some valid deep subdomains may be miss
 
 	_ = reverseforwardCmd.MarkFlagRequired("domain")
 
-	subenumCmd.AddCommand(reverseforwardCmd)
-
 	takeoverCmd := &cobra.Command{
 		Use:   "takeover",
 		Short: "Detect domain takeovers given a list of targets",
@@ -257,6 +255,7 @@ This ensures efficient scanning but means some valid deep subdomains may be miss
 	a.DNSCmd.AddCommand(recordCmd)
 	a.DNSCmd.AddCommand(certsCmd)
 	a.DNSCmd.AddCommand(subenumCmd)
+	a.DNSCmd.AddCommand(reverseforwardCmd)
 	a.DNSCmd.AddCommand(takeoverCmd)
 	a.RootCmd.AddCommand(a.DNSCmd)
 }
