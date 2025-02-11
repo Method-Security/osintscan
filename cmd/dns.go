@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"github.com/Method-Security/osintscan/internal/dns"
+	subenum "github.com/Method-Security/osintscan/internal/dns/subenum"
 	"github.com/Method-Security/osintscan/utils"
 	"github.com/spf13/cobra"
 )
@@ -74,7 +75,7 @@ func (a *OsintScan) InitDNSCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			report, err := dns.GetDomainSubdomainsPassive(cmd.Context(), domain)
+			report, err := subenum.GetDomainSubdomainsPassive(cmd.Context(), domain)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -144,7 +145,7 @@ This ensures efficient scanning but means some valid deep subdomains may be miss
 				return
 			}
 
-			report, err := dns.GetDomainSubdomainsBrute(cmd.Context(), domain, allSubdomains, parallelThreads, recursiveDepth, timeout)
+			report, err := subenum.GetDomainSubdomainsBrute(cmd.Context(), domain, allSubdomains, parallelThreads, recursiveDepth, timeout)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
