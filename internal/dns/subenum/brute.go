@@ -1,68 +1,16 @@
 package dns
 
 import (
-	"bytes"
 	"context"
-	"io"
+	"crypto/rand"
+	"fmt"
+	"math/big"
 	"net"
-	"strings"
 	"sync"
 	"time"
 
 	osintscan "github.com/Method-Security/osintscan/generated/go"
-	"github.com/projectdiscovery/subfinder/v2/pkg/runner"
 )
-
-// GetDomainSubdomainsPassive queries subfinder for all subdomains for a given domain. It returns a SubdomainsEnumReport struct containing
-// all subdomains and any errors that occurred.
-func GetDomainSubdomainsPassive(ctx context.Context, domain string) (osintscan.DnsSubenumReport, error) {
-	report := osintscan.DnsSubenumReport{
-		Domain:          domain,
-		EnumerationType: osintscan.DnsSubenumTypePassive,
-	}
-	errors := []string{}
-
-	// Get all valid subdomains
-	subdomains, err := getSubdomainsPassive(ctx, domain)
-	if err != nil {
-		errors = append(errors, err.Error())
-	}
-
-	report.Subdomains = subdomains
-	report.Errors = errors
-	return report, nil
-
-}
-
-// SubdomainsEnumReport represents the report of all subdomains for a given domain including all non-fatal errors that occurred.
-
-func getSubdomainsPassive(ctx context.Context, domain string) ([]string, error) {
-	subfinderOpts := &runner.Options{
-		Threads:            10, // Thread controls the number of threads to use for active enumerations
-		Timeout:            30, // Timeout is the seconds to wait for sources to respond
-		MaxEnumerationTime: 10, // MaxEnumerationTime is the maximum amount of time in mins to wait for enumeration
-	}
-
-	subfinder, err := runner.NewRunner(subfinderOpts)
-	if err != nil {
-		return []string{}, err
-	}
-
-	output := &bytes.Buffer{}
-	// To run subdomain enumeration on a single domain
-	if err = subfinder.EnumerateSingleDomainWithCtx(ctx, domain, []io.Writer{output}); err != nil {
-		return []string{}, err
-	}
-
-	// Convert buffer to string and split by new line
-	subdomains := strings.Split(output.String(), "\n")
-
-	// Trim the last empty string if the output ends with a newline
-	if len(subdomains) > 0 && subdomains[len(subdomains)-1] == "" {
-		subdomains = subdomains[:len(subdomains)-1]
-	}
-	return subdomains, err
-}
 
 // GetDomainSubdomainsBrute queries subfinder for all subdomains for a given domain. It returns a SubdomainsEnumReport struct containing
 // all subdomains and any errors that occurred.
@@ -73,7 +21,10 @@ func GetDomainSubdomainsBrute(ctx context.Context, domain string, subdomainList 
 	}
 	errors := []string{}
 
-	subdomains := getSubdomainsBrute(ctx, domain, subdomainList, parallelThreads, recursiveDepth, timeout)
+	subdomains, err := getSubdomainsBrute(ctx, domain, subdomainList, parallelThreads, recursiveDepth, timeout)
+	if err != nil {
+		errors = append(errors, err.Error())
+	}
 
 	report.Subdomains = subdomains
 	report.Errors = errors
@@ -81,7 +32,28 @@ func GetDomainSubdomainsBrute(ctx context.Context, domain string, subdomainList 
 
 }
 
-func getSubdomainsBrute(ctx context.Context, domain string, subdomainList []string, parallelThreads int, recursiveDepth int, timeout int) []string {
+// detectWildcardDNS tests a random high-entropy subdomain to check if a wildcard DNS record is present.
+func detectWildcardDNS(ctx context.Context, domain string, resolver *net.Resolver) (*string, error) {
+	// Generate a high-entropy 16-character random subdomain
+	randomSubdomain, err := generateRandomSubdomain(domain)
+	if err != nil {
+		return nil, err
+	}
+
+	// Check if the random subdomain resolves
+	_, err = resolver.LookupHost(ctx, randomSubdomain)
+
+	// If no error, it resolved, meaning wildcard is present
+	if err == nil {
+		wildcardDomain := "*." + domain
+		return &wildcardDomain, nil
+	}
+
+	// If the error is NXDOMAIN or SERVFAIL, wildcard is NOT present
+	return nil, nil
+}
+
+func getSubdomainsBrute(ctx context.Context, domain string, subdomainList []string, parallelThreads int, recursiveDepth int, timeout int) ([]string, error) {
 	subdomains := []string{}
 	subdomainsSet := make(map[string]struct{}) // To track unique valid subdomains
 	subdomainsMutex := &sync.Mutex{}
@@ -97,6 +69,16 @@ func getSubdomainsBrute(ctx context.Context, domain string, subdomainList []stri
 	resolver := net.Resolver{}
 
 	// First iteration - test all base subdomains
+	wildcardDNS, err := detectWildcardDNS(ctx, domain, &resolver)
+	if err != nil {
+		return []string{}, err
+	}
+	if wildcardDNS != nil {
+		domain = *wildcardDNS
+		subdomains = append(subdomains, domain)
+		return subdomains, nil
+	}
+
 	basePermutations := generatePermutations([]string{domain}, subdomainList)
 	validBaseSubdomains := testPermutations(ctx, basePermutations, &resolver, semaphore, &wg, subdomainsMutex, subdomainsSet, &subdomains)
 
@@ -107,11 +89,22 @@ func getSubdomainsBrute(ctx context.Context, domain string, subdomainList []stri
 			break // No valid subdomains to build on
 		}
 
-		newPermutations := generatePermutations(currentDepthSubdomains, subdomainList)
+		validSubdomains := []string{}
+		for _, subdomain := range currentDepthSubdomains {
+			wildcardDNS, err := detectWildcardDNS(ctx, subdomain, &resolver)
+			if err != nil || wildcardDNS != nil {
+				domain = *wildcardDNS
+				subdomains = append(subdomains, domain)
+				continue
+			}
+			validSubdomains = append(validSubdomains, subdomain)
+		}
+
+		newPermutations := generatePermutations(validSubdomains, subdomainList)
 		currentDepthSubdomains = testPermutations(ctx, newPermutations, &resolver, semaphore, &wg, subdomainsMutex, subdomainsSet, &subdomains)
 	}
 
-	return subdomains
+	return subdomains, nil
 }
 
 func testPermutations(ctx context.Context, permutations []string, resolver *net.Resolver, semaphore chan struct{}, wg *sync.WaitGroup, subdomainsMutex *sync.Mutex, subdomainsSet map[string]struct{}, subdomains *[]string) []string {
@@ -159,4 +152,20 @@ func generatePermutations(validSubdomains []string, subdomainList []string) []st
 		}
 	}
 	return results
+}
+
+// generateRandomSubdomain generates a high-entropy subdomain with only letters (16 characters).
+func generateRandomSubdomain(domain string) (string, error) {
+	letterBytes := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+	randomString := make([]byte, 16)
+	for i := range randomString {
+		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(letterBytes))))
+		if err != nil {
+			return "", err
+		}
+		randomString[i] = letterBytes[n.Int64()]
+	}
+
+	return fmt.Sprintf("%s.%s", string(randomString), domain), nil
 }
