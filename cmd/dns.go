@@ -5,6 +5,7 @@ import (
 
 	"github.com/Method-Security/osintscan/internal/dns"
 	subenum "github.com/Method-Security/osintscan/internal/dns/subenum"
+	zonetransfer "github.com/Method-Security/osintscan/internal/dns/zonetransfer"
 	"github.com/Method-Security/osintscan/utils"
 	"github.com/spf13/cobra"
 )
@@ -253,10 +254,46 @@ This ensures efficient scanning but means some valid deep subdomains may be miss
 	takeoverCmd.Flags().Bool("https", false, "Only check sites with secure SSL")
 	takeoverCmd.Flags().Int("timeout", 10, "Request timeout in seconds")
 
+	zoneTransferCmd := &cobra.Command{
+		Use:   "zonetransfer",
+		Short: "Perform zone transfers for a given domain",
+		Long:  `Perform zone transfers for a given domain`,
+		Run: func(cmd *cobra.Command, args []string) {
+			domains, err := cmd.Flags().GetStringSlice("domains")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			timeout, err := cmd.Flags().GetInt("timeout")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			maxJumps, err := cmd.Flags().GetInt("maxjumps")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			report, err := zonetransfer.TestZoneTransfer(cmd.Context(), domains, timeout, maxJumps)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			a.OutputSignal.Content = report
+		},
+	}
+
+	zoneTransferCmd.Flags().StringSlice("domains", []string{}, "Domains to perform zone transfers for")
+	zoneTransferCmd.Flags().Int("timeout", 30, "Request timeout in seconds")
+	zoneTransferCmd.Flags().Int("maxjumps", 10, "Maximum number of jumps")
+
+	_ = zoneTransferCmd.MarkFlagRequired("domains")
+
 	a.DNSCmd.AddCommand(recordCmd)
 	a.DNSCmd.AddCommand(certsCmd)
 	a.DNSCmd.AddCommand(subenumCmd)
 	a.DNSCmd.AddCommand(reverseforwardCmd)
 	a.DNSCmd.AddCommand(takeoverCmd)
+	a.DNSCmd.AddCommand(zoneTransferCmd)
 	a.RootCmd.AddCommand(a.DNSCmd)
 }

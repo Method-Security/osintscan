@@ -167,3 +167,34 @@ Global Flags:
   -q, --quiet                Suppress output
   -v, --verbose              Verbose output
 ```
+
+### Zone Transfer
+
+#### Usage
+
+```bash
+osintscan dns zone-transfer --domain example.com --timeout 10
+```
+
+#### Help Text
+
+```bash
+Perform zone transfers for a given domain
+
+Usage:
+  osintscan dns zonetransfer [flags]
+
+Flags:
+      --domains strings   Domains to perform zone transfers for
+  -h, --help              help for zonetransfer
+      --timeout int       Request timeout in seconds (default 30)
+      --maxjumps int   Maximum number of jumps (default 10)
+
+
+Global Flags:
+  -o, --output string        Output format (signal, json, yaml). Default value is signal (default "signal")
+  -f, --output-file string   Path to output file. If blank, will output to STDOUT
+  -q, --quiet                Suppress output
+  -v, --verbose              Verbose output
+  
+  ```

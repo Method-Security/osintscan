@@ -476,3 +476,217 @@ func (s *Service) String() string {
 	}
 	return fmt.Sprintf("%#v", s)
 }
+
+type DnsQueryHeader struct {
+	Id      int `json:"ID" url:"ID"`
+	Flags   int `json:"Flags" url:"Flags"`
+	QdCount int `json:"QDCount" url:"QDCount"`
+	AnCount int `json:"ANCount" url:"ANCount"`
+	NsCount int `json:"NSCount" url:"NSCount"`
+	ArCount int `json:"ARCount" url:"ARCount"`
+
+	extraProperties map[string]interface{}
+	_rawJSON        json.RawMessage
+}
+
+func (d *DnsQueryHeader) GetExtraProperties() map[string]interface{} {
+	return d.extraProperties
+}
+
+func (d *DnsQueryHeader) UnmarshalJSON(data []byte) error {
+	type unmarshaler DnsQueryHeader
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*d = DnsQueryHeader(value)
+
+	extraProperties, err := core.ExtractExtraProperties(data, *d)
+	if err != nil {
+		return err
+	}
+	d.extraProperties = extraProperties
+
+	d._rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (d *DnsQueryHeader) String() string {
+	if len(d._rawJSON) > 0 {
+		if value, err := core.StringifyJSON(d._rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := core.StringifyJSON(d); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", d)
+}
+
+type DnsRecordEnum string
+
+const (
+	DnsRecordEnumA     DnsRecordEnum = "A"
+	DnsRecordEnumAaaa  DnsRecordEnum = "AAAA"
+	DnsRecordEnumCname DnsRecordEnum = "CNAME"
+	DnsRecordEnumMx    DnsRecordEnum = "MX"
+	DnsRecordEnumNs    DnsRecordEnum = "NS"
+	DnsRecordEnumSoa   DnsRecordEnum = "SOA"
+	DnsRecordEnumTxt   DnsRecordEnum = "TXT"
+)
+
+func NewDnsRecordEnumFromString(s string) (DnsRecordEnum, error) {
+	switch s {
+	case "A":
+		return DnsRecordEnumA, nil
+	case "AAAA":
+		return DnsRecordEnumAaaa, nil
+	case "CNAME":
+		return DnsRecordEnumCname, nil
+	case "MX":
+		return DnsRecordEnumMx, nil
+	case "NS":
+		return DnsRecordEnumNs, nil
+	case "SOA":
+		return DnsRecordEnumSoa, nil
+	case "TXT":
+		return DnsRecordEnumTxt, nil
+	}
+	var t DnsRecordEnum
+	return "", fmt.Errorf("%s is not a valid %T", s, t)
+}
+
+func (d DnsRecordEnum) Ptr() *DnsRecordEnum {
+	return &d
+}
+
+type DnsZoneTransferDetails struct {
+	Domain     string                   `json:"Domain" url:"Domain"`
+	DnsRecords []*DnsZoneTransferRecord `json:"DNSRecords,omitempty" url:"DNSRecords,omitempty"`
+	Success    *bool                    `json:"Success,omitempty" url:"Success,omitempty"`
+
+	extraProperties map[string]interface{}
+	_rawJSON        json.RawMessage
+}
+
+func (d *DnsZoneTransferDetails) GetExtraProperties() map[string]interface{} {
+	return d.extraProperties
+}
+
+func (d *DnsZoneTransferDetails) UnmarshalJSON(data []byte) error {
+	type unmarshaler DnsZoneTransferDetails
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*d = DnsZoneTransferDetails(value)
+
+	extraProperties, err := core.ExtractExtraProperties(data, *d)
+	if err != nil {
+		return err
+	}
+	d.extraProperties = extraProperties
+
+	d._rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (d *DnsZoneTransferDetails) String() string {
+	if len(d._rawJSON) > 0 {
+		if value, err := core.StringifyJSON(d._rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := core.StringifyJSON(d); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", d)
+}
+
+type DnsZoneTransferRecord struct {
+	Name  string        `json:"Name" url:"Name"`
+	Type  DnsRecordEnum `json:"Type" url:"Type"`
+	Ttl   *int          `json:"Ttl,omitempty" url:"Ttl,omitempty"`
+	Class *int          `json:"Class,omitempty" url:"Class,omitempty"`
+	Value string        `json:"Value" url:"Value"`
+
+	extraProperties map[string]interface{}
+	_rawJSON        json.RawMessage
+}
+
+func (d *DnsZoneTransferRecord) GetExtraProperties() map[string]interface{} {
+	return d.extraProperties
+}
+
+func (d *DnsZoneTransferRecord) UnmarshalJSON(data []byte) error {
+	type unmarshaler DnsZoneTransferRecord
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*d = DnsZoneTransferRecord(value)
+
+	extraProperties, err := core.ExtractExtraProperties(data, *d)
+	if err != nil {
+		return err
+	}
+	d.extraProperties = extraProperties
+
+	d._rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (d *DnsZoneTransferRecord) String() string {
+	if len(d._rawJSON) > 0 {
+		if value, err := core.StringifyJSON(d._rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := core.StringifyJSON(d); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", d)
+}
+
+type DnsZoneTransferReport struct {
+	Domains      []string                  `json:"Domains,omitempty" url:"Domains,omitempty"`
+	ZoneTransfer []*DnsZoneTransferDetails `json:"ZoneTransfer,omitempty" url:"ZoneTransfer,omitempty"`
+	Errors       []string                  `json:"Errors,omitempty" url:"Errors,omitempty"`
+
+	extraProperties map[string]interface{}
+	_rawJSON        json.RawMessage
+}
+
+func (d *DnsZoneTransferReport) GetExtraProperties() map[string]interface{} {
+	return d.extraProperties
+}
+
+func (d *DnsZoneTransferReport) UnmarshalJSON(data []byte) error {
+	type unmarshaler DnsZoneTransferReport
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*d = DnsZoneTransferReport(value)
+
+	extraProperties, err := core.ExtractExtraProperties(data, *d)
+	if err != nil {
+		return err
+	}
+	d.extraProperties = extraProperties
+
+	d._rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (d *DnsZoneTransferReport) String() string {
+	if len(d._rawJSON) > 0 {
+		if value, err := core.StringifyJSON(d._rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := core.StringifyJSON(d); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", d)
+}
