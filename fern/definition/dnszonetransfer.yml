@@ -8,20 +8,10 @@ types:
       - NS
       - SOA
       - TXT
-  DnsQueryHeader:
-    properties:
-      ID: integer
-      Flags: integer
-      QDCount: integer
-      ANCount: integer
-      NSCount: integer
-      ARCount: integer
   DnsZoneTransferRecord:
     properties:
       Name: string
       Type: DnsRecordEnum
-      Ttl: optional<integer>
-      Class: optional<integer>
       Value: string
   DnsZoneTransferDetails:
     properties:

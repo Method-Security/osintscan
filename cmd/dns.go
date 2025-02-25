@@ -269,12 +269,8 @@ This ensures efficient scanning but means some valid deep subdomains may be miss
 				a.OutputSignal.AddError(err)
 				return
 			}
-			maxJumps, err := cmd.Flags().GetInt("maxjumps")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-			report, err := zonetransfer.TestZoneTransfer(cmd.Context(), domains, timeout, maxJumps)
+
+			report, err := zonetransfer.TestZoneTransfer(cmd.Context(), domains, timeout)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -285,7 +281,6 @@ This ensures efficient scanning but means some valid deep subdomains may be miss
 
 	zoneTransferCmd.Flags().StringSlice("domains", []string{}, "Domains to perform zone transfers for")
 	zoneTransferCmd.Flags().Int("timeout", 30, "Request timeout in seconds")
-	zoneTransferCmd.Flags().Int("maxjumps", 10, "Maximum number of jumps")
 
 	_ = zoneTransferCmd.MarkFlagRequired("domains")
 

@@ -188,7 +188,6 @@ Flags:
       --domains strings   Domains to perform zone transfers for
   -h, --help              help for zonetransfer
       --timeout int       Request timeout in seconds (default 30)
-      --maxjumps int   Maximum number of jumps (default 10)
 
 
 Global Flags:

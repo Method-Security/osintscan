@@ -9,13 +9,13 @@ import (
 )
 
 // TestZoneTransfer checks if a domain is vulnerable to a DNS zone transfer attack
-func TestZoneTransfer(ctx context.Context, domains []string, timeout int, maxJumps int) (*osintscan.DnsZoneTransferReport, error) {
+func TestZoneTransfer(ctx context.Context, domains []string, timeout int) (*osintscan.DnsZoneTransferReport, error) {
 	report := &osintscan.DnsZoneTransferReport{Domains: domains}
 	errors := []string{}
 
 	zoneTransferDetails := []*osintscan.DnsZoneTransferDetails{}
 	for _, domain := range domains {
-		var axfrSuccessful bool
+		axfrSuccessful := false
 
 		fmt.Printf("[Debug] Retrieving NS records for %s\n", domain)
 		nsRecords, err := net.LookupNS(domain)
@@ -33,7 +33,7 @@ func TestZoneTransfer(ctx context.Context, domains []string, timeout int, maxJum
 				Value: ns.Host,
 			})
 			fmt.Printf("[Debug] Testing zone transfer on NS: %s\n", ns.Host)
-			records, success, err := sendAXFRRequest(ns.Host, domain, timeout, maxJumps)
+			records, success, err := sendAXFRRequest(ns.Host, domain, timeout)
 			if len(err) > 0 {
 				errors = append(errors, err...)
 			}

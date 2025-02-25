@@ -477,52 +477,6 @@ func (s *Service) String() string {
 	return fmt.Sprintf("%#v", s)
 }
 
-type DnsQueryHeader struct {
-	Id      int `json:"ID" url:"ID"`
-	Flags   int `json:"Flags" url:"Flags"`
-	QdCount int `json:"QDCount" url:"QDCount"`
-	AnCount int `json:"ANCount" url:"ANCount"`
-	NsCount int `json:"NSCount" url:"NSCount"`
-	ArCount int `json:"ARCount" url:"ARCount"`
-
-	extraProperties map[string]interface{}
-	_rawJSON        json.RawMessage
-}
-
-func (d *DnsQueryHeader) GetExtraProperties() map[string]interface{} {
-	return d.extraProperties
-}
-
-func (d *DnsQueryHeader) UnmarshalJSON(data []byte) error {
-	type unmarshaler DnsQueryHeader
-	var value unmarshaler
-	if err := json.Unmarshal(data, &value); err != nil {
-		return err
-	}
-	*d = DnsQueryHeader(value)
-
-	extraProperties, err := core.ExtractExtraProperties(data, *d)
-	if err != nil {
-		return err
-	}
-	d.extraProperties = extraProperties
-
-	d._rawJSON = json.RawMessage(data)
-	return nil
-}
-
-func (d *DnsQueryHeader) String() string {
-	if len(d._rawJSON) > 0 {
-		if value, err := core.StringifyJSON(d._rawJSON); err == nil {
-			return value
-		}
-	}
-	if value, err := core.StringifyJSON(d); err == nil {
-		return value
-	}
-	return fmt.Sprintf("%#v", d)
-}
-
 type DnsRecordEnum string
 
 const (
@@ -606,8 +560,6 @@ func (d *DnsZoneTransferDetails) String() string {
 type DnsZoneTransferRecord struct {
 	Name  string        `json:"Name" url:"Name"`
 	Type  DnsRecordEnum `json:"Type" url:"Type"`
-	Ttl   *int          `json:"Ttl,omitempty" url:"Ttl,omitempty"`
-	Class *int          `json:"Class,omitempty" url:"Class,omitempty"`
 	Value string        `json:"Value" url:"Value"`
 
 	extraProperties map[string]interface{}
