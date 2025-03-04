@@ -120,13 +120,14 @@ Usage:
   osintscan dns subenum brute [flags]
 
 Flags:
-      --domain string       Domain to get subdomains for
-      --file strings        List of files containing subdomains to enumerate
-  -h, --help                help for brute
-      --maxdepth int        Maximum recursion depth (default 3)
-      --subdomain strings   List of subdomains to enumerate
-      --threads int         Number of parallel threads (default 20)
-      --timeout int         Maximum time of enumeration (Minutes)
+      --dnsServerAddress string   IP address + port of DNS server to use
+      --domain string             Domain to get subdomains for
+      --file strings              List of files containing subdomains to enumerate
+  -h, --help                      help for brute
+      --maxdepth int              Maximum recursion depth (default 3)
+      --subdomain strings         List of subdomains to enumerate
+      --threads int               Number of parallel threads (default 20)
+      --timeout int               Maximum time of enumeration (Minutes)
 
 Global Flags:
   -o, --output string        Output format (signal, json, yaml). Default value is signal (default "signal")
