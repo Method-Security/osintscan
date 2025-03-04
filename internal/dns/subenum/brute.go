@@ -10,6 +10,7 @@ import (
 	"time"
 
 	osintscan "github.com/Method-Security/osintscan/generated/go"
+	"github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
 // GetDomainSubdomainsBrute queries subfinder for all subdomains for a given domain. It returns a SubdomainsEnumReport struct containing
@@ -54,6 +55,7 @@ func detectWildcardDNS(ctx context.Context, domain string, resolver *net.Resolve
 }
 
 func getSubdomainsBrute(ctx context.Context, domain string, subdomainList []string, parallelThreads int, recursiveDepth int, timeout int, dnsServerAddress string) ([]string, error) {
+	log := svc1log.FromContext(ctx)
 	subdomains := []string{}
 	subdomainsSet := make(map[string]struct{}) // To track unique valid subdomains
 	subdomainsMutex := &sync.Mutex{}
@@ -68,8 +70,10 @@ func getSubdomainsBrute(ctx context.Context, domain string, subdomainList []stri
 
 	var resolver *net.Resolver
 	if dnsServerAddress == "" {
+		log.Info("Using system default DNS resolver")
 		resolver = &net.Resolver{}
 	} else {
+		log.Info("Using custom DNS server address", svc1log.SafeParam("dnsServerAddress", dnsServerAddress))
 		resolver = &net.Resolver{
 			PreferGo: true,
 			Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
