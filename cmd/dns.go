@@ -167,7 +167,7 @@ This ensures efficient scanning but means some valid deep subdomains may be miss
 	subenumbruteCmd.Flags().Int("threads", 20, "Number of parallel threads")
 	subenumbruteCmd.Flags().Int("maxdepth", 3, "Maximum recursion depth")
 	subenumbruteCmd.Flags().Int("timeout", 0, "Maximum time of enumeration (Minutes)")
-	subenumbruteCmd.Flags().String("dnsServerAddress", "", "IP address of DNS server to use")
+	subenumbruteCmd.Flags().String("dnsServerAddress", "", "IP address + port of DNS server to use")
 
 	_ = subenumbruteCmd.MarkFlagRequired("domain")
 
