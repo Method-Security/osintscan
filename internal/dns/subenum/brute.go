@@ -14,14 +14,14 @@ import (
 
 // GetDomainSubdomainsBrute queries subfinder for all subdomains for a given domain. It returns a SubdomainsEnumReport struct containing
 // all subdomains and any errors that occurred.
-func GetDomainSubdomainsBrute(ctx context.Context, domain string, subdomainList []string, parallelThreads int, recursiveDepth int, timeout int) (osintscan.DnsSubenumReport, error) {
+func GetDomainSubdomainsBrute(ctx context.Context, domain string, subdomainList []string, parallelThreads int, recursiveDepth int, timeout int, dnsServerAddress string) (osintscan.DnsSubenumReport, error) {
 	report := osintscan.DnsSubenumReport{
 		Domain:          domain,
 		EnumerationType: osintscan.DnsSubenumTypeBrute,
 	}
 	errors := []string{}
 
-	subdomains, err := getSubdomainsBrute(ctx, domain, subdomainList, parallelThreads, recursiveDepth, timeout)
+	subdomains, err := getSubdomainsBrute(ctx, domain, subdomainList, parallelThreads, recursiveDepth, timeout, dnsServerAddress)
 	if err != nil {
 		errors = append(errors, err.Error())
 	}
@@ -53,7 +53,7 @@ func detectWildcardDNS(ctx context.Context, domain string, resolver *net.Resolve
 	return nil, nil
 }
 
-func getSubdomainsBrute(ctx context.Context, domain string, subdomainList []string, parallelThreads int, recursiveDepth int, timeout int) ([]string, error) {
+func getSubdomainsBrute(ctx context.Context, domain string, subdomainList []string, parallelThreads int, recursiveDepth int, timeout int, dnsServerAddress string) ([]string, error) {
 	subdomains := []string{}
 	subdomainsSet := make(map[string]struct{}) // To track unique valid subdomains
 	subdomainsMutex := &sync.Mutex{}
@@ -66,10 +66,23 @@ func getSubdomainsBrute(ctx context.Context, domain string, subdomainList []stri
 		defer cancel()
 	}
 
-	resolver := net.Resolver{}
+	var resolver *net.Resolver
+	if dnsServerAddress == "" {
+		resolver = &net.Resolver{}
+	} else {
+		resolver = &net.Resolver{
+			PreferGo: true,
+			Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
+				d := net.Dialer{
+					Timeout: time.Second * 10,
+				}
+				return d.DialContext(ctx, "udp", dnsServerAddress)
+			},
+		}
+	}
 
 	// First iteration - test all base subdomains
-	wildcardDNS, err := detectWildcardDNS(ctx, domain, &resolver)
+	wildcardDNS, err := detectWildcardDNS(ctx, domain, resolver)
 	if err != nil {
 		return []string{}, err
 	}
@@ -80,7 +93,7 @@ func getSubdomainsBrute(ctx context.Context, domain string, subdomainList []stri
 	}
 
 	basePermutations := generatePermutations([]string{domain}, subdomainList)
-	validBaseSubdomains := testPermutations(ctx, basePermutations, &resolver, semaphore, &wg, subdomainsMutex, subdomainsSet, &subdomains)
+	validBaseSubdomains := testPermutations(ctx, basePermutations, resolver, semaphore, &wg, subdomainsMutex, subdomainsSet, &subdomains)
 
 	// For each subsequent depth, only build on valid subdomains from previous iteration
 	currentDepthSubdomains := validBaseSubdomains
@@ -91,8 +104,11 @@ func getSubdomainsBrute(ctx context.Context, domain string, subdomainList []stri
 
 		validSubdomains := []string{}
 		for _, subdomain := range currentDepthSubdomains {
-			wildcardDNS, err := detectWildcardDNS(ctx, subdomain, &resolver)
-			if err != nil || wildcardDNS != nil {
+			wildcardDNS, err := detectWildcardDNS(ctx, subdomain, resolver)
+			if err != nil {
+				continue
+			}
+			if wildcardDNS != nil {
 				domain = *wildcardDNS
 				subdomains = append(subdomains, domain)
 				continue
@@ -101,7 +117,7 @@ func getSubdomainsBrute(ctx context.Context, domain string, subdomainList []stri
 		}
 
 		newPermutations := generatePermutations(validSubdomains, subdomainList)
-		currentDepthSubdomains = testPermutations(ctx, newPermutations, &resolver, semaphore, &wg, subdomainsMutex, subdomainsSet, &subdomains)
+		currentDepthSubdomains = testPermutations(ctx, newPermutations, resolver, semaphore, &wg, subdomainsMutex, subdomainsSet, &subdomains)
 	}
 
 	return subdomains, nil

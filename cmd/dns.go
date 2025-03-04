@@ -146,7 +146,13 @@ This ensures efficient scanning but means some valid deep subdomains may be miss
 				return
 			}
 
-			report, err := subenum.GetDomainSubdomainsBrute(cmd.Context(), domain, allSubdomains, parallelThreads, recursiveDepth, timeout)
+			dnsServerAddress, err := cmd.Flags().GetString("dnsServerAddress")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			report, err := subenum.GetDomainSubdomainsBrute(cmd.Context(), domain, allSubdomains, parallelThreads, recursiveDepth, timeout, dnsServerAddress)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -161,6 +167,7 @@ This ensures efficient scanning but means some valid deep subdomains may be miss
 	subenumbruteCmd.Flags().Int("threads", 20, "Number of parallel threads")
 	subenumbruteCmd.Flags().Int("maxdepth", 3, "Maximum recursion depth")
 	subenumbruteCmd.Flags().Int("timeout", 0, "Maximum time of enumeration (Minutes)")
+	subenumbruteCmd.Flags().String("dnsServerAddress", "", "IP address of DNS server to use")
 
 	_ = subenumbruteCmd.MarkFlagRequired("domain")
 
