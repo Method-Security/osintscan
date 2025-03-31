@@ -1,0 +1,52 @@
+types:
+  # File JSON Schema
+  SaasFingerprintProfile:
+    properties:
+      headers: optional<map<string, list<string>>>
+      body: optional<list<string>>
+      pageNotFound: optional<list<string>>
+  SaasFingerprintEntry:
+    properties:
+      fingerprintProfile: SaasFingerprintProfile
+      domainSlugs: list<string>
+  SaasFingerprintFile:
+    properties:
+      fingerprints: map<string, SaasFingerprintEntry>
+  # CLI Config
+  SaasDiscoveryConfig:
+    properties:
+      orgs: list<string>
+      saasFilePaths: list<string>
+      ssoFilePaths: list<string>
+      saasCompanies: optional<list<string>>
+      ssoCompanies: optional<list<string>>
+      timeout: integer
+      httpsOnly: boolean
+      successfulOnly: boolean
+      skipTLS: boolean
+  # Report
+  SaaSDiscoveryFinding:
+    properties:
+      ssoPage: optional<string>
+      companyPage: optional<boolean>
+  SaasDiscoveryRequest:
+    properties:
+      url: string
+      redirectChain: optional<list<string>>
+      statusCode: optional<integer>
+      responseHeaders: optional<map<string, string>>
+      responseBody: optional<string>
+      findings: optional<SaaSDiscoveryFinding>
+  SaasDiscoveryCompany:
+    properties:
+      company: string
+      requests: list<SaasDiscoveryRequest>
+  SaasDiscoveryAttempt:
+    properties:
+      org: string
+      companies: list<SaasDiscoveryCompany>
+  SaasDiscoveryReport:
+    properties:
+      orgs: optional<list<SaasDiscoveryAttempt>>
+      config: SaasDiscoveryConfig
+      errors: optional<list<string>>
