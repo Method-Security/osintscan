@@ -1,8 +1,8 @@
-FROM alpine:3.20
+FROM chromedp/headless-shell:129.0.6643.2 
 
 ARG CLI_NAME="osintscan"
 
-RUN apk update && apk add --no-cache bash jq ca-certificates
+RUN apt-get update && apt-get install -y ca-certificates git
 
 # Setup Method Directory Structure
 RUN \
@@ -13,13 +13,15 @@ RUN \
   mkdir -p /opt/method/${CLI_NAME}/var/conf/dns && \
   mkdir -p /opt/method/${CLI_NAME}/var/conf/dns/subenum && \
   mkdir -p /opt/method/${CLI_NAME}/var/conf/dns/takeover && \
+  mkdir -p /opt/method/${CLI_NAME}/var/conf/saas && \
   mkdir -p /opt/method/${CLI_NAME}/var/log && \
   mkdir -p /opt/method/${CLI_NAME}/service/bin && \
   mkdir -p /mnt/output
 
 COPY configs/dns/subenum/*                   /opt/method/${CLI_NAME}/var/conf/dns/subenum/
 COPY configs/dns/takeover/*                  /opt/method/${CLI_NAME}/var/conf/dns/takeover/
-COPY ${CLI_NAME} /opt/method/${CLI_NAME}/service/bin/${CLI_NAME}
+COPY configs/saas/*                          /opt/method/${CLI_NAME}/var/conf/saas/
+COPY ${CLI_NAME}                             /opt/method/${CLI_NAME}/service/bin/${CLI_NAME}
 
 RUN \
   adduser --disabled-password --gecos '' method && \

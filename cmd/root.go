@@ -27,6 +27,7 @@ type OsintScan struct {
 	RootCmd      *cobra.Command
 	VersionCmd   *cobra.Command
 	DNSCmd       *cobra.Command
+	SaasCmd      *cobra.Command
 	ShodanCmd    *cobra.Command
 }
 
