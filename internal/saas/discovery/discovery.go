@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Method-Security/osintscan/generated/go/saas"
 	saasFern "github.com/Method-Security/osintscan/generated/go/saas"
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/launcher"
@@ -17,23 +16,39 @@ import (
 
 func Discovery(ctx context.Context, saasFingerprints saasFern.SaasFingerprintFile, ssoFingerprints saasFern.SaasFingerprintFile, config saasFern.SaasDiscoveryConfig) (*saasFern.SaasDiscoveryReport, error) {
 	// Initialize report
-	report := saas.SaasDiscoveryReport{
+	report := saasFern.SaasDiscoveryReport{
 		Config: &config,
 	}
 	errors := []string{}
 
 	// Gather fingerprints
-	selectedSaasFingerprints := selectFingerprints(saasFingerprints, config.SaasCompanies)
-	selectedSsoFingerprints := selectFingerprints(ssoFingerprints, config.SsoCompanies)
+	selectedSaasFingerprints, errs := selectFingerprints(saasFingerprints, config.SaasCompanies)
+	if len(errs) > 0 {
+		errors = append(errors, errs...)
+	}
+	selectedSsoFingerprints, errs := selectFingerprints(ssoFingerprints, config.SsoCompanies)
+	if len(errs) > 0 {
+		errors = append(errors, errs...)
+	}
+	if len(selectedSaasFingerprints.Fingerprints) == 0 {
+		errors = append(errors, "no SaaS fingerprints found")
+		report.Errors = errors
+		return &report, nil
+	}
+	if len(selectedSsoFingerprints.Fingerprints) == 0 {
+		errors = append(errors, "no SSO fingerprints found")
+		report.Errors = errors
+		return &report, nil
+	}
 
 	// Loop through each organization and fingerprint
-	attempts := []*saas.SaasDiscoveryAttempt{}
+	attempts := []*saasFern.SaasDiscoveryAttempt{}
 	for _, org := range config.Orgs {
-		attempt := saas.SaasDiscoveryAttempt{Org: org}
-		companies := []*saas.SaasDiscoveryCompany{}
+		attempt := saasFern.SaasDiscoveryAttempt{Org: org}
+		companies := []*saasFern.SaasDiscoveryCompany{}
 		for company, fingerprint := range selectedSaasFingerprints.Fingerprints {
-			company := saas.SaasDiscoveryCompany{Company: company}
-			requests := []*saas.SaasDiscoveryRequest{}
+			company := saasFern.SaasDiscoveryCompany{Company: company}
+			requests := []*saasFern.SaasDiscoveryRequest{}
 			for _, domainSlug := range fingerprint.DomainSlugs {
 				// Determine the schemas to use for the request
 				schemas := []string{"https"}
@@ -73,10 +88,10 @@ func handleSaasRequest(
 	org string,
 	domainSlug string,
 	schema string,
-	config *saas.SaasDiscoveryConfig,
-	fingerprint *saas.SaasFingerprintEntry,
-	selectedSsoFingerprints saas.SaasFingerprintFile,
-) (*saas.SaasDiscoveryRequest, []string) {
+	config *saasFern.SaasDiscoveryConfig,
+	fingerprint *saasFern.SaasFingerprintEntry,
+	selectedSsoFingerprints saasFern.SaasFingerprintFile,
+) (*saasFern.SaasDiscoveryRequest, []string) {
 	request, errs := sendSaasRequest(ctx, org, domainSlug, schema, config.Timeout, config.SkipTls)
 
 	// Check if the page was redirected
@@ -91,7 +106,7 @@ func handleSaasRequest(
 	return request, errs
 }
 
-func sendSaasRequest(ctx context.Context, org string, domainSlug string, schema string, timeout int, skipTLS bool) (*saas.SaasDiscoveryRequest, []string) {
+func sendSaasRequest(ctx context.Context, org string, domainSlug string, schema string, timeout int, skipTLS bool) (*saasFern.SaasDiscoveryRequest, []string) {
 	// Initialize variables
 	var redirectChain []string
 	var errors []string
@@ -99,7 +114,7 @@ func sendSaasRequest(ctx context.Context, org string, domainSlug string, schema 
 	slug := strings.Replace(domainSlug, "INPUT_ORG", org, 1)
 	fullURL := fmt.Sprintf("%s://%s", schema, slug)
 
-	request := &saas.SaasDiscoveryRequest{Url: fullURL}
+	request := &saasFern.SaasDiscoveryRequest{Url: fullURL}
 	log.Printf("Sending request to %s", fullURL)
 
 	// Setup browser launch options

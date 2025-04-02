@@ -1,9 +1,7 @@
 package cmd
 
 import (
-	"encoding/json"
 	"errors"
-	"os"
 
 	saasFern "github.com/Method-Security/osintscan/generated/go/saas"
 	saasdiscovery "github.com/Method-Security/osintscan/internal/saas/discovery"
@@ -41,8 +39,8 @@ func (a *OsintScan) InitSaasCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			saasFingerprints := unmarshalFingerprints(saasFilePaths)
-			ssoFingerprints := unmarshalFingerprints(ssoFilePaths)
+			saasFingerprints := saasdiscovery.UnmarshalFingerprints(saasFilePaths)
+			ssoFingerprints := saasdiscovery.UnmarshalFingerprints(ssoFilePaths)
 
 			if len(saasFingerprints.Fingerprints) == 0 {
 				a.OutputSignal.AddError(errors.New("no SaaS fingerprints found"))
@@ -130,27 +128,4 @@ func saasDiscoveryConfig(orgs []string, saasFilePaths []string, ssoFilePaths []s
 		config.SsoCompanies = ssoCompanies
 	}
 	return config
-}
-
-func unmarshalFingerprints(fingerprintFiles []string) saasFern.SaasFingerprintFile {
-	result := saasFern.SaasFingerprintFile{
-		Fingerprints: make(map[string]*saasFern.SaasFingerprintEntry),
-	}
-	// Read and unmarshal each fingerprint file
-	for _, file := range fingerprintFiles {
-		data, err := os.ReadFile(file)
-		if err != nil {
-			continue
-		}
-		var fingerprints saasFern.SaasFingerprintFile
-		if err := json.Unmarshal(data, &fingerprints); err != nil {
-			continue
-		}
-		// Merge fingerprints from this file into result
-		for k, v := range fingerprints.Fingerprints {
-			result.Fingerprints[k] = v
-		}
-	}
-
-	return result
 }
