@@ -1,22 +1,22 @@
 module github.com/Method-Security/osintscan
 
 go 1.22
-
-toolchain go1.22.6
+toolchain go1.24.1
 
 require (
 	github.com/Method-Security/pkg v0.0.3
 	github.com/google/uuid v1.3.1
 	github.com/miekg/dns v1.1.59
 	github.com/palantir/pkg/datetime v1.1.0
-	github.com/palantir/witchcraft-go-logging v1.57.0
+	github.com/palantir/witchcraft-go-logging v1.60.0
 	github.com/projectdiscovery/dnsx v1.2.1
 	github.com/projectdiscovery/subfinder/v2 v2.6.6
 	github.com/spf13/cobra v1.8.1
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.10.0
 )
 
 require (
+	github.com/palantir/pkg/uuid v1.2.0 // indirect
 	github.com/ysmood/fetchup v0.2.3 // indirect
 	github.com/ysmood/goob v0.4.0 // indirect
 	github.com/ysmood/got v0.40.0 // indirect
@@ -82,9 +82,9 @@ require (
 	github.com/palantir/pkg/safelong v1.1.0 // indirect
 	github.com/palantir/pkg/safeyaml v1.1.0 // indirect
 	github.com/palantir/pkg/transform v1.1.0 // indirect
-	github.com/palantir/witchcraft-go-error v1.38.0 // indirect
-	github.com/palantir/witchcraft-go-params v1.35.0 // indirect
-	github.com/palantir/witchcraft-go-tracing v1.37.0 // indirect
+	github.com/palantir/witchcraft-go-error v1.41.0 // indirect
+	github.com/palantir/witchcraft-go-params v1.38.0 // indirect
+	github.com/palantir/witchcraft-go-tracing v1.40.0 // indirect
 	github.com/pierrec/lz4/v4 v4.1.2 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
