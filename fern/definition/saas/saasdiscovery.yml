@@ -45,7 +45,7 @@ types:
   SaasDiscoveryAttempt:
     properties:
       org: string
-      companies: list<SaasDiscoveryCompany>
+      companies: optional<list<SaasDiscoveryCompany>>
   SaasDiscoveryReport:
     properties:
       orgs: optional<list<SaasDiscoveryAttempt>>
