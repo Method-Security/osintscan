@@ -1,0 +1,53 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+# vim: set ts=2 sw=2 tw=0 fo=cnqoj
+
+version: 2
+
+project_name: osintscan
+
+partial:
+  by: target
+
+builds:
+  - id: build-linux
+    main: .
+    binary: osintscan
+    ldflags:
+      - -s -w
+      - "-extldflags '-static -lm -ldl -lpthread'"
+      - -X github.com/method-security/osintscan/main.version={{.Version}}
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - arm64
+      - amd64
+    goarm:
+      - "7"
+  - id: build-macos
+    main: .
+    binary: osintscan
+    ldflags:
+      - -s -w
+      - -X github.com/method-security/osintscan/main.version={{.Version}}
+    env:
+      - CGO_ENABLED=1
+    goos:
+      - darwin
+    goarch:
+      - arm64
+    goarm:
+      - "7"
+  - id: build-windows
+    main: .
+    binary: osintscan
+    ldflags:
+      - -s -w
+      - -X github.com/method-security/osintscan/main.version={{.Version}}
+    env:
+      - CGO_ENABLED=1
+    goos:
+      - windows
+    goarch:
+      - amd64

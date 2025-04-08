@@ -1,6 +1,7 @@
 FROM chromedp/headless-shell:129.0.6643.2 
 
 ARG CLI_NAME="osintscan"
+ARG TARGETARCH
 
 RUN apt-get update && apt-get install -y ca-certificates git
 
@@ -17,7 +18,7 @@ RUN \
   mkdir -p /opt/method/${CLI_NAME}/var/log && \
   mkdir -p /opt/method/${CLI_NAME}/service/bin && \
   mkdir -p /mnt/output
-
+  
 COPY configs/dns/subenum/*                   /opt/method/${CLI_NAME}/var/conf/dns/subenum/
 COPY configs/dns/takeover/*                  /opt/method/${CLI_NAME}/var/conf/dns/takeover/
 COPY configs/saas/*                          /opt/method/${CLI_NAME}/var/conf/saas/
@@ -33,4 +34,5 @@ USER method
 WORKDIR /opt/method/${CLI_NAME}/
 
 ENV PATH="/opt/method/${CLI_NAME}/service/bin:${PATH}"
+
 ENTRYPOINT [ "osintscan" ]

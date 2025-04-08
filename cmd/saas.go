@@ -82,8 +82,13 @@ func (a *OsintScan) InitSaasCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
+			browserPath, err := cmd.Flags().GetString("browserpath")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
 
-			config := saasDiscoveryConfig(orgs, saasFilePaths, ssoFilePaths, saasCompanies, ssoCompanies, timeout, httpsOnly, successfulOnly, skipTLS)
+			config := saasDiscoveryConfig(orgs, saasFilePaths, ssoFilePaths, saasCompanies, ssoCompanies, timeout, httpsOnly, successfulOnly, skipTLS, browserPath)
 
 			// Generate the report
 			report, err := saasdiscovery.Discovery(cmd.Context(), saasFingerprints, ssoFingerprints, config)
@@ -104,6 +109,7 @@ func (a *OsintScan) InitSaasCommand() {
 	discoveryCmd.Flags().Bool("httpsonly", true, "Only use HTTPS for the requests")
 	discoveryCmd.Flags().Bool("successfulonly", false, "Only return results where the finding is a success")
 	discoveryCmd.Flags().Bool("skiptls", false, "Skip TLS verification")
+	discoveryCmd.Flags().String("browserpath", "", "The path to the browser to use for the requests")
 
 	_ = discoveryCmd.MarkFlagRequired("orgs")
 
@@ -111,7 +117,7 @@ func (a *OsintScan) InitSaasCommand() {
 	a.RootCmd.AddCommand(a.SaasCmd)
 }
 
-func saasDiscoveryConfig(orgs []string, saasFilePaths []string, ssoFilePaths []string, saasCompanies []string, ssoCompanies []string, timeout int, httpsOnly bool, successfulOnly bool, skipTLS bool) saasFern.SaasDiscoveryConfig {
+func saasDiscoveryConfig(orgs []string, saasFilePaths []string, ssoFilePaths []string, saasCompanies []string, ssoCompanies []string, timeout int, httpsOnly bool, successfulOnly bool, skipTLS bool, browserPath string) saasFern.SaasDiscoveryConfig {
 	config := saasFern.SaasDiscoveryConfig{
 		Orgs:           orgs,
 		SaasFilePaths:  saasFilePaths,
@@ -120,6 +126,9 @@ func saasDiscoveryConfig(orgs []string, saasFilePaths []string, ssoFilePaths []s
 		HttpsOnly:      httpsOnly,
 		SuccessfulOnly: successfulOnly,
 		SkipTls:        skipTLS,
+	}
+	if len(browserPath) > 0 {
+		config.BrowserPath = &browserPath
 	}
 	if len(saasCompanies) > 0 {
 		config.SaasCompanies = saasCompanies

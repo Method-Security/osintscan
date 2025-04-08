@@ -36,6 +36,25 @@ osintscan dns records --domain example.com
 
 ```bash
 osintscan dns certs --domain example.com
+
+### Building a Statically Compiled Container for Local Testing
+(Reference reusable-build.yaml)
+
+1. Build ARM64 builder image: `docker buildx build . --platform linux/arm64 --load --tag armbuilder -f Dockerfile.builder`
+
+2. Build ARM64 image: `docker run -v .:/app/osintscan -e GOARCH=arm64 -e GOOS=linux --rm armbuilder goreleaser build --single-target -f .goreleaser/goreleaser-build.yml --snapshot --clean`
+
+3. `cp dist/linux_arm64/build-linux_linux_arm64/osintscan .`
+
+4. `docker buildx build . --platform linux/arm64 --load --tag osintscan:local -f Dockerfile`
+
+5. Open shell: `docker run -it --rm --entrypoint /bin/bash osintscan:local`
+
+6. OR run command without shell example: `docker run osintscan:local discovery saas --org example -o json`
+
+
+### Note:
+This tool runs on a headless-shell base image to support chrome/chromium browser automation. The dockerfile uses debian-based install tools. 
 ```
 
 ## Contributing

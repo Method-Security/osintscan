@@ -24,6 +24,7 @@ types:
       httpsOnly: boolean
       successfulOnly: boolean
       skipTLS: boolean
+      browserPath: optional<string>
   # Report
   SaaSDiscoveryFinding:
     properties:

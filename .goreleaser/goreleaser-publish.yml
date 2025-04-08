@@ -1,56 +1,27 @@
 version: 2
 
 project_name: osintscan
+
 builds:
-  - id: build-linux
-    main: .
-    binary: osintscan
-    ldflags:
-      - -s -w
-      - "-extldflags '-static'"
-      - -X github.com/method-security/osintscan/main.version={{.Version}}
-    env:
-      - CGO_ENABLED=0
+  - id: prebuilt
+    builder: prebuilt
     goos:
       - linux
-    goarch:
-      - "386"
-      - arm
-      - amd64
-      - arm64
-    goarm:
-      - "7"
-  - id: build-macos
-    main: .
-    binary: osintscan
-    ldflags:
-      - -s -w
-      - "-extldflags '-static'"
-      - -X github.com/method-security/osintscan/main.version={{.Version}}
-    env:
-      - CGO_ENABLED=0
-    goos:
       - darwin
-    goarch:
-      - amd64
-      - arm64
-    goarm:
-      - "7"
-  - id: build-windows
-    main: .
-    binary: osintscan
-    ldflags:
-      - -s -w
-      - "-extldflags '-static'"
-      - -X github.com/method-security/osintscan/main.version={{.Version}}
-    env:
-      - CGO_ENABLED=0
-    goos:
       - windows
     goarch:
       - amd64
-    goarm:
-      - "7"
+      - arm64
+    goamd64:
+      - v1
+    ignore:
+      - goos: windows
+        goarch: arm64
+      - goos: darwin
+        goarch: amd64
+    prebuilt:
+      path: output/build-{{ .Os }}_{{ .Arch }}/osintscan{{ if eq .Os "windows" }}.exe{{ end }}
+    binary: osintscan
 
 archives:
   - id: archive
@@ -72,6 +43,9 @@ archives:
       - goos: windows
         format: zip
 
+checksum:
+  name_template: "{{ .ProjectName }}_checksums.txt"
+
 dockers:
   - image_templates:
       - "ghcr.io/method-security/osintscan:{{ .Version }}-amd64"
@@ -82,10 +56,10 @@ dockers:
     goos: linux
     goarch: amd64
     ids:
-      - build-linux
+      - prebuilt
     build_flag_templates:
       - "--label=org.opencontainers.image.title={{ .ProjectName }}"
-      - "--label=org.opencontainers.image.description=An on-rails OSINT enumeration tool"
+      - "--label=org.opencontainers.image.description=An on-rails AWS enumeration tool"
       - "--label=org.opencontainers.image.vendor=Method Security"
       - "--label=org.opencontainers.image.version={{ .Version }}"
       - "--label=org.opencontainers.image.created={{ .Date }}"
@@ -105,10 +79,10 @@ dockers:
     goos: linux
     goarch: arm64
     ids:
-      - build-linux
+      - prebuilt
     build_flag_templates:
       - "--label=org.opencontainers.image.title={{ .ProjectName }}"
-      - "--label=org.opencontainers.image.description=An on-rails OSINT enumeration tool"
+      - "--label=org.opencontainers.image.description=An on-rails AWS enumeration tool"
       - "--label=org.opencontainers.image.vendor=Method Security"
       - "--label=org.opencontainers.image.version={{ .Version }}"
       - "--label=org.opencontainers.image.created={{ .Date }}"
@@ -119,7 +93,6 @@ dockers:
       - "--platform=linux/arm64"
     extra_files:
       - configs/
-
 docker_manifests:
   - name_template: 'ghcr.io/method-security/osintscan:{{ .Version }}'
     image_templates:
@@ -137,17 +110,6 @@ docker_manifests:
     image_templates:
     - 'methodsecurity/osintscan:{{ .Version }}-amd64'
     - 'methodsecurity/osintscan:{{ .Version }}-arm64'
-
-source:
-  enabled: true
-
-checksum:
-  name_template: "{{ .ProjectName }}_checksums.txt"
-
-sboms:
-  - artifacts: archive
-  - id: source
-    artifacts: source
 
 signs:
   - cmd: cosign
@@ -175,3 +137,8 @@ docker_signs:
     - "sign"
     - "${artifact}"
     - "--yes"
+
+sboms:
+  - artifacts: archive
+  - id: source
+    artifacts: source
