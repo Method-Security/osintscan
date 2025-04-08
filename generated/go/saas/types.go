@@ -144,6 +144,7 @@ type SaasDiscoveryConfig struct {
 	HttpsOnly      bool     `json:"httpsOnly" url:"httpsOnly"`
 	SuccessfulOnly bool     `json:"successfulOnly" url:"successfulOnly"`
 	SkipTls        bool     `json:"skipTLS" url:"skipTLS"`
+	BrowserPath    *string  `json:"browserPath,omitempty" url:"browserPath,omitempty"`
 
 	extraProperties map[string]interface{}
 	_rawJSON        json.RawMessage

@@ -92,7 +92,7 @@ func handleSaasRequest(
 	fingerprint *saasFern.SaasFingerprintEntry,
 	selectedSsoFingerprints saasFern.SaasFingerprintFile,
 ) (*saasFern.SaasDiscoveryRequest, []string) {
-	request, errs := sendSaasRequest(ctx, org, domainSlug, schema, config.Timeout, config.SkipTls)
+	request, errs := sendSaasRequest(ctx, org, domainSlug, schema, config.Timeout, config.BrowserPath, config.SkipTls)
 
 	// Check if the page was redirected
 	redirectedPage := false
@@ -106,7 +106,7 @@ func handleSaasRequest(
 	return request, errs
 }
 
-func sendSaasRequest(ctx context.Context, org string, domainSlug string, schema string, timeout int, skipTLS bool) (*saasFern.SaasDiscoveryRequest, []string) {
+func sendSaasRequest(ctx context.Context, org string, domainSlug string, schema string, timeout int, browserPath *string, skipTLS bool) (*saasFern.SaasDiscoveryRequest, []string) {
 	// Initialize variables
 	var redirectChain []string
 	var errors []string
@@ -118,7 +118,12 @@ func sendSaasRequest(ctx context.Context, org string, domainSlug string, schema 
 	log.Printf("Sending request to %s", fullURL)
 
 	// Setup browser launch options
-	launch := launcher.New()
+	var launch *launcher.Launcher
+	if browserPath != nil && *browserPath != "" {
+		launch = launcher.New().Headless(true).Bin(*browserPath)
+	} else {
+		launch = launcher.New().Headless(true)
+	}
 	if skipTLS {
 		launch.Set("ignore-certificate-errors")
 	}
