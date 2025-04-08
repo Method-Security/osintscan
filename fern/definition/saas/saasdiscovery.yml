@@ -41,11 +41,11 @@ types:
   SaasDiscoveryCompany:
     properties:
       company: string
-      requests: list<SaasDiscoveryRequest>
+      requests: optional<list<SaasDiscoveryRequest>>
   SaasDiscoveryAttempt:
     properties:
       org: string
-      companies: optional<list<SaasDiscoveryCompany>>
+      companies: list<SaasDiscoveryCompany>
   SaasDiscoveryReport:
     properties:
       orgs: optional<list<SaasDiscoveryAttempt>>
