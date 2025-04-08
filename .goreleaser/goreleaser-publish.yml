@@ -111,6 +111,33 @@ docker_manifests:
     - 'methodsecurity/osintscan:{{ .Version }}-amd64'
     - 'methodsecurity/osintscan:{{ .Version }}-arm64'
 
+signs:
+  - cmd: cosign
+    env:
+    - COSIGN_EXPERIMENTAL=1
+    signature: "${artifact}.sig"
+    certificate: '${artifact}.pem'
+    args:
+      - sign-blob
+      - "--oidc-issuer=https://token.actions.githubusercontent.com"
+      - "--output-certificate=${certificate}"
+      - "--output-signature=${signature}"
+      - "${artifact}"
+      - "--yes"
+    artifacts: all
+    output: true
+
+docker_signs:
+  - cmd: cosign
+    env:
+    - COSIGN_EXPERIMENTAL=1
+    artifacts: manifests
+    output: true
+    args:
+    - "sign"
+    - "${artifact}"
+    - "--yes"
+
 sboms:
   - artifacts: archive
   - id: source
