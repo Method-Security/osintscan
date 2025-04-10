@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"strconv"
 	"strings"
 	"time"
 
@@ -82,7 +83,7 @@ func Discovery(ctx context.Context, saasFingerprints saasFern.SaasFingerprintFil
 	return &report, nil
 }
 
-// handleSaasRequest is a helper function to handle the request and analysis of the response
+// handleSaasRequest handles a single SaaS request
 func handleSaasRequest(
 	ctx context.Context,
 	org string,
@@ -92,18 +93,62 @@ func handleSaasRequest(
 	fingerprint *saasFern.SaasFingerprintEntry,
 	selectedSsoFingerprints saasFern.SaasFingerprintFile,
 ) (*saasFern.SaasDiscoveryRequest, []string) {
-	request, errs := sendSaasRequest(ctx, org, domainSlug, schema, config.Timeout, config.BrowserPath, config.SkipTls)
+	timeoutCtx, cancel := context.WithTimeout(ctx, time.Duration(config.Timeout)*time.Second)
+	defer cancel()
 
-	// Check if the page was redirected
-	redirectedPage := false
-	if len(request.RedirectChain) > 1 {
-		redirectedPage = true
+	// Use channels to communicate results and errors
+	requestCh := make(chan *saasFern.SaasDiscoveryRequest, 1)
+	errsCh := make(chan []string, 1)
+	panicCh := make(chan interface{}, 1)
+
+	// Run the request in a goroutine with panic recovery
+	go func() {
+		// Recover from any panics
+		defer func() {
+			if r := recover(); r != nil {
+				panicCh <- r
+			}
+		}()
+
+		// Execute the request
+		req, errs := sendSaasRequest(timeoutCtx, org, domainSlug, schema, config.Timeout, config.BrowserPath, config.SkipTls)
+
+		// Check if the context has already expired before we try to process further
+		if timeoutCtx.Err() != nil {
+			errsCh <- []string{"request processing interrupted: " + timeoutCtx.Err().Error()}
+			requestCh <- nil
+			return
+		}
+
+		// If we have a successful request, process it
+		if req != nil {
+			redirectedPage := false
+			if len(req.RedirectChain) > 1 {
+				redirectedPage = true
+			}
+
+			// Analyze the request (with timeout context to ensure this can be interrupted)
+			finding := analyzeSaasRequest(req, fingerprint, selectedSsoFingerprints, redirectedPage)
+			req.Findings = finding
+		}
+
+		// Send results to channels
+		requestCh <- req
+		errsCh <- errs
+	}()
+
+	// Wait for either completion, timeout, or panic
+	select {
+	case <-timeoutCtx.Done():
+		log.Printf("[ERROR] Request timed out after %v seconds", config.Timeout)
+		return nil, []string{"request timed out after " + strconv.Itoa(config.Timeout) + " seconds"}
+	case p := <-panicCh:
+		log.Printf("[ERROR] Request panicked with: %v", p)
+		return nil, []string{"request failed with internal error"}
+	case request := <-requestCh:
+		errs := <-errsCh
+		return request, errs
 	}
-
-	// Analyze the request
-	finding := analyzeSaasRequest(request, fingerprint, selectedSsoFingerprints, redirectedPage)
-	request.Findings = finding
-	return request, errs
 }
 
 func sendSaasRequest(ctx context.Context, org string, domainSlug string, schema string, timeout int, browserPath *string, skipTLS bool) (*saasFern.SaasDiscoveryRequest, []string) {
