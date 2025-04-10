@@ -27,6 +27,10 @@ func selectFingerprints(fingerprints saasFern.SaasFingerprintFile, companies []s
 
 // shouldAddRequest determines if a request should be included in results based on its findings and the successfulOnly flag
 func shouldAddRequest(request *saasFern.SaasDiscoveryRequest, successfulOnly bool) bool {
+	if request == nil {
+		return false
+	}
+
 	if request.Findings == nil {
 		return !successfulOnly
 	}
