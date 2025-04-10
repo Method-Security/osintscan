@@ -128,11 +128,21 @@ func sendSaasRequest(ctx context.Context, org string, domainSlug string, schema 
 		launch.Set("ignore-certificate-errors")
 	}
 
-	// Launch the browser
-	browserURL := launch.MustLaunch()
+	// Launch the browser with timeout
+	browserURL, err := launch.Launch()
+	if err != nil {
+		log.Printf("[ERROR] Failed to launch browser: %v", err)
+		errors = append(errors, fmt.Sprintf("Failed to launch browser: %v", err))
+		return request, errors
+	}
 
-	// Connect to browser
-	browser := rod.New().ControlURL(browserURL).MustConnect()
+	// Connect to browser with timeout
+	browser := rod.New().ControlURL(browserURL)
+	if err := browser.Connect(); err != nil {
+		log.Printf("[ERROR] Failed to connect to browser: %v", err)
+		errors = append(errors, fmt.Sprintf("Failed to connect to browser: %v", err))
+		return request, errors
+	}
 	defer browser.MustClose()
 
 	// Create page with context
@@ -166,8 +176,10 @@ func sendSaasRequest(ctx context.Context, org string, domainSlug string, schema 
         };
     }`)
 
-	// Setup network event capturing
+	// Setup network event capturing with timeout
 	wait := page.WaitNavigation(proto.PageLifecycleEventNameNetworkAlmostIdle)
+	waitCtx, waitCancel := context.WithTimeout(ctx, time.Duration(timeout)*time.Second)
+	defer waitCancel()
 
 	// Intercept requests for tracking
 	router := page.HijackRequests()
@@ -187,8 +199,9 @@ func sendSaasRequest(ctx context.Context, org string, domainSlug string, schema 
 	go router.Run()
 
 	// Enable network monitoring
-	err := proto.NetworkEnable{}.Call(page)
+	err = proto.NetworkEnable{}.Call(page)
 	if err != nil {
+		log.Printf("[ERROR] Error enabling network monitoring: %v", err)
 		errors = append(errors, fmt.Sprintf("Error enabling network monitoring: %v", err))
 		return request, errors
 	}
@@ -227,21 +240,29 @@ func sendSaasRequest(ctx context.Context, org string, domainSlug string, schema 
 		}
 	})()
 
-	// Navigate to URL
+	// Navigate to URL with timeout
 	err = page.Navigate(request.Url)
 	if err != nil {
+		log.Printf("[ERROR] Navigation error: %v", err)
 		errors = append(errors, fmt.Sprintf("Navigation error: %v", err))
 		return request, errors
 	}
 
-	// Wait for navigation to complete
-	wait()
+	// Wait for navigation to complete with timeout
+	select {
+	case <-waitCtx.Done():
+		log.Printf("[ERROR] Navigation timeout reached")
+		errors = append(errors, "Navigation timeout reached")
+		return request, errors
+	default:
+		wait()
+	}
 
 	// Get the final URL
 	finalURL := page.MustInfo().URL
 	redirectChain = append(redirectChain, finalURL)
 
-	// Capture JavaScript-based redirects
+	// Capture JavaScript-based redirects with timeout
 	jsRedirectsScript := `
     const history = window.__redirectHistory || [];
     if (Array.isArray(history)) {
