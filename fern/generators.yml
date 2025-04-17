@@ -3,7 +3,7 @@ groups:
   local:
     generators:
       - name: fernapi/fern-go-sdk
-        version: 0.27.0
+        version: 0.37.2
         config:
           importpath: github.com/Method-Security/osintscan/generated/go
         output:
@@ -12,14 +12,14 @@ groups:
   pypi-local:
     generators:
       - name: fernapi/fern-pydantic-model
-        version: 1.4.3
+        version: 1.4.7
         output:
           location: local-file-system
           path: ../generated/python
   pypi-test:
     generators:
       - name: fernapi/fern-pydantic-model
-        version: 1.4.3
+        version: 1.4.7
         config:
           package_name: methodosintscan
         output:
@@ -30,7 +30,7 @@ groups:
   pypi:
     generators:
       - name: fernapi/fern-pydantic-model
-        version: 1.4.3
+        version: 1.4.7
         config:
           package_name: methodosintscan
         output:
