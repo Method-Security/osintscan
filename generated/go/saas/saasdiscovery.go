@@ -5,7 +5,7 @@ package saas
 import (
 	json "encoding/json"
 	fmt "fmt"
-	core "github.com/Method-Security/osintscan/generated/go/core"
+	internal "github.com/Method-Security/osintscan/generated/go/internal"
 )
 
 type SaaSDiscoveryFinding struct {
@@ -13,7 +13,21 @@ type SaaSDiscoveryFinding struct {
 	CompanyPage *bool   `json:"companyPage,omitempty" url:"companyPage,omitempty"`
 
 	extraProperties map[string]interface{}
-	_rawJSON        json.RawMessage
+	rawJSON         json.RawMessage
+}
+
+func (s *SaaSDiscoveryFinding) GetSsoPage() *string {
+	if s == nil {
+		return nil
+	}
+	return s.SsoPage
+}
+
+func (s *SaaSDiscoveryFinding) GetCompanyPage() *bool {
+	if s == nil {
+		return nil
+	}
+	return s.CompanyPage
 }
 
 func (s *SaaSDiscoveryFinding) GetExtraProperties() map[string]interface{} {
@@ -27,24 +41,22 @@ func (s *SaaSDiscoveryFinding) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	*s = SaaSDiscoveryFinding(value)
-
-	extraProperties, err := core.ExtractExtraProperties(data, *s)
+	extraProperties, err := internal.ExtractExtraProperties(data, *s)
 	if err != nil {
 		return err
 	}
 	s.extraProperties = extraProperties
-
-	s._rawJSON = json.RawMessage(data)
+	s.rawJSON = json.RawMessage(data)
 	return nil
 }
 
 func (s *SaaSDiscoveryFinding) String() string {
-	if len(s._rawJSON) > 0 {
-		if value, err := core.StringifyJSON(s._rawJSON); err == nil {
+	if len(s.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(s.rawJSON); err == nil {
 			return value
 		}
 	}
-	if value, err := core.StringifyJSON(s); err == nil {
+	if value, err := internal.StringifyJSON(s); err == nil {
 		return value
 	}
 	return fmt.Sprintf("%#v", s)
@@ -55,7 +67,21 @@ type SaasDiscoveryAttempt struct {
 	Companies []*SaasDiscoveryCompany `json:"companies,omitempty" url:"companies,omitempty"`
 
 	extraProperties map[string]interface{}
-	_rawJSON        json.RawMessage
+	rawJSON         json.RawMessage
+}
+
+func (s *SaasDiscoveryAttempt) GetOrg() string {
+	if s == nil {
+		return ""
+	}
+	return s.Org
+}
+
+func (s *SaasDiscoveryAttempt) GetCompanies() []*SaasDiscoveryCompany {
+	if s == nil {
+		return nil
+	}
+	return s.Companies
 }
 
 func (s *SaasDiscoveryAttempt) GetExtraProperties() map[string]interface{} {
@@ -69,24 +95,22 @@ func (s *SaasDiscoveryAttempt) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	*s = SaasDiscoveryAttempt(value)
-
-	extraProperties, err := core.ExtractExtraProperties(data, *s)
+	extraProperties, err := internal.ExtractExtraProperties(data, *s)
 	if err != nil {
 		return err
 	}
 	s.extraProperties = extraProperties
-
-	s._rawJSON = json.RawMessage(data)
+	s.rawJSON = json.RawMessage(data)
 	return nil
 }
 
 func (s *SaasDiscoveryAttempt) String() string {
-	if len(s._rawJSON) > 0 {
-		if value, err := core.StringifyJSON(s._rawJSON); err == nil {
+	if len(s.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(s.rawJSON); err == nil {
 			return value
 		}
 	}
-	if value, err := core.StringifyJSON(s); err == nil {
+	if value, err := internal.StringifyJSON(s); err == nil {
 		return value
 	}
 	return fmt.Sprintf("%#v", s)
@@ -97,7 +121,21 @@ type SaasDiscoveryCompany struct {
 	Requests []*SaasDiscoveryRequest `json:"requests,omitempty" url:"requests,omitempty"`
 
 	extraProperties map[string]interface{}
-	_rawJSON        json.RawMessage
+	rawJSON         json.RawMessage
+}
+
+func (s *SaasDiscoveryCompany) GetCompany() string {
+	if s == nil {
+		return ""
+	}
+	return s.Company
+}
+
+func (s *SaasDiscoveryCompany) GetRequests() []*SaasDiscoveryRequest {
+	if s == nil {
+		return nil
+	}
+	return s.Requests
 }
 
 func (s *SaasDiscoveryCompany) GetExtraProperties() map[string]interface{} {
@@ -111,24 +149,22 @@ func (s *SaasDiscoveryCompany) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	*s = SaasDiscoveryCompany(value)
-
-	extraProperties, err := core.ExtractExtraProperties(data, *s)
+	extraProperties, err := internal.ExtractExtraProperties(data, *s)
 	if err != nil {
 		return err
 	}
 	s.extraProperties = extraProperties
-
-	s._rawJSON = json.RawMessage(data)
+	s.rawJSON = json.RawMessage(data)
 	return nil
 }
 
 func (s *SaasDiscoveryCompany) String() string {
-	if len(s._rawJSON) > 0 {
-		if value, err := core.StringifyJSON(s._rawJSON); err == nil {
+	if len(s.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(s.rawJSON); err == nil {
 			return value
 		}
 	}
-	if value, err := core.StringifyJSON(s); err == nil {
+	if value, err := internal.StringifyJSON(s); err == nil {
 		return value
 	}
 	return fmt.Sprintf("%#v", s)
@@ -147,7 +183,77 @@ type SaasDiscoveryConfig struct {
 	BrowserPath    *string  `json:"browserPath,omitempty" url:"browserPath,omitempty"`
 
 	extraProperties map[string]interface{}
-	_rawJSON        json.RawMessage
+	rawJSON         json.RawMessage
+}
+
+func (s *SaasDiscoveryConfig) GetOrgs() []string {
+	if s == nil {
+		return nil
+	}
+	return s.Orgs
+}
+
+func (s *SaasDiscoveryConfig) GetSaasFilePaths() []string {
+	if s == nil {
+		return nil
+	}
+	return s.SaasFilePaths
+}
+
+func (s *SaasDiscoveryConfig) GetSsoFilePaths() []string {
+	if s == nil {
+		return nil
+	}
+	return s.SsoFilePaths
+}
+
+func (s *SaasDiscoveryConfig) GetSaasCompanies() []string {
+	if s == nil {
+		return nil
+	}
+	return s.SaasCompanies
+}
+
+func (s *SaasDiscoveryConfig) GetSsoCompanies() []string {
+	if s == nil {
+		return nil
+	}
+	return s.SsoCompanies
+}
+
+func (s *SaasDiscoveryConfig) GetTimeout() int {
+	if s == nil {
+		return 0
+	}
+	return s.Timeout
+}
+
+func (s *SaasDiscoveryConfig) GetHttpsOnly() bool {
+	if s == nil {
+		return false
+	}
+	return s.HttpsOnly
+}
+
+func (s *SaasDiscoveryConfig) GetSuccessfulOnly() bool {
+	if s == nil {
+		return false
+	}
+	return s.SuccessfulOnly
+}
+
+func (s *SaasDiscoveryConfig) GetSkipTls() bool {
+	if s == nil {
+		return false
+	}
+	return s.SkipTls
+}
+
+func (s *SaasDiscoveryConfig) GetBrowserPath() *string {
+	if s == nil {
+		return nil
+	}
+	return s.BrowserPath
 }
 
 func (s *SaasDiscoveryConfig) GetExtraProperties() map[string]interface{} {
@@ -161,24 +267,22 @@ func (s *SaasDiscoveryConfig) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	*s = SaasDiscoveryConfig(value)
-
-	extraProperties, err := core.ExtractExtraProperties(data, *s)
+	extraProperties, err := internal.ExtractExtraProperties(data, *s)
 	if err != nil {
 		return err
 	}
 	s.extraProperties = extraProperties
-
-	s._rawJSON = json.RawMessage(data)
+	s.rawJSON = json.RawMessage(data)
 	return nil
 }
 
 func (s *SaasDiscoveryConfig) String() string {
-	if len(s._rawJSON) > 0 {
-		if value, err := core.StringifyJSON(s._rawJSON); err == nil {
+	if len(s.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(s.rawJSON); err == nil {
 			return value
 		}
 	}
-	if value, err := core.StringifyJSON(s); err == nil {
+	if value, err := internal.StringifyJSON(s); err == nil {
 		return value
 	}
 	return fmt.Sprintf("%#v", s)
@@ -190,7 +294,28 @@ type SaasDiscoveryReport struct {
 	Errors []string                `json:"errors,omitempty" url:"errors,omitempty"`
 
 	extraProperties map[string]interface{}
-	_rawJSON        json.RawMessage
+	rawJSON         json.RawMessage
+}
+
+func (s *SaasDiscoveryReport) GetOrgs() []*SaasDiscoveryAttempt {
+	if s == nil {
+		return nil
+	}
+	return s.Orgs
+}
+
+func (s *SaasDiscoveryReport) GetConfig() *SaasDiscoveryConfig {
+	if s == nil {
+		return nil
+	}
+	return s.Config
+}
+
+func (s *SaasDiscoveryReport) GetErrors() []string {
+	if s == nil {
+		return nil
+	}
+	return s.Errors
 }
 
 func (s *SaasDiscoveryReport) GetExtraProperties() map[string]interface{} {
@@ -204,24 +329,22 @@ func (s *SaasDiscoveryReport) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	*s = SaasDiscoveryReport(value)
-
-	extraProperties, err := core.ExtractExtraProperties(data, *s)
+	extraProperties, err := internal.ExtractExtraProperties(data, *s)
 	if err != nil {
 		return err
 	}
 	s.extraProperties = extraProperties
-
-	s._rawJSON = json.RawMessage(data)
+	s.rawJSON = json.RawMessage(data)
 	return nil
 }
 
 func (s *SaasDiscoveryReport) String() string {
-	if len(s._rawJSON) > 0 {
-		if value, err := core.StringifyJSON(s._rawJSON); err == nil {
+	if len(s.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(s.rawJSON); err == nil {
 			return value
 		}
 	}
-	if value, err := core.StringifyJSON(s); err == nil {
+	if value, err := internal.StringifyJSON(s); err == nil {
 		return value
 	}
 	return fmt.Sprintf("%#v", s)
@@ -236,7 +359,49 @@ type SaasDiscoveryRequest struct {
 	Findings        *SaaSDiscoveryFinding `json:"findings,omitempty" url:"findings,omitempty"`
 
 	extraProperties map[string]interface{}
-	_rawJSON        json.RawMessage
+	rawJSON         json.RawMessage
+}
+
+func (s *SaasDiscoveryRequest) GetUrl() string {
+	if s == nil {
+		return ""
+	}
+	return s.Url
+}
+
+func (s *SaasDiscoveryRequest) GetRedirectChain() []string {
+	if s == nil {
+		return nil
+	}
+	return s.RedirectChain
+}
+
+func (s *SaasDiscoveryRequest) GetStatusCode() *int {
+	if s == nil {
+		return nil
+	}
+	return s.StatusCode
+}
+
+func (s *SaasDiscoveryRequest) GetResponseHeaders() map[string]string {
+	if s == nil {
+		return nil
+	}
+	return s.ResponseHeaders
+}
+
+func (s *SaasDiscoveryRequest) GetResponseBody() *string {
+	if s == nil {
+		return nil
+	}
+	return s.ResponseBody
+}
+
+func (s *SaasDiscoveryRequest) GetFindings() *SaaSDiscoveryFinding {
+	if s == nil {
+		return nil
+	}
+	return s.Findings
 }
 
 func (s *SaasDiscoveryRequest) GetExtraProperties() map[string]interface{} {
@@ -250,24 +415,22 @@ func (s *SaasDiscoveryRequest) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	*s = SaasDiscoveryRequest(value)
-
-	extraProperties, err := core.ExtractExtraProperties(data, *s)
+	extraProperties, err := internal.ExtractExtraProperties(data, *s)
 	if err != nil {
 		return err
 	}
 	s.extraProperties = extraProperties
-
-	s._rawJSON = json.RawMessage(data)
+	s.rawJSON = json.RawMessage(data)
 	return nil
 }
 
 func (s *SaasDiscoveryRequest) String() string {
-	if len(s._rawJSON) > 0 {
-		if value, err := core.StringifyJSON(s._rawJSON); err == nil {
+	if len(s.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(s.rawJSON); err == nil {
 			return value
 		}
 	}
-	if value, err := core.StringifyJSON(s); err == nil {
+	if value, err := internal.StringifyJSON(s); err == nil {
 		return value
 	}
 	return fmt.Sprintf("%#v", s)
@@ -278,7 +441,21 @@ type SaasFingerprintEntry struct {
 	DomainSlugs        []string                `json:"domainSlugs,omitempty" url:"domainSlugs,omitempty"`
 
 	extraProperties map[string]interface{}
-	_rawJSON        json.RawMessage
+	rawJSON         json.RawMessage
+}
+
+func (s *SaasFingerprintEntry) GetFingerprintProfile() *SaasFingerprintProfile {
+	if s == nil {
+		return nil
+	}
+	return s.FingerprintProfile
+}
+
+func (s *SaasFingerprintEntry) GetDomainSlugs() []string {
+	if s == nil {
+		return nil
+	}
+	return s.DomainSlugs
 }
 
 func (s *SaasFingerprintEntry) GetExtraProperties() map[string]interface{} {
@@ -292,24 +469,22 @@ func (s *SaasFingerprintEntry) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	*s = SaasFingerprintEntry(value)
-
-	extraProperties, err := core.ExtractExtraProperties(data, *s)
+	extraProperties, err := internal.ExtractExtraProperties(data, *s)
 	if err != nil {
 		return err
 	}
 	s.extraProperties = extraProperties
-
-	s._rawJSON = json.RawMessage(data)
+	s.rawJSON = json.RawMessage(data)
 	return nil
 }
 
 func (s *SaasFingerprintEntry) String() string {
-	if len(s._rawJSON) > 0 {
-		if value, err := core.StringifyJSON(s._rawJSON); err == nil {
+	if len(s.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(s.rawJSON); err == nil {
 			return value
 		}
 	}
-	if value, err := core.StringifyJSON(s); err == nil {
+	if value, err := internal.StringifyJSON(s); err == nil {
 		return value
 	}
 	return fmt.Sprintf("%#v", s)
@@ -319,7 +494,14 @@ type SaasFingerprintFile struct {
 	Fingerprints map[string]*SaasFingerprintEntry `json:"fingerprints,omitempty" url:"fingerprints,omitempty"`
 
 	extraProperties map[string]interface{}
-	_rawJSON        json.RawMessage
+	rawJSON         json.RawMessage
+}
+
+func (s *SaasFingerprintFile) GetFingerprints() map[string]*SaasFingerprintEntry {
+	if s == nil {
+		return nil
+	}
+	return s.Fingerprints
 }
 
 func (s *SaasFingerprintFile) GetExtraProperties() map[string]interface{} {
@@ -333,24 +515,22 @@ func (s *SaasFingerprintFile) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	*s = SaasFingerprintFile(value)
-
-	extraProperties, err := core.ExtractExtraProperties(data, *s)
+	extraProperties, err := internal.ExtractExtraProperties(data, *s)
 	if err != nil {
 		return err
 	}
 	s.extraProperties = extraProperties
-
-	s._rawJSON = json.RawMessage(data)
+	s.rawJSON = json.RawMessage(data)
 	return nil
 }
 
 func (s *SaasFingerprintFile) String() string {
-	if len(s._rawJSON) > 0 {
-		if value, err := core.StringifyJSON(s._rawJSON); err == nil {
+	if len(s.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(s.rawJSON); err == nil {
 			return value
 		}
 	}
-	if value, err := core.StringifyJSON(s); err == nil {
+	if value, err := internal.StringifyJSON(s); err == nil {
 		return value
 	}
 	return fmt.Sprintf("%#v", s)
@@ -362,7 +542,28 @@ type SaasFingerprintProfile struct {
 	PageNotFound []string            `json:"pageNotFound,omitempty" url:"pageNotFound,omitempty"`
 
 	extraProperties map[string]interface{}
-	_rawJSON        json.RawMessage
+	rawJSON         json.RawMessage
+}
+
+func (s *SaasFingerprintProfile) GetHeaders() map[string][]string {
+	if s == nil {
+		return nil
+	}
+	return s.Headers
+}
+
+func (s *SaasFingerprintProfile) GetBody() []string {
+	if s == nil {
+		return nil
+	}
+	return s.Body
+}
+
+func (s *SaasFingerprintProfile) GetPageNotFound() []string {
+	if s == nil {
+		return nil
+	}
+	return s.PageNotFound
 }
 
 func (s *SaasFingerprintProfile) GetExtraProperties() map[string]interface{} {
@@ -376,24 +577,22 @@ func (s *SaasFingerprintProfile) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	*s = SaasFingerprintProfile(value)
-
-	extraProperties, err := core.ExtractExtraProperties(data, *s)
+	extraProperties, err := internal.ExtractExtraProperties(data, *s)
 	if err != nil {
 		return err
 	}
 	s.extraProperties = extraProperties
-
-	s._rawJSON = json.RawMessage(data)
+	s.rawJSON = json.RawMessage(data)
 	return nil
 }
 
 func (s *SaasFingerprintProfile) String() string {
-	if len(s._rawJSON) > 0 {
-		if value, err := core.StringifyJSON(s._rawJSON); err == nil {
+	if len(s.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(s.rawJSON); err == nil {
 			return value
 		}
 	}
-	if value, err := core.StringifyJSON(s); err == nil {
+	if value, err := internal.StringifyJSON(s); err == nil {
 		return value
 	}
 	return fmt.Sprintf("%#v", s)
