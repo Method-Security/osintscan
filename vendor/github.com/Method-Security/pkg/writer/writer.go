@@ -17,7 +17,7 @@ import (
 func Write(
 	report any,
 	config OutputConfig,
-	startedAt datetime.DateTime,
+	startedAt *datetime.DateTime,
 	completedAt *datetime.DateTime,
 	status int,
 	errorMessage *string,

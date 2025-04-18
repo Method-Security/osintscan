@@ -4,8 +4,8 @@ aead.dev/minisign
 # github.com/Masterminds/semver/v3 v3.2.1
 ## explicit; go 1.18
 github.com/Masterminds/semver/v3
-# github.com/Method-Security/pkg v0.0.3
-## explicit; go 1.22
+# github.com/Method-Security/pkg v0.0.6
+## explicit; go 1.24
 github.com/Method-Security/pkg/signal
 github.com/Method-Security/pkg/writer
 # github.com/Mzack9999/gcache v0.0.0-20230410081825-519e28eab057
