@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"time"
 
 	"github.com/palantir/pkg/datetime"
 	"github.com/palantir/pkg/safejson"
@@ -22,10 +23,17 @@ type Signal struct {
 	ErrorMessage *string            `json:"error_message,omitempty" yaml:"error_message,omitempty"`
 }
 
-func NewSignal(content any, startedAt datetime.DateTime, completedAt *datetime.DateTime, status int, errorMessage *string) Signal {
+func NewSignal(content any, startedAt *datetime.DateTime, completedAt *datetime.DateTime, status int, errorMessage *string) Signal {
+	var startedAtTime datetime.DateTime
+	if startedAt == nil {
+		startedAtTime = datetime.DateTime(time.Now())
+	} else {
+		startedAtTime = *startedAt
+	}
+
 	return Signal{
 		Content:      content,
-		StartedAt:    startedAt,
+		StartedAt:    startedAtTime,
 		CompletedAt:  completedAt,
 		Status:       status,
 		ErrorMessage: errorMessage,
