@@ -17,6 +17,16 @@
                     "window.okta"
                 ]
             }
+        },
+        "microsoft": {
+            "fingerprintProfile": {
+                "headers": {
+                    "X-MS-CLIENT-REQUEST-ID": []
+                },
+                "body": [
+                    "login.microsoftonline.com"
+                ]
+            }
         }
     }
 }
