@@ -5,11 +5,11 @@ import (
 	"strings"
 	"time"
 
-	osintscan "github.com/Method-Security/osintscan/generated/go"
+	dnsfern "github.com/Method-Security/osintscan/generated/go/dns"
 	"github.com/miekg/dns"
 )
 
-func sendAXFRRequest(ns, domain string, timeout int) ([]*osintscan.DnsZoneTransferRecord, bool, []string) {
+func sendAXFRRequest(ns, domain string, timeout int) ([]*dnsfern.DnsZoneTransferRecord, bool, []string) {
 	errors := []string{}
 	addr := fmt.Sprintf("%s:53", ns)
 	fmt.Printf("[Debug] Attempting AXFR transfer from %s\n", addr)
@@ -31,7 +31,7 @@ func sendAXFRRequest(ns, domain string, timeout int) ([]*osintscan.DnsZoneTransf
 		return nil, false, errors
 	}
 
-	var records []*osintscan.DnsZoneTransferRecord
+	var records []*dnsfern.DnsZoneTransferRecord
 	axfrSuccessful := false
 
 	for response := range conn {
@@ -57,22 +57,22 @@ func sendAXFRRequest(ns, domain string, timeout int) ([]*osintscan.DnsZoneTransf
 	return records, false, errors
 }
 
-func convertRecord(rr dns.RR) *osintscan.DnsZoneTransferRecord {
+func convertRecord(rr dns.RR) *dnsfern.DnsZoneTransferRecord {
 	switch r := rr.(type) {
 	case *dns.A:
-		return &osintscan.DnsZoneTransferRecord{Name: r.Hdr.Name, Type: osintscan.DnsRecordEnumA, Value: r.A.String()}
+		return &dnsfern.DnsZoneTransferRecord{Name: r.Hdr.Name, Type: dnsfern.DnsRecordEnumA, Value: r.A.String()}
 	case *dns.AAAA:
-		return &osintscan.DnsZoneTransferRecord{Name: r.Hdr.Name, Type: osintscan.DnsRecordEnumAaaa, Value: r.AAAA.String()}
+		return &dnsfern.DnsZoneTransferRecord{Name: r.Hdr.Name, Type: dnsfern.DnsRecordEnumAaaa, Value: r.AAAA.String()}
 	case *dns.CNAME:
-		return &osintscan.DnsZoneTransferRecord{Name: r.Hdr.Name, Type: osintscan.DnsRecordEnumCname, Value: r.Target}
+		return &dnsfern.DnsZoneTransferRecord{Name: r.Hdr.Name, Type: dnsfern.DnsRecordEnumCname, Value: r.Target}
 	case *dns.MX:
-		return &osintscan.DnsZoneTransferRecord{Name: r.Hdr.Name, Type: osintscan.DnsRecordEnumMx, Value: fmt.Sprintf("%d %s", r.Preference, r.Mx)}
+		return &dnsfern.DnsZoneTransferRecord{Name: r.Hdr.Name, Type: dnsfern.DnsRecordEnumMx, Value: fmt.Sprintf("%d %s", r.Preference, r.Mx)}
 	case *dns.NS:
-		return &osintscan.DnsZoneTransferRecord{Name: r.Hdr.Name, Type: osintscan.DnsRecordEnumNs, Value: r.Ns}
+		return &dnsfern.DnsZoneTransferRecord{Name: r.Hdr.Name, Type: dnsfern.DnsRecordEnumNs, Value: r.Ns}
 	case *dns.SOA:
-		return &osintscan.DnsZoneTransferRecord{Name: r.Hdr.Name, Type: osintscan.DnsRecordEnumSoa, Value: fmt.Sprintf("%s %s %d", r.Ns, r.Mbox, r.Serial)}
+		return &dnsfern.DnsZoneTransferRecord{Name: r.Hdr.Name, Type: dnsfern.DnsRecordEnumSoa, Value: fmt.Sprintf("%s %s %d", r.Ns, r.Mbox, r.Serial)}
 	case *dns.TXT:
-		return &osintscan.DnsZoneTransferRecord{Name: r.Hdr.Name, Type: osintscan.DnsRecordEnumTxt, Value: fmt.Sprintf("%s", r.Txt)}
+		return &dnsfern.DnsZoneTransferRecord{Name: r.Hdr.Name, Type: dnsfern.DnsRecordEnumTxt, Value: fmt.Sprintf("%s", r.Txt)}
 	default:
 		return nil
 	}
