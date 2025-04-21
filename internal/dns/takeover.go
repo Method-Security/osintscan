@@ -14,11 +14,11 @@ import (
 	"strings"
 	"time"
 
-	osintscan "github.com/Method-Security/osintscan/generated/go"
+	dnsfern "github.com/Method-Security/osintscan/generated/go/dns"
 )
 
-func DetectDomainTakeover(targets []string, fingerprintsPath string, onlySuccessful bool, setHTTPS bool, timeout int) (*osintscan.DomainTakeoverReport, error) {
-	resources := osintscan.DomainTakeoverReport{}
+func DetectDomainTakeover(targets []string, fingerprintsPath string, onlySuccessful bool, setHTTPS bool, timeout int) (*dnsfern.DomainTakeoverReport, error) {
+	resources := dnsfern.DomainTakeoverReport{}
 	errs := []string{}
 
 	httpClient := createHTTPClient(setHTTPS, timeout)
@@ -28,7 +28,7 @@ func DetectDomainTakeover(targets []string, fingerprintsPath string, onlySuccess
 		return &resources, err
 	}
 
-	var takeoverResults []*osintscan.DomainTakeover
+	var takeoverResults []*dnsfern.DomainTakeover
 	for _, target := range targets {
 		var urlTargets []string
 
@@ -55,7 +55,7 @@ func DetectDomainTakeover(targets []string, fingerprintsPath string, onlySuccess
 				continue
 			}
 			if !onlySuccessful || successful {
-				takeoverResult := osintscan.DomainTakeover{
+				takeoverResult := dnsfern.DomainTakeover{
 					Target:       url,
 					ResponseBody: responseBody,
 					StatusCode:   statusCode,
@@ -83,8 +83,8 @@ func createHTTPClient(setHTTPS bool, timeout int) *http.Client {
 	}
 }
 
-func retrieveFingerprints(fingerprintsPath string) ([]osintscan.Fingerprint, error) {
-	var fingerprints []osintscan.Fingerprint
+func retrieveFingerprints(fingerprintsPath string) ([]dnsfern.Fingerprint, error) {
+	var fingerprints []dnsfern.Fingerprint
 
 	absPath, err := filepath.Abs(fingerprintsPath)
 	if err != nil {
@@ -104,7 +104,7 @@ func retrieveFingerprints(fingerprintsPath string) ([]osintscan.Fingerprint, err
 	return fingerprints, nil
 }
 
-func assessTarget(url string, client *http.Client, fingerprints []osintscan.Fingerprint) (string, int, []*osintscan.Service, bool, error) {
+func assessTarget(url string, client *http.Client, fingerprints []dnsfern.Fingerprint) (string, int, []*dnsfern.Service, bool, error) {
 
 	resp, err := client.Get(url)
 	if err != nil {
@@ -127,12 +127,12 @@ func assessTarget(url string, client *http.Client, fingerprints []osintscan.Fing
 	return body, statusCode, serviceInfo, successful, nil
 }
 
-func analyzeResponse(body string, fingerprints []osintscan.Fingerprint) ([]*osintscan.Service, bool) {
-	var serviceResults []*osintscan.Service
+func analyzeResponse(body string, fingerprints []dnsfern.Fingerprint) ([]*dnsfern.Service, bool) {
+	var serviceResults []*dnsfern.Service
 	successful := false
 	for _, fp := range fingerprints {
 		isVulnerability := isVulnerability(body, fp)
-		serviceResult := osintscan.Service{
+		serviceResult := dnsfern.Service{
 			Name:        fp.Service,
 			Fingerprint: fp.Fingerprint,
 			Vulnerable:  isVulnerability,
@@ -143,7 +143,7 @@ func analyzeResponse(body string, fingerprints []osintscan.Fingerprint) ([]*osin
 	return serviceResults, successful
 }
 
-func isVulnerability(body string, fp osintscan.Fingerprint) bool {
+func isVulnerability(body string, fp dnsfern.Fingerprint) bool {
 	if fp.Fingerprint != "" {
 		re, err := regexp.Compile(fp.Fingerprint)
 		if err != nil {

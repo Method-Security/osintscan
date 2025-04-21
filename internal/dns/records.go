@@ -4,30 +4,30 @@ import (
 	"context"
 	"slices"
 
-	osintscan "github.com/Method-Security/osintscan/generated/go"
+	dnsfern "github.com/Method-Security/osintscan/generated/go/dns"
 	"github.com/miekg/dns"
 	"github.com/projectdiscovery/dnsx/libs/dnsx"
 )
 
-func getDNSRecords(domain string, questionTypes []uint16) (osintscan.DnsRecords, error) {
+func getDNSRecords(domain string, questionTypes []uint16) (dnsfern.DnsRecords, error) {
 	options := dnsx.DefaultOptions
 	options.QuestionTypes = questionTypes
 	client, err := dnsx.New(options)
 	if err != nil {
-		return osintscan.DnsRecords{}, err
+		return dnsfern.DnsRecords{}, err
 	}
 
-	dnsRecords := osintscan.DnsRecords{}
+	dnsRecords := dnsfern.DnsRecords{}
 
 	results, err := client.QueryMultiple(domain)
 	if err != nil {
-		return osintscan.DnsRecords{}, err
+		return dnsfern.DnsRecords{}, err
 	}
 
-	populateRecords := func(records []string, recordType string) []*osintscan.DnsRecord {
-		var dnsRecordsSlice []*osintscan.DnsRecord
+	populateRecords := func(records []string, recordType string) []*dnsfern.DnsRecord {
+		var dnsRecordsSlice []*dnsfern.DnsRecord
 		for _, record := range records {
-			dnsRecord := osintscan.DnsRecord{
+			dnsRecord := dnsfern.DnsRecord{
 				Name:  domain,
 				Ttl:   int(results.TTL), // This assumes a common TTL for all records; adjust if needed
 				Type:  recordType,
@@ -62,7 +62,7 @@ func getDNSRecords(domain string, questionTypes []uint16) (osintscan.DnsRecords,
 
 // GetDomainDNSRecords queries DNS for all records for a given domain. It returns a RecordsReport struct containing
 // all records that were and any non-fatal errors that occurred.
-func GetDomainDNSRecords(ctx context.Context, domain string) (osintscan.DnsRecordsReport, error) {
+func GetDomainDNSRecords(ctx context.Context, domain string) (dnsfern.DnsRecordsReport, error) {
 	errors := []string{}
 
 	// Get all the DNS records
@@ -81,7 +81,7 @@ func GetDomainDNSRecords(ctx context.Context, domain string) (osintscan.DnsRecor
 	// The DKIM record is always in the _domainkey subdomain (RFC-6376) and therefore must be fetched separately.
 	// To complicate matters, the _domainkey subdomain itself includes a subdomain named after a selector which we
 	// don't know in advance, so we need to check each common selector that we're aware of.
-	dkimRecords := osintscan.DnsRecords{}
+	dkimRecords := dnsfern.DnsRecords{}
 	var selectors []string = []string{"default", "selector1", "selector2", "google", "amazonses", "microsoft"}
 	for _, selector := range selectors {
 		dkimRecordForSelector, err := getDNSRecords(selector+"._domainkey."+domain, []uint16{dns.TypeTXT})
@@ -92,7 +92,7 @@ func GetDomainDNSRecords(ctx context.Context, domain string) (osintscan.DnsRecor
 	}
 
 	// Create report and write to file
-	report := osintscan.DnsRecordsReport{
+	report := dnsfern.DnsRecordsReport{
 		Domain:          domain,
 		DnsRecords:      &dnsRecords,
 		DmarcDnsRecords: &dmarcRecords,

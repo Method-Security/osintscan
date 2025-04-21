@@ -9,16 +9,16 @@ import (
 	"sync"
 	"time"
 
-	osintscan "github.com/Method-Security/osintscan/generated/go"
+	dnsfern "github.com/Method-Security/osintscan/generated/go/dns"
 	"github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
 // GetDomainSubdomainsBrute queries subfinder for all subdomains for a given domain. It returns a SubdomainsEnumReport struct containing
 // all subdomains and any errors that occurred.
-func GetDomainSubdomainsBrute(ctx context.Context, domain string, subdomainList []string, parallelThreads int, recursiveDepth int, timeout int, dnsServerAddress string) (osintscan.DnsSubenumReport, error) {
-	report := osintscan.DnsSubenumReport{
+func GetDomainSubdomainsBrute(ctx context.Context, domain string, subdomainList []string, parallelThreads int, recursiveDepth int, timeout int, dnsServerAddress string) (dnsfern.DnsSubenumReport, error) {
+	report := dnsfern.DnsSubenumReport{
 		Domain:          domain,
-		EnumerationType: osintscan.DnsSubenumTypeBrute,
+		EnumerationType: dnsfern.DnsSubenumTypeBrute,
 	}
 	errors := []string{}
 
