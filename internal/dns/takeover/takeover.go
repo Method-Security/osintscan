@@ -1,0 +1,121 @@
+package dns
+
+import (
+	"io"
+	"net/http"
+	"strings"
+
+	dnsfern "github.com/Method-Security/osintscan/generated/go/dns"
+)
+
+func DetectDomainTakeover(targets []string, config dnsfern.DnsTakeoverConfig) (*dnsfern.DomainTakeoverReport, error) {
+	// Initialize resources
+	resources := dnsfern.DomainTakeoverReport{Config: &config}
+	errs := []string{}
+
+	// Create HTTP client
+	httpClient := createHTTPClient(config.TlsVerify, config.OnlyHttps, config.Timeout)
+
+	var takeoverResults []*dnsfern.DomainTakeover
+	for _, target := range targets {
+		var urlTargets []string
+
+		if !strings.HasPrefix(target, "http://") && !strings.HasPrefix(target, "https://") {
+			if config.OnlyHttps {
+				urlTargets = append(urlTargets, "https://"+target)
+			} else {
+				urlTargets = append(urlTargets, "http://"+target, "https://"+target)
+			}
+		} else {
+			urlTargets = append(urlTargets, target)
+		}
+
+		// Loop through targets with schemes
+		for _, url := range urlTargets {
+			// Retrieve CNAME record
+			domain, cname, returnsNXDomain, err := retrieveCNAMERecord(url)
+			if err != nil {
+				errs = append(errs, err.Error())
+				continue
+			}
+
+			// Assess target
+			response, serviceResults, successful := assessTarget(url, httpClient, config.Fingerprints, cname, returnsNXDomain, config.SuccessfulOnly)
+			if !config.SuccessfulOnly || successful {
+				takeoverResult := dnsfern.DomainTakeover{
+					Target:          url,
+					Domain:          domain,
+					Cname:           cname,
+					ReturnsNxDomain: returnsNXDomain,
+					Response:        response,
+					HostingServices: serviceResults,
+				}
+				takeoverResults = append(takeoverResults, &takeoverResult)
+			}
+		}
+	}
+
+	resources.Targets = takeoverResults
+	resources.Errors = errs
+	return &resources, nil
+}
+
+// assessTarget sends a request to the target and analyzes the response for domain takeovers
+func assessTarget(url string, client *http.Client, fingerprints []*dnsfern.DnsTakeoverFingerprint, cname string, returnsNXDomain bool, onlySuccessful bool) (*dnsfern.DnsTakeoverResponse, []*dnsfern.HostingService, bool) {
+	response := dnsfern.DnsTakeoverResponse{}
+
+	if !returnsNXDomain {
+		resp, err := client.Get(url)
+		if err != nil {
+			errString := err.Error()
+			response.Error = &errString
+			return &response, nil, false
+		}
+
+		bodyBytes, err := io.ReadAll(resp.Body)
+		if err != nil {
+			errString := err.Error()
+			response.Error = &errString
+			return &response, nil, false
+		}
+
+		err = resp.Body.Close()
+		if err != nil {
+			errString := err.Error()
+			response.Error = &errString
+			return &response, nil, false
+		}
+
+		// Set Response Data
+		response.StatusCode = &resp.StatusCode
+		response.ResponseHeaders = make(map[string]string)
+		for key, value := range resp.Header {
+			response.ResponseHeaders[key] = strings.Join(value, ",")
+		}
+		body := string(bodyBytes)
+		response.ResponseBody = &body
+	}
+
+	// Analyze Response
+	serviceInfo, successful := analyzeResponse(fingerprints, cname, response.ResponseBody, returnsNXDomain, onlySuccessful)
+	return &response, serviceInfo, successful
+}
+
+// analyzeResponse analyzes the response for domain takeovers using the helper function isVulnerable
+func analyzeResponse(fingerprints []*dnsfern.DnsTakeoverFingerprint, cname string, body *string, returnsNXDomain bool, onlySuccessful bool) ([]*dnsfern.HostingService, bool) {
+	var serviceResults []*dnsfern.HostingService
+	successful := false
+	for _, fp := range fingerprints {
+		isVulnerable := isVulnerable(cname, body, returnsNXDomain, *fp)
+		if onlySuccessful && !isVulnerable {
+			continue
+		}
+		hostingServiceResult := dnsfern.HostingService{
+			Name:       fp.Service,
+			Vulnerable: isVulnerable,
+		}
+		serviceResults = append(serviceResults, &hostingServiceResult)
+		successful = successful || isVulnerable
+	}
+	return serviceResults, successful
+}

@@ -1,5 +1,6 @@
 types:
-  Fingerprint:
+  # Struct for a fingerprint to be used for a domain takeover check
+  DnsTakeoverFingerprint:
     properties:
       cicdPass: boolean
       cname: list<string>
@@ -9,22 +10,35 @@ types:
       httpStatus: optional<integer>
       nxDomain: boolean
       service: string
-      status: string
-      vulnerable: boolean
-  Service:
+  # Config for a domain takeover check
+  DnsTakeoverConfig:
+    properties:
+      fingerprints: list<DnsTakeoverFingerprint>
+      successfulOnly: boolean
+      onlyHTTPS: boolean
+      TLSVerify: boolean
+      timeout: integer
+  # Report
+  HostingService:
     properties:
       name: string
-      fingerprint: string
       vulnerable: boolean
+  DnsTakeoverResponse:
+    properties:
+      statusCode: optional<integer>
+      responseHeaders: optional<map<string, string>>
+      responseBody: optional<string>
+      error: optional<string>
   DomainTakeover:
     properties:
       target: string
-      statusCode: integer
-      responseBody: string
       domain: string
       cname: string
-      services: list<Service>
+      returnsNXDomain: boolean
+      response: optional<DnsTakeoverResponse>
+      hostingServices: list<HostingService>
   DomainTakeoverReport:
     properties:
-      domainTakeovers: optional<list<DomainTakeover>>
+      targets: optional<list<DomainTakeover>>
+      config: DnsTakeoverConfig
       errors: optional<list<string>>
