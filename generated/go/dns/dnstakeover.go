@@ -8,13 +8,263 @@ import (
 	internal "github.com/Method-Security/osintscan/generated/go/internal"
 )
 
+type DnsTakeoverConfig struct {
+	Fingerprints   []*DnsTakeoverFingerprint `json:"fingerprints,omitempty" url:"fingerprints,omitempty"`
+	SuccessfulOnly bool                      `json:"successfulOnly" url:"successfulOnly"`
+	OnlyHttps      bool                      `json:"onlyHTTPS" url:"onlyHTTPS"`
+	TlsVerify      bool                      `json:"TLSVerify" url:"TLSVerify"`
+	Timeout        int                       `json:"timeout" url:"timeout"`
+
+	extraProperties map[string]interface{}
+	rawJSON         json.RawMessage
+}
+
+func (d *DnsTakeoverConfig) GetFingerprints() []*DnsTakeoverFingerprint {
+	if d == nil {
+		return nil
+	}
+	return d.Fingerprints
+}
+
+func (d *DnsTakeoverConfig) GetSuccessfulOnly() bool {
+	if d == nil {
+		return false
+	}
+	return d.SuccessfulOnly
+}
+
+func (d *DnsTakeoverConfig) GetOnlyHttps() bool {
+	if d == nil {
+		return false
+	}
+	return d.OnlyHttps
+}
+
+func (d *DnsTakeoverConfig) GetTlsVerify() bool {
+	if d == nil {
+		return false
+	}
+	return d.TlsVerify
+}
+
+func (d *DnsTakeoverConfig) GetTimeout() int {
+	if d == nil {
+		return 0
+	}
+	return d.Timeout
+}
+
+func (d *DnsTakeoverConfig) GetExtraProperties() map[string]interface{} {
+	return d.extraProperties
+}
+
+func (d *DnsTakeoverConfig) UnmarshalJSON(data []byte) error {
+	type unmarshaler DnsTakeoverConfig
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*d = DnsTakeoverConfig(value)
+	extraProperties, err := internal.ExtractExtraProperties(data, *d)
+	if err != nil {
+		return err
+	}
+	d.extraProperties = extraProperties
+	d.rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (d *DnsTakeoverConfig) String() string {
+	if len(d.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(d.rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := internal.StringifyJSON(d); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", d)
+}
+
+type DnsTakeoverFingerprint struct {
+	CicdPass      bool     `json:"cicdPass" url:"cicdPass"`
+	Cname         []string `json:"cname,omitempty" url:"cname,omitempty"`
+	Discussion    string   `json:"discussion" url:"discussion"`
+	Documentation string   `json:"documentation" url:"documentation"`
+	Fingerprint   string   `json:"fingerprint" url:"fingerprint"`
+	HttpStatus    *int     `json:"httpStatus,omitempty" url:"httpStatus,omitempty"`
+	NxDomain      bool     `json:"nxDomain" url:"nxDomain"`
+	Service       string   `json:"service" url:"service"`
+
+	extraProperties map[string]interface{}
+	rawJSON         json.RawMessage
+}
+
+func (d *DnsTakeoverFingerprint) GetCicdPass() bool {
+	if d == nil {
+		return false
+	}
+	return d.CicdPass
+}
+
+func (d *DnsTakeoverFingerprint) GetCname() []string {
+	if d == nil {
+		return nil
+	}
+	return d.Cname
+}
+
+func (d *DnsTakeoverFingerprint) GetDiscussion() string {
+	if d == nil {
+		return ""
+	}
+	return d.Discussion
+}
+
+func (d *DnsTakeoverFingerprint) GetDocumentation() string {
+	if d == nil {
+		return ""
+	}
+	return d.Documentation
+}
+
+func (d *DnsTakeoverFingerprint) GetFingerprint() string {
+	if d == nil {
+		return ""
+	}
+	return d.Fingerprint
+}
+
+func (d *DnsTakeoverFingerprint) GetHttpStatus() *int {
+	if d == nil {
+		return nil
+	}
+	return d.HttpStatus
+}
+
+func (d *DnsTakeoverFingerprint) GetNxDomain() bool {
+	if d == nil {
+		return false
+	}
+	return d.NxDomain
+}
+
+func (d *DnsTakeoverFingerprint) GetService() string {
+	if d == nil {
+		return ""
+	}
+	return d.Service
+}
+
+func (d *DnsTakeoverFingerprint) GetExtraProperties() map[string]interface{} {
+	return d.extraProperties
+}
+
+func (d *DnsTakeoverFingerprint) UnmarshalJSON(data []byte) error {
+	type unmarshaler DnsTakeoverFingerprint
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*d = DnsTakeoverFingerprint(value)
+	extraProperties, err := internal.ExtractExtraProperties(data, *d)
+	if err != nil {
+		return err
+	}
+	d.extraProperties = extraProperties
+	d.rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (d *DnsTakeoverFingerprint) String() string {
+	if len(d.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(d.rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := internal.StringifyJSON(d); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", d)
+}
+
+type DnsTakeoverResponse struct {
+	StatusCode      *int              `json:"statusCode,omitempty" url:"statusCode,omitempty"`
+	ResponseHeaders map[string]string `json:"responseHeaders,omitempty" url:"responseHeaders,omitempty"`
+	ResponseBody    *string           `json:"responseBody,omitempty" url:"responseBody,omitempty"`
+	Error           *string           `json:"error,omitempty" url:"error,omitempty"`
+
+	extraProperties map[string]interface{}
+	rawJSON         json.RawMessage
+}
+
+func (d *DnsTakeoverResponse) GetStatusCode() *int {
+	if d == nil {
+		return nil
+	}
+	return d.StatusCode
+}
+
+func (d *DnsTakeoverResponse) GetResponseHeaders() map[string]string {
+	if d == nil {
+		return nil
+	}
+	return d.ResponseHeaders
+}
+
+func (d *DnsTakeoverResponse) GetResponseBody() *string {
+	if d == nil {
+		return nil
+	}
+	return d.ResponseBody
+}
+
+func (d *DnsTakeoverResponse) GetError() *string {
+	if d == nil {
+		return nil
+	}
+	return d.Error
+}
+
+func (d *DnsTakeoverResponse) GetExtraProperties() map[string]interface{} {
+	return d.extraProperties
+}
+
+func (d *DnsTakeoverResponse) UnmarshalJSON(data []byte) error {
+	type unmarshaler DnsTakeoverResponse
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*d = DnsTakeoverResponse(value)
+	extraProperties, err := internal.ExtractExtraProperties(data, *d)
+	if err != nil {
+		return err
+	}
+	d.extraProperties = extraProperties
+	d.rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (d *DnsTakeoverResponse) String() string {
+	if len(d.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(d.rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := internal.StringifyJSON(d); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", d)
+}
+
 type DomainTakeover struct {
-	Target       string     `json:"target" url:"target"`
-	StatusCode   int        `json:"statusCode" url:"statusCode"`
-	ResponseBody string     `json:"responseBody" url:"responseBody"`
-	Domain       string     `json:"domain" url:"domain"`
-	Cname        string     `json:"cname" url:"cname"`
-	Services     []*Service `json:"services,omitempty" url:"services,omitempty"`
+	Target          string               `json:"target" url:"target"`
+	Domain          string               `json:"domain" url:"domain"`
+	Cname           string               `json:"cname" url:"cname"`
+	ReturnsNxDomain bool                 `json:"returnsNXDomain" url:"returnsNXDomain"`
+	Response        *DnsTakeoverResponse `json:"response,omitempty" url:"response,omitempty"`
+	HostingServices []*HostingService    `json:"hostingServices,omitempty" url:"hostingServices,omitempty"`
 
 	extraProperties map[string]interface{}
 	rawJSON         json.RawMessage
@@ -25,20 +275,6 @@ func (d *DomainTakeover) GetTarget() string {
 		return ""
 	}
 	return d.Target
-}
-
-func (d *DomainTakeover) GetStatusCode() int {
-	if d == nil {
-		return 0
-	}
-	return d.StatusCode
-}
-
-func (d *DomainTakeover) GetResponseBody() string {
-	if d == nil {
-		return ""
-	}
-	return d.ResponseBody
 }
 
 func (d *DomainTakeover) GetDomain() string {
@@ -55,11 +291,25 @@ func (d *DomainTakeover) GetCname() string {
 	return d.Cname
 }
 
-func (d *DomainTakeover) GetServices() []*Service {
+func (d *DomainTakeover) GetReturnsNxDomain() bool {
+	if d == nil {
+		return false
+	}
+	return d.ReturnsNxDomain
+}
+
+func (d *DomainTakeover) GetResponse() *DnsTakeoverResponse {
 	if d == nil {
 		return nil
 	}
-	return d.Services
+	return d.Response
+}
+
+func (d *DomainTakeover) GetHostingServices() []*HostingService {
+	if d == nil {
+		return nil
+	}
+	return d.HostingServices
 }
 
 func (d *DomainTakeover) GetExtraProperties() map[string]interface{} {
@@ -95,18 +345,26 @@ func (d *DomainTakeover) String() string {
 }
 
 type DomainTakeoverReport struct {
-	DomainTakeovers []*DomainTakeover `json:"domainTakeovers,omitempty" url:"domainTakeovers,omitempty"`
-	Errors          []string          `json:"errors,omitempty" url:"errors,omitempty"`
+	Targets []*DomainTakeover  `json:"targets,omitempty" url:"targets,omitempty"`
+	Config  *DnsTakeoverConfig `json:"config,omitempty" url:"config,omitempty"`
+	Errors  []string           `json:"errors,omitempty" url:"errors,omitempty"`
 
 	extraProperties map[string]interface{}
 	rawJSON         json.RawMessage
 }
 
-func (d *DomainTakeoverReport) GetDomainTakeovers() []*DomainTakeover {
+func (d *DomainTakeoverReport) GetTargets() []*DomainTakeover {
 	if d == nil {
 		return nil
 	}
-	return d.DomainTakeovers
+	return d.Targets
+}
+
+func (d *DomainTakeoverReport) GetConfig() *DnsTakeoverConfig {
+	if d == nil {
+		return nil
+	}
+	return d.Config
 }
 
 func (d *DomainTakeoverReport) GetErrors() []string {
@@ -148,182 +406,56 @@ func (d *DomainTakeoverReport) String() string {
 	return fmt.Sprintf("%#v", d)
 }
 
-type Fingerprint struct {
-	CicdPass      bool     `json:"cicdPass" url:"cicdPass"`
-	Cname         []string `json:"cname,omitempty" url:"cname,omitempty"`
-	Discussion    string   `json:"discussion" url:"discussion"`
-	Documentation string   `json:"documentation" url:"documentation"`
-	Fingerprint   string   `json:"fingerprint" url:"fingerprint"`
-	HttpStatus    *int     `json:"httpStatus,omitempty" url:"httpStatus,omitempty"`
-	NxDomain      bool     `json:"nxDomain" url:"nxDomain"`
-	Service       string   `json:"service" url:"service"`
-	Status        string   `json:"status" url:"status"`
-	Vulnerable    bool     `json:"vulnerable" url:"vulnerable"`
+type HostingService struct {
+	Name       string `json:"name" url:"name"`
+	Vulnerable bool   `json:"vulnerable" url:"vulnerable"`
 
 	extraProperties map[string]interface{}
 	rawJSON         json.RawMessage
 }
 
-func (f *Fingerprint) GetCicdPass() bool {
-	if f == nil {
+func (h *HostingService) GetName() string {
+	if h == nil {
+		return ""
+	}
+	return h.Name
+}
+
+func (h *HostingService) GetVulnerable() bool {
+	if h == nil {
 		return false
 	}
-	return f.CicdPass
+	return h.Vulnerable
 }
 
-func (f *Fingerprint) GetCname() []string {
-	if f == nil {
-		return nil
-	}
-	return f.Cname
+func (h *HostingService) GetExtraProperties() map[string]interface{} {
+	return h.extraProperties
 }
 
-func (f *Fingerprint) GetDiscussion() string {
-	if f == nil {
-		return ""
-	}
-	return f.Discussion
-}
-
-func (f *Fingerprint) GetDocumentation() string {
-	if f == nil {
-		return ""
-	}
-	return f.Documentation
-}
-
-func (f *Fingerprint) GetFingerprint() string {
-	if f == nil {
-		return ""
-	}
-	return f.Fingerprint
-}
-
-func (f *Fingerprint) GetHttpStatus() *int {
-	if f == nil {
-		return nil
-	}
-	return f.HttpStatus
-}
-
-func (f *Fingerprint) GetNxDomain() bool {
-	if f == nil {
-		return false
-	}
-	return f.NxDomain
-}
-
-func (f *Fingerprint) GetService() string {
-	if f == nil {
-		return ""
-	}
-	return f.Service
-}
-
-func (f *Fingerprint) GetStatus() string {
-	if f == nil {
-		return ""
-	}
-	return f.Status
-}
-
-func (f *Fingerprint) GetVulnerable() bool {
-	if f == nil {
-		return false
-	}
-	return f.Vulnerable
-}
-
-func (f *Fingerprint) GetExtraProperties() map[string]interface{} {
-	return f.extraProperties
-}
-
-func (f *Fingerprint) UnmarshalJSON(data []byte) error {
-	type unmarshaler Fingerprint
+func (h *HostingService) UnmarshalJSON(data []byte) error {
+	type unmarshaler HostingService
 	var value unmarshaler
 	if err := json.Unmarshal(data, &value); err != nil {
 		return err
 	}
-	*f = Fingerprint(value)
-	extraProperties, err := internal.ExtractExtraProperties(data, *f)
+	*h = HostingService(value)
+	extraProperties, err := internal.ExtractExtraProperties(data, *h)
 	if err != nil {
 		return err
 	}
-	f.extraProperties = extraProperties
-	f.rawJSON = json.RawMessage(data)
+	h.extraProperties = extraProperties
+	h.rawJSON = json.RawMessage(data)
 	return nil
 }
 
-func (f *Fingerprint) String() string {
-	if len(f.rawJSON) > 0 {
-		if value, err := internal.StringifyJSON(f.rawJSON); err == nil {
+func (h *HostingService) String() string {
+	if len(h.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(h.rawJSON); err == nil {
 			return value
 		}
 	}
-	if value, err := internal.StringifyJSON(f); err == nil {
+	if value, err := internal.StringifyJSON(h); err == nil {
 		return value
 	}
-	return fmt.Sprintf("%#v", f)
-}
-
-type Service struct {
-	Name        string `json:"name" url:"name"`
-	Fingerprint string `json:"fingerprint" url:"fingerprint"`
-	Vulnerable  bool   `json:"vulnerable" url:"vulnerable"`
-
-	extraProperties map[string]interface{}
-	rawJSON         json.RawMessage
-}
-
-func (s *Service) GetName() string {
-	if s == nil {
-		return ""
-	}
-	return s.Name
-}
-
-func (s *Service) GetFingerprint() string {
-	if s == nil {
-		return ""
-	}
-	return s.Fingerprint
-}
-
-func (s *Service) GetVulnerable() bool {
-	if s == nil {
-		return false
-	}
-	return s.Vulnerable
-}
-
-func (s *Service) GetExtraProperties() map[string]interface{} {
-	return s.extraProperties
-}
-
-func (s *Service) UnmarshalJSON(data []byte) error {
-	type unmarshaler Service
-	var value unmarshaler
-	if err := json.Unmarshal(data, &value); err != nil {
-		return err
-	}
-	*s = Service(value)
-	extraProperties, err := internal.ExtractExtraProperties(data, *s)
-	if err != nil {
-		return err
-	}
-	s.extraProperties = extraProperties
-	s.rawJSON = json.RawMessage(data)
-	return nil
-}
-
-func (s *Service) String() string {
-	if len(s.rawJSON) > 0 {
-		if value, err := internal.StringifyJSON(s.rawJSON); err == nil {
-			return value
-		}
-	}
-	if value, err := internal.StringifyJSON(s); err == nil {
-		return value
-	}
-	return fmt.Sprintf("%#v", s)
+	return fmt.Sprintf("%#v", h)
 }

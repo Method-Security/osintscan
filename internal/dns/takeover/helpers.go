@@ -1,0 +1,158 @@
+package dns
+
+import (
+	"crypto/tls"
+	"encoding/json"
+	"errors"
+	"net"
+	"net/http"
+	"net/url"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strings"
+	"time"
+
+	dnsfern "github.com/Method-Security/osintscan/generated/go/dns"
+)
+
+// RetrieveFingerprints retrieves the fingerprints defined in a JSON file from the given path
+func RetrieveFingerprints(fingerprintsPath string) ([]*dnsfern.DnsTakeoverFingerprint, error) {
+	var fingerprints []*dnsfern.DnsTakeoverFingerprint
+
+	absPath, err := filepath.Abs(fingerprintsPath)
+	if err != nil {
+		return nil, err
+	}
+
+	file, err := os.ReadFile(absPath)
+	if err != nil {
+		return nil, err
+	}
+
+	err = json.Unmarshal(file, &fingerprints)
+	if err != nil {
+		return nil, errors.New("could not unmarshal fingerprint file")
+	}
+
+	return fingerprints, nil
+}
+
+// createHTTPClient creates an HTTP client with the given TLS verification and timeout
+func createHTTPClient(verifyTLS bool, onlyHTTPS bool, timeout int) *http.Client {
+	// Check to see if only HTTP is enabled and if the User has requested TLS verification
+	skipTLS := !verifyTLS && onlyHTTPS
+
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: skipTLS},
+	}
+	return &http.Client{
+		Timeout:   time.Duration(timeout) * time.Second,
+		Transport: tr,
+	}
+}
+
+// isVulnerable checks if the given body contains the fingerprint
+func isVulnerable(cname string, body *string, returnsNXDomain bool, fp dnsfern.DnsTakeoverFingerprint) bool {
+	if fp.Fingerprint != "" {
+		// Return false if there is a CNAME defined in the fingerprint and the CNAME does not match
+		if len(fp.Cname) > 0 {
+			for _, fingerprintCname := range fp.Cname {
+				if !strings.Contains(cname, fingerprintCname) {
+					return false
+				}
+			}
+		}
+
+		// Check if the fingerprint is for NXDOMAIN
+		if fp.NxDomain && returnsNXDomain {
+			return true
+		}
+
+		// Check cnames and response body if it exists
+		if body == nil {
+			return false
+		}
+
+		// Convert the fingerprint and body to lowercase
+		lowercaseFingerprint := strings.ToLower(fp.Fingerprint)
+		lowercaseBody := strings.ToLower(*body)
+
+		// Check if the fingerprint is in the body
+		matched, err := regexp.MatchString(lowercaseFingerprint, lowercaseBody)
+		if err != nil {
+			return false
+		}
+
+		if matched {
+			return true
+		}
+	}
+	return false
+}
+
+// retrieveCNAMEAndNXDomain returns:
+// - original domain
+// - cname target (if any)
+// - if the cname target returns NXDOMAIN
+func retrieveCNAMERecord(rawURL string) (string, string, bool, error) {
+	domain, err := getDomainFromURL(rawURL)
+	if err != nil {
+		return "", "", false, err
+	}
+
+	// Lookup the CNAME for the domain
+	cnameTarget, err := net.LookupCNAME(domain)
+	if err != nil {
+		// This could be NXDOMAIN for the base domain itself
+		if dnsErr, ok := err.(*net.DNSError); ok {
+			if isNXDomainError(dnsErr.Err) {
+				return domain, "", true, nil
+			}
+		}
+		return domain, "", false, err
+	}
+
+	// Attempt to resolve the CNAME target (to see if it returns NXDOMAIN)
+	_, err = net.LookupHost(cnameTarget)
+	if err != nil {
+		if dnsErr, ok := err.(*net.DNSError); ok {
+			if isNXDomainError(dnsErr.Err) {
+				return domain, cnameTarget, true, nil
+			}
+		}
+		// fallback: don't treat it as NXDOMAIN, just propagate error
+		return domain, cnameTarget, false, err
+	}
+
+	return domain, cnameTarget, false, nil
+}
+
+// isNXDomainError helps identify NXDOMAIN in DNS error message
+func isNXDomainError(errMsg string) bool {
+	nxdomainIndicators := []string{"no such host", "nxdomain"}
+	lower := strings.ToLower(errMsg)
+	for _, indicator := range nxdomainIndicators {
+		if strings.Contains(lower, indicator) {
+			return true
+		}
+	}
+	return false
+}
+
+// getDomainFromURL retrieves the domain from the given URL
+func getDomainFromURL(rawURL string) (string, error) {
+	parsedURL, err := url.Parse(rawURL)
+	if err != nil {
+		return "", err
+	}
+
+	host := parsedURL.Host
+	if strings.Contains(host, ":") {
+		host, _, err = net.SplitHostPort(host)
+		if err != nil {
+			return "", err
+		}
+	}
+	return host, nil
+}

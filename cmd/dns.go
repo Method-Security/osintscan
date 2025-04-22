@@ -3,8 +3,10 @@ package cmd
 import (
 	"errors"
 
+	dnsfern "github.com/Method-Security/osintscan/generated/go/dns"
 	"github.com/Method-Security/osintscan/internal/dns"
 	subenum "github.com/Method-Security/osintscan/internal/dns/subenum"
+	takeover "github.com/Method-Security/osintscan/internal/dns/takeover"
 	zonetransfer "github.com/Method-Security/osintscan/internal/dns/zonetransfer"
 	"github.com/Method-Security/osintscan/utils"
 	"github.com/spf13/cobra"
@@ -198,12 +200,13 @@ This ensures efficient scanning but means some valid deep subdomains may be miss
 		Short: "Detect domain takeovers given a list of targets",
 		Long:  `Detect domain takeovers given a list of targets`,
 		Run: func(cmd *cobra.Command, args []string) {
+			// Get targets
 			targets, err := cmd.Flags().GetStringSlice("targets")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			filePaths, err := cmd.Flags().GetStringSlice("files")
+			filePaths, err := cmd.Flags().GetStringSlice("targetfiles")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -215,25 +218,40 @@ This ensures efficient scanning but means some valid deep subdomains may be miss
 			}
 
 			allTargets := append(targets, fileTargets...)
-
 			if len(allTargets) == 0 {
 				a.OutputSignal.AddError(errors.New("no targets specified"))
 				return
 			}
 
-			fingerprintsPath, err := cmd.Flags().GetString("fingerprints")
+			// Config
+			fingerprintsPath, err := cmd.Flags().GetString("fingerprintfiles")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			fingerprints, err := takeover.RetrieveFingerprints(fingerprintsPath)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			if len(fingerprints) == 0 {
+				a.OutputSignal.AddError(errors.New("no fingerprints found"))
+				return
+			}
+
+			successfulOnly, err := cmd.Flags().GetBool("successfulonly")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
 
-			onlySuccessful, err := cmd.Flags().GetBool("onlysuccessful")
+			onlyHTTPS, err := cmd.Flags().GetBool("onlyhttps")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
 
-			setHTTPS, err := cmd.Flags().GetBool("https")
+			TLSVerify, err := cmd.Flags().GetBool("tlsverify")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -245,7 +263,9 @@ This ensures efficient scanning but means some valid deep subdomains may be miss
 				return
 			}
 
-			report, err := dns.DetectDomainTakeover(allTargets, fingerprintsPath, onlySuccessful, setHTTPS, timeout)
+			config := getDNSTakeoverConfig(fingerprints, successfulOnly, onlyHTTPS, TLSVerify, timeout)
+
+			report, err := takeover.DetectDomainTakeover(allTargets, config)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -255,11 +275,12 @@ This ensures efficient scanning but means some valid deep subdomains may be miss
 	}
 
 	takeoverCmd.Flags().StringSlice("targets", []string{}, "URL targets to analyze")
-	takeoverCmd.Flags().String("fingerprints", "configs/fingerprints.json", "Path to fingerprints file")
-	takeoverCmd.Flags().StringSlice("files", []string{}, "Paths to files containing the list of targets")
-	takeoverCmd.Flags().Bool("onlysuccessful", false, "Only check sites with secure SSL")
-	takeoverCmd.Flags().Bool("https", false, "Only check sites with secure SSL")
-	takeoverCmd.Flags().Int("timeout", 10, "Request timeout in seconds")
+	takeoverCmd.Flags().StringSlice("targetfiles", []string{}, "Paths to files containing the list of targets")
+	takeoverCmd.Flags().String("fingerprintfiles", "configs/dns/takeover/fingerprints.json", "Path to fingerprints file")
+	takeoverCmd.Flags().Bool("successfulonly", false, "Only check sites with secure SSL")
+	takeoverCmd.Flags().Bool("onlyhttps", false, "Only check sites using https requests")
+	takeoverCmd.Flags().Bool("tlsverify", true, "For requests with https, verify TLS certificates")
+	takeoverCmd.Flags().Int("timeout", 30, "Request timeout in seconds")
 
 	zoneTransferCmd := &cobra.Command{
 		Use:   "zonetransfer",
@@ -298,4 +319,21 @@ This ensures efficient scanning but means some valid deep subdomains may be miss
 	a.DNSCmd.AddCommand(takeoverCmd)
 	a.DNSCmd.AddCommand(zoneTransferCmd)
 	a.RootCmd.AddCommand(a.DNSCmd)
+}
+
+func getDNSTakeoverConfig(fingerprints []*dnsfern.DnsTakeoverFingerprint, successfulOnly bool, onlyHTTPS bool, tlsVerify bool, timeout int) dnsfern.DnsTakeoverConfig {
+	config := dnsfern.DnsTakeoverConfig{
+		Fingerprints:   fingerprints,
+		SuccessfulOnly: successfulOnly,
+		OnlyHttps:      onlyHTTPS,
+		TlsVerify:      tlsVerify,
+	}
+
+	if timeout >= 0 {
+		config.Timeout = timeout
+	} else {
+		config.Timeout = 30
+	}
+
+	return config
 }
