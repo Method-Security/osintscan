@@ -3,7 +3,7 @@ types:
   DnsTakeoverFingerprint:
     properties:
       cicdPass: boolean
-      cname: list<string>
+      cname: optional<list<string>>
       discussion: string
       documentation: string
       fingerprint: string
