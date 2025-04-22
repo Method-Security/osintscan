@@ -4,10 +4,17 @@ Regexp2 is a feature-rich RegExp engine for Go.  It doesn't have constant time g
 ## Basis of the engine
 The engine is ported from the .NET framework's System.Text.RegularExpressions.Regex engine.  That engine was open sourced in 2015 under the MIT license.  There are some fundamental differences between .NET strings and Go strings that required a bit of borrowing from the Go framework regex engine as well.  I cleaned up a couple of the dirtier bits during the port (regexcharclass.cs was terrible), but the parse tree, code emmitted, and therefore patterns matched should be identical.
 
+## New Code Generation
+For extra performance use `regexp2` with [`regexp2cg`](https://github.com/dlclark/regexp2cg). It is a code generation utility for `regexp2` and you can likely improve your regexp runtime performance by 3-10x in hot code paths. As always you should benchmark your specifics to confirm the results. Give it a try!
+
 ## Installing
 This is a go-gettable library, so install is easy:
 
-    go get github.com/dlclark/regexp2/...
+    go get github.com/dlclark/regexp2
+
+To use the new Code Generation (while it's in beta) you'll need to use the `code_gen` branch:
+
+    go get github.com/dlclark/regexp2@code_gen
 
 ## Usage
 Usage is similar to the Go `regexp` package.  Just like in `regexp`, you start by converting a regex into a state machine via the `Compile` or `MustCompile` methods.  They ultimately do the same thing, but `MustCompile` will panic if the regex is invalid.  You can then use the provided `Regexp` struct to find matches repeatedly.  A `Regexp` struct is safe to use across goroutines.
@@ -113,22 +120,44 @@ deadline for the match. The performance impact is as follows.
     is reached. E.g., if you set a timeout of one minute the load will persist
     for approximately a minute even if the match finishes quickly.
 
-Some alternative implementations were considered and ruled out. 
+See [PR #58](https://github.com/dlclark/regexp2/pull/58) for more details and 
+alternatives considered.
 
-1.  **time.Now()** - This was the initial timeout implementation. It called `time.Now()`
-    and compared the result to the deadline approximately once every 1000 matching steps.
-    Adding a timeout to a simple match increased the cost from ~45ns to ~3000ns).
-2.  **time.AfterFunc** - This approach entails using `time.AfterFunc` to set an `expired`
-    atomic boolean value. However it increases the cost of handling a simple match 
-    with a timeout from ~45ns to ~360ns and was therefore ruled out.
-3.  **counter** - In this approach an atomic variable tracks the number of live matches
-    with timeouts. The background clock stops when the counter hits zero. The benefit
-    of this approach is that the background load will stop more quickly (after the
-    last match has finished as opposed to waiting until the deadline for the last
-    match). However this approach requires more atomic variable updates and has poorer
-    performance when multiple matches are executed concurrently. (The cost of a
-    single match jumps from ~45ns to ~65ns, and the cost of running matches on
-    all 12 available CPUs jumps from ~400ns to ~730ns).
+## Goroutine leak error
+If you're using a library during unit tests (e.g. https://github.com/uber-go/goleak) that validates all goroutines are exited then you'll likely get an error if you or any of your dependencies use regex's with a MatchTimeout. 
+To remedy the problem you'll need to tell the unit test to wait until the backgroup timeout goroutine is exited.
+
+```go
+func TestSomething(t *testing.T) {
+    defer goleak.VerifyNone(t)
+    defer regexp2.StopTimeoutClock()
+
+    // ... test
+}
+
+//or
+
+func TestMain(m *testing.M) {
+    // setup
+    // ...
+
+    // run 
+    m.Run()
+
+    //tear down
+    regexp2.StopTimeoutClock()
+    goleak.VerifyNone(t)
+}
+```
+
+This will add ~100ms runtime to each test (or TestMain). If that's too much time you can set the clock cycle rate of the timeout goroutine in an init function in a test file. `regexp2.SetTimeoutCheckPeriod` isn't threadsafe so it must be setup before starting any regex's with Timeouts.
+
+```go
+func init() {
+	//speed up testing by making the timeout clock 1ms
+	regexp2.SetTimeoutCheckPeriod(time.Millisecond)
+}
+```
 
 ## ECMAScript compatibility mode
 In this mode the engine provides compatibility with the [regex engine](https://tc39.es/ecma262/multipage/text-processing.html#sec-regexp-regular-expression-objects) described in the ECMAScript specification.

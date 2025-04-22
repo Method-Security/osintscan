@@ -6,14 +6,19 @@ package tls
 
 import (
 	"crypto/ecdh"
+	crand "crypto/rand"
 	"crypto/sha256"
 	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
+	"math"
+	"math/big"
 	"math/rand"
 	"sort"
 	"strconv"
+
+	"github.com/refraction-networking/utls/dicttls"
 )
 
 var ErrUnknownClientHelloID = errors.New("tls: unknown ClientHelloID")
@@ -656,6 +661,152 @@ func utlsIdToSpec(id ClientHelloID) (ClientHelloSpec, error) {
 				&UtlsPaddingExtension{GetPaddingLen: BoringPaddingStyle},
 			}),
 		}, nil
+	// Chrome ECH
+	case HelloChrome_120:
+		return ClientHelloSpec{
+			CipherSuites: []uint16{
+				GREASE_PLACEHOLDER,
+				TLS_AES_128_GCM_SHA256,
+				TLS_AES_256_GCM_SHA384,
+				TLS_CHACHA20_POLY1305_SHA256,
+				TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+				TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+				TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+				TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+				TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
+				TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,
+				TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,
+				TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
+				TLS_RSA_WITH_AES_128_GCM_SHA256,
+				TLS_RSA_WITH_AES_256_GCM_SHA384,
+				TLS_RSA_WITH_AES_128_CBC_SHA,
+				TLS_RSA_WITH_AES_256_CBC_SHA,
+			},
+			CompressionMethods: []byte{
+				0x00, // compressionNone
+			},
+			Extensions: ShuffleChromeTLSExtensions([]TLSExtension{
+				&UtlsGREASEExtension{},
+				&SNIExtension{},
+				&ExtendedMasterSecretExtension{},
+				&RenegotiationInfoExtension{Renegotiation: RenegotiateOnceAsClient},
+				&SupportedCurvesExtension{Curves: []CurveID{
+					GREASE_PLACEHOLDER,
+					X25519,
+					CurveP256,
+					CurveP384,
+				}},
+				&SupportedPointsExtension{SupportedPoints: []byte{
+					0x00, // pointFormatUncompressed
+				}},
+				&SessionTicketExtension{},
+				&ALPNExtension{AlpnProtocols: []string{"h2", "http/1.1"}},
+				&StatusRequestExtension{},
+				&SignatureAlgorithmsExtension{SupportedSignatureAlgorithms: []SignatureScheme{
+					ECDSAWithP256AndSHA256,
+					PSSWithSHA256,
+					PKCS1WithSHA256,
+					ECDSAWithP384AndSHA384,
+					PSSWithSHA384,
+					PKCS1WithSHA384,
+					PSSWithSHA512,
+					PKCS1WithSHA512,
+				}},
+				&SCTExtension{},
+				&KeyShareExtension{KeyShares: []KeyShare{
+					{Group: CurveID(GREASE_PLACEHOLDER), Data: []byte{0}},
+					{Group: X25519},
+				}},
+				&PSKKeyExchangeModesExtension{Modes: []uint8{
+					PskModeDHE,
+				}},
+				&SupportedVersionsExtension{Versions: []uint16{
+					GREASE_PLACEHOLDER,
+					VersionTLS13,
+					VersionTLS12,
+				}},
+				&UtlsCompressCertExtension{Algorithms: []CertCompressionAlgo{
+					CertCompressionBrotli,
+				}},
+				&ApplicationSettingsExtension{SupportedProtocols: []string{"h2"}},
+				BoringGREASEECH(),
+				&UtlsGREASEExtension{},
+			}),
+		}, nil
+	// Chrome w/ Post-Quantum Key Agreement and ECH
+	case HelloChrome_120_PQ:
+		return ClientHelloSpec{
+			CipherSuites: []uint16{
+				GREASE_PLACEHOLDER,
+				TLS_AES_128_GCM_SHA256,
+				TLS_AES_256_GCM_SHA384,
+				TLS_CHACHA20_POLY1305_SHA256,
+				TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+				TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+				TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+				TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+				TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
+				TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,
+				TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,
+				TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
+				TLS_RSA_WITH_AES_128_GCM_SHA256,
+				TLS_RSA_WITH_AES_256_GCM_SHA384,
+				TLS_RSA_WITH_AES_128_CBC_SHA,
+				TLS_RSA_WITH_AES_256_CBC_SHA,
+			},
+			CompressionMethods: []byte{
+				0x00, // compressionNone
+			},
+			Extensions: ShuffleChromeTLSExtensions([]TLSExtension{
+				&UtlsGREASEExtension{},
+				&SNIExtension{},
+				&ExtendedMasterSecretExtension{},
+				&RenegotiationInfoExtension{Renegotiation: RenegotiateOnceAsClient},
+				&SupportedCurvesExtension{[]CurveID{
+					GREASE_PLACEHOLDER,
+					X25519Kyber768Draft00,
+					X25519,
+					CurveP256,
+					CurveP384,
+				}},
+				&SupportedPointsExtension{SupportedPoints: []byte{
+					0x00, // pointFormatUncompressed
+				}},
+				&SessionTicketExtension{},
+				&ALPNExtension{AlpnProtocols: []string{"h2", "http/1.1"}},
+				&StatusRequestExtension{},
+				&SignatureAlgorithmsExtension{SupportedSignatureAlgorithms: []SignatureScheme{
+					ECDSAWithP256AndSHA256,
+					PSSWithSHA256,
+					PKCS1WithSHA256,
+					ECDSAWithP384AndSHA384,
+					PSSWithSHA384,
+					PKCS1WithSHA384,
+					PSSWithSHA512,
+					PKCS1WithSHA512,
+				}},
+				&SCTExtension{},
+				&KeyShareExtension{[]KeyShare{
+					{Group: CurveID(GREASE_PLACEHOLDER), Data: []byte{0}},
+					{Group: X25519Kyber768Draft00},
+					{Group: X25519},
+				}},
+				&PSKKeyExchangeModesExtension{[]uint8{
+					PskModeDHE,
+				}},
+				&SupportedVersionsExtension{[]uint16{
+					GREASE_PLACEHOLDER,
+					VersionTLS13,
+					VersionTLS12,
+				}},
+				&UtlsCompressCertExtension{[]CertCompressionAlgo{
+					CertCompressionBrotli,
+				}},
+				&ApplicationSettingsExtension{SupportedProtocols: []string{"h2"}},
+				BoringGREASEECH(),
+				&UtlsGREASEExtension{},
+			}),
+		}, nil
 	case HelloFirefox_55, HelloFirefox_56:
 		return ClientHelloSpec{
 			TLSVersMax: VersionTLS12,
@@ -1040,6 +1191,121 @@ func utlsIdToSpec(id ClientHelloID) (ClientHelloSpec, error) {
 				},
 				&UtlsPaddingExtension{
 					GetPaddingLen: BoringPaddingStyle,
+				},
+			},
+		}, nil
+	case HelloFirefox_120:
+		return ClientHelloSpec{
+			TLSVersMin: VersionTLS12,
+			TLSVersMax: VersionTLS13,
+			CipherSuites: []uint16{
+				TLS_AES_128_GCM_SHA256,
+				TLS_CHACHA20_POLY1305_SHA256,
+				TLS_AES_256_GCM_SHA384,
+				TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+				TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+				TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
+				TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,
+				TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+				TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+				TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA,
+				TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA,
+				TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,
+				TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
+				TLS_RSA_WITH_AES_128_GCM_SHA256,
+				TLS_RSA_WITH_AES_256_GCM_SHA384,
+				TLS_RSA_WITH_AES_128_CBC_SHA,
+				TLS_RSA_WITH_AES_256_CBC_SHA,
+			},
+			CompressionMethods: []uint8{
+				0x0, // no compression
+			},
+			Extensions: []TLSExtension{
+				&SNIExtension{},
+				&ExtendedMasterSecretExtension{},
+				&RenegotiationInfoExtension{
+					Renegotiation: RenegotiateOnceAsClient,
+				},
+				&SupportedCurvesExtension{
+					Curves: []CurveID{
+						X25519,
+						CurveP256,
+						CurveP384,
+						CurveP521,
+						256,
+						257,
+					},
+				},
+				&SupportedPointsExtension{
+					SupportedPoints: []uint8{
+						0x0, // uncompressed
+					},
+				},
+				&SessionTicketExtension{},
+				&ALPNExtension{
+					AlpnProtocols: []string{
+						"h2",
+						"http/1.1",
+					},
+				},
+				&StatusRequestExtension{},
+				&FakeDelegatedCredentialsExtension{
+					SupportedSignatureAlgorithms: []SignatureScheme{
+						ECDSAWithP256AndSHA256,
+						ECDSAWithP384AndSHA384,
+						ECDSAWithP521AndSHA512,
+						ECDSAWithSHA1,
+					},
+				},
+				&KeyShareExtension{
+					KeyShares: []KeyShare{
+						{
+							Group: X25519,
+						},
+						{
+							Group: CurveP256,
+						},
+					},
+				},
+				&SupportedVersionsExtension{
+					Versions: []uint16{
+						VersionTLS13,
+						VersionTLS12,
+					},
+				},
+				&SignatureAlgorithmsExtension{
+					SupportedSignatureAlgorithms: []SignatureScheme{
+						ECDSAWithP256AndSHA256,
+						ECDSAWithP384AndSHA384,
+						ECDSAWithP521AndSHA512,
+						PSSWithSHA256,
+						PSSWithSHA384,
+						PSSWithSHA512,
+						PKCS1WithSHA256,
+						PKCS1WithSHA384,
+						PKCS1WithSHA512,
+						ECDSAWithSHA1,
+						PKCS1WithSHA1,
+					},
+				},
+				&PSKKeyExchangeModesExtension{[]uint8{
+					PskModeDHE,
+				}},
+				&FakeRecordSizeLimitExtension{
+					Limit: 0x4001,
+				},
+				&GREASEEncryptedClientHelloExtension{
+					CandidateCipherSuites: []HPKESymmetricCipherSuite{
+						{
+							KdfId:  dicttls.HKDF_SHA256,
+							AeadId: dicttls.AEAD_AES_128_GCM,
+						},
+						{
+							KdfId:  dicttls.HKDF_SHA256,
+							AeadId: dicttls.AEAD_CHACHA20_POLY1305,
+						},
+					},
+					CandidatePayloadLens: []uint16{223}, // +16: 239
 				},
 			},
 		}, nil
@@ -2299,12 +2565,24 @@ func ShuffleChromeTLSExtensions(exts []TLSExtension) []TLSExtension {
 	}
 
 	// Shuffle other extensions
-	rand.Shuffle(len(exts), func(i, j int) {
-		if skipShuf(i, exts) || skipShuf(j, exts) {
-			return // do not shuffle some of the extensions
-		}
-		exts[i], exts[j] = exts[j], exts[i]
-	})
+	randInt64, err := crand.Int(crand.Reader, big.NewInt(math.MaxInt64))
+	if err != nil {
+		// warning: random could be deterministic
+		rand.Shuffle(len(exts), func(i, j int) {
+			if skipShuf(i, exts) || skipShuf(j, exts) {
+				return // do not shuffle some of the extensions
+			}
+			exts[i], exts[j] = exts[j], exts[i]
+		})
+		fmt.Println("Warning: failed to use a cryptographically secure random number generator. The shuffle can be deterministic.")
+	} else {
+		rand.New(rand.NewSource(randInt64.Int64())).Shuffle(len(exts), func(i, j int) {
+			if skipShuf(i, exts) || skipShuf(j, exts) {
+				return // do not shuffle some of the extensions
+			}
+			exts[i], exts[j] = exts[j], exts[i]
+		})
+	}
 
 	return exts
 }
@@ -2394,12 +2672,21 @@ func (uconn *UConn) ApplyPreset(p *ClientHelloSpec) error {
 			hello.CipherSuites[i] = GetBoringGREASEValue(uconn.greaseSeed, ssl_grease_cipher)
 		}
 	}
-	var sessionID [32]byte
-	_, err = io.ReadFull(uconn.config.rand(), sessionID[:])
-	if err != nil {
-		return err
+
+	// A random session ID is used to detect when the server accepted a ticket
+	// and is resuming a session (see RFC 5077). In TLS 1.3, it's always set as
+	// a compatibility measure (see RFC 8446, Section 4.1.2).
+	//
+	// The session ID is not set for QUIC connections (see RFC 9001, Section 8.4).
+	if uconn.quic == nil {
+		var sessionID [32]byte
+		_, err = io.ReadFull(uconn.config.rand(), sessionID[:])
+		if err != nil {
+			return err
+		}
+		uconn.HandshakeState.Hello.SessionId = sessionID[:]
 	}
-	uconn.HandshakeState.Hello.SessionId = sessionID[:]
+
 	uconn.Extensions = make([]TLSExtension, len(p.Extensions))
 	copy(uconn.Extensions, p.Extensions)
 

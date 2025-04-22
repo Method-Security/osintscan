@@ -14,7 +14,7 @@ var (
 	ErrInvalidColor = errors.New("invalid color")
 )
 
-// Foreground and Background sequence codes
+// Foreground and Background sequence codes.
 const (
 	Foreground = "38"
 	Background = "48"
@@ -68,7 +68,7 @@ func ConvertToRGB(c Color) colorful.Color {
 }
 
 // Sequence returns the ANSI Sequence for the color.
-func (c NoColor) Sequence(bg bool) string {
+func (c NoColor) Sequence(_ bool) string {
 	return ""
 }
 

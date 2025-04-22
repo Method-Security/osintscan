@@ -20,6 +20,8 @@ type Options struct {
 	LocalAddrIP           net.IP
 	LocalAddrPort         uint16
 	ConnectionPoolThreads int
+	MaxPerCNAMEFollows    int
+	Proxy                 string
 }
 
 // Returns a net.Addr of a UDP or TCP type depending on whats required

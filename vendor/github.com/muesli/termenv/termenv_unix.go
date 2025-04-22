@@ -1,5 +1,5 @@
-//go:build darwin || dragonfly || freebsd || linux || netbsd || openbsd || solaris
-// +build darwin dragonfly freebsd linux netbsd openbsd solaris
+//go:build darwin || dragonfly || freebsd || linux || netbsd || openbsd || solaris || zos
+// +build darwin dragonfly freebsd linux netbsd openbsd solaris zos
 
 package termenv
 
@@ -25,6 +25,10 @@ func (o *Output) ColorProfile() Profile {
 		return Ascii
 	}
 
+	if o.environ.Getenv("GOOGLE_CLOUD_SHELL") == "true" {
+		return TrueColor
+	}
+
 	term := o.environ.Getenv("TERM")
 	colorTerm := o.environ.Getenv("COLORTERM")
 
@@ -46,7 +50,7 @@ func (o *Output) ColorProfile() Profile {
 	}
 
 	switch term {
-	case "xterm-kitty":
+	case "xterm-kitty", "wezterm", "xterm-ghostty":
 		return TrueColor
 	case "linux":
 		return ANSI
@@ -223,7 +227,7 @@ func (o Output) termStatusReport(sequence int) (string, error) {
 	// screen/tmux can't support OSC, because they can be connected to multiple
 	// terminals concurrently.
 	term := o.environ.Getenv("TERM")
-	if strings.HasPrefix(term, "screen") || strings.HasPrefix(term, "tmux") {
+	if strings.HasPrefix(term, "screen") || strings.HasPrefix(term, "tmux") || strings.HasPrefix(term, "dumb") {
 		return "", ErrStatusReport
 	}
 
@@ -284,6 +288,6 @@ func (o Output) termStatusReport(sequence int) (string, error) {
 // Windows for w and returns a function that restores w to its previous state.
 // On non-Windows platforms, or if w does not refer to a terminal, then it
 // returns a non-nil no-op function and no error.
-func EnableVirtualTerminalProcessing(w io.Writer) (func() error, error) {
+func EnableVirtualTerminalProcessing(_ io.Writer) (func() error, error) {
 	return func() error { return nil }, nil
 }

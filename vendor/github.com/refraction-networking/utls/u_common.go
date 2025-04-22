@@ -35,9 +35,11 @@ const (
 	extensionNextProtoNeg uint16 = 13172 // not IANA assigned. Removed by crypto/tls since Nov 2019
 
 	utlsExtensionPadding             uint16 = 21
-	utlsExtensionCompressCertificate uint16 = 27    // https://datatracker.ietf.org/doc/html/rfc8879#section-7.1
-	utlsExtensionApplicationSettings uint16 = 17513 // not IANA assigned
-	utlsFakeExtensionCustom          uint16 = 1234  // not IANA assigned, for ALPS
+	utlsExtensionCompressCertificate uint16 = 27     // https://datatracker.ietf.org/doc/html/rfc8879#section-7.1
+	utlsExtensionApplicationSettings uint16 = 17513  // not IANA assigned
+	utlsFakeExtensionCustom          uint16 = 1234   // not IANA assigned, for ALPS
+	utlsExtensionECH                 uint16 = 0xfe0d // draft-ietf-tls-esni-17
+	utlsExtensionECHOuterExtensions  uint16 = 0xfd00 // draft-ietf-tls-esni-17
 
 	// extensions with 'fake' prefix break connection, if server echoes them back
 	fakeExtensionEncryptThenMAC       uint16 = 22
@@ -208,8 +210,6 @@ func (chs *ClientHelloSpec) ReadCompressionMethods(compressionMethods []byte) er
 
 // ReadTLSExtensions is a helper function to construct a list of TLS extensions from
 // a byte slice into []TLSExtension.
-//
-// If keepPSK is not set, the PSK extension will cause an error.
 func (chs *ClientHelloSpec) ReadTLSExtensions(b []byte, allowBluntMimicry bool, realPSK bool) error {
 	extensions := cryptobyte.String(b)
 	for !extensions.Empty() {
@@ -233,12 +233,11 @@ func (chs *ClientHelloSpec) ReadTLSExtensions(b []byte, allowBluntMimicry bool, 
 				} else {
 					extWriter = &FakePreSharedKeyExtension{}
 				}
-			}
-
-			if extension == extensionSupportedVersions {
+			case extensionSupportedVersions:
 				chs.TLSVersMin = 0
 				chs.TLSVersMax = 0
 			}
+
 			if _, err := extWriter.Write(extData); err != nil {
 				return err
 			}
@@ -548,6 +547,15 @@ func (chs *ClientHelloSpec) FromRaw(raw []byte, ctrlFlags ...bool) error {
 		return err
 	}
 
+	// if extension list includes padding, we update the padding-to-len according to
+	// the raw ClientHello length
+	for _, ext := range chs.Extensions {
+		if _, ok := ext.(*UtlsPaddingExtension); ok {
+			ext.(*UtlsPaddingExtension).GetPaddingLen = AlwaysPadToLen(len(raw) - 5)
+			break
+		}
+	}
+
 	return nil
 }
 
@@ -579,7 +587,7 @@ var (
 	HelloRandomizedNoALPN = ClientHelloID{helloRandomizedNoALPN, helloAutoVers, nil, nil}
 
 	// The rest will will parrot given browser.
-	HelloFirefox_Auto = HelloFirefox_105
+	HelloFirefox_Auto = HelloFirefox_120
 	HelloFirefox_55   = ClientHelloID{helloFirefox, "55", nil, nil}
 	HelloFirefox_56   = ClientHelloID{helloFirefox, "56", nil, nil}
 	HelloFirefox_63   = ClientHelloID{helloFirefox, "63", nil, nil}
@@ -587,8 +595,9 @@ var (
 	HelloFirefox_99   = ClientHelloID{helloFirefox, "99", nil, nil}
 	HelloFirefox_102  = ClientHelloID{helloFirefox, "102", nil, nil}
 	HelloFirefox_105  = ClientHelloID{helloFirefox, "105", nil, nil}
+	HelloFirefox_120  = ClientHelloID{helloFirefox, "120", nil, nil}
 
-	HelloChrome_Auto        = HelloChrome_106_Shuffle
+	HelloChrome_Auto        = HelloChrome_120
 	HelloChrome_58          = ClientHelloID{helloChrome, "58", nil, nil}
 	HelloChrome_62          = ClientHelloID{helloChrome, "62", nil, nil}
 	HelloChrome_70          = ClientHelloID{helloChrome, "70", nil, nil}
@@ -598,7 +607,7 @@ var (
 	HelloChrome_96          = ClientHelloID{helloChrome, "96", nil, nil}
 	HelloChrome_100         = ClientHelloID{helloChrome, "100", nil, nil}
 	HelloChrome_102         = ClientHelloID{helloChrome, "102", nil, nil}
-	HelloChrome_106_Shuffle = ClientHelloID{helloChrome, "106", nil, nil} // beta: shuffler enabled starting from 106
+	HelloChrome_106_Shuffle = ClientHelloID{helloChrome, "106", nil, nil} // TLS Extension shuffler enabled starting from 106
 
 	// Chrome w/ PSK: Chrome start sending this ClientHello after doing TLS 1.3 handshake with the same server.
 	// Beta: PSK extension added. However, uTLS doesn't ship with full PSK support.
@@ -611,6 +620,11 @@ var (
 	// Beta: PQ extension added. However, uTLS doesn't ship with full PQ support. Use at your own discretion.
 	HelloChrome_115_PQ     = ClientHelloID{helloChrome, "115_PQ", nil, nil}
 	HelloChrome_115_PQ_PSK = ClientHelloID{helloChrome, "115_PQ_PSK", nil, nil}
+
+	// Chrome ECH
+	HelloChrome_120 = ClientHelloID{helloChrome, "120", nil, nil}
+	// Chrome w/ Post-Quantum Key Agreement and Encrypted ClientHello
+	HelloChrome_120_PQ = ClientHelloID{helloChrome, "120_PQ", nil, nil}
 
 	HelloIOS_Auto = HelloIOS_14
 	HelloIOS_11_1 = ClientHelloID{helloIOS, "111", nil, nil} // legacy "111" means 11.1
