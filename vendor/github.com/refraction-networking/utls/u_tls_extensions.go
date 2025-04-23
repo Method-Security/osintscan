@@ -11,7 +11,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/gaukas/godicttls"
+	"github.com/refraction-networking/utls/dicttls"
 	"golang.org/x/crypto/cryptobyte"
 )
 
@@ -43,6 +43,8 @@ func ExtensionFromID(id uint16) TLSExtension {
 		return &FakeTokenBindingExtension{}
 	case utlsExtensionCompressCertificate:
 		return &UtlsCompressCertExtension{}
+	case fakeRecordSizeLimit:
+		return &FakeRecordSizeLimitExtension{}
 	case fakeExtensionDelegatedCredentials:
 		return &FakeDelegatedCredentialsExtension{}
 	case extensionSessionTicket:
@@ -73,8 +75,8 @@ func ExtensionFromID(id uint16) TLSExtension {
 		return &FakeChannelIDExtension{true}
 	case fakeExtensionChannelID:
 		return &FakeChannelIDExtension{}
-	case fakeRecordSizeLimit:
-		return &FakeRecordSizeLimitExtension{}
+	case utlsExtensionECH:
+		return &GREASEEncryptedClientHelloExtension{}
 	case extensionRenegotiationInfo:
 		return &RenegotiationInfoExtension{}
 	default:
@@ -294,7 +296,7 @@ func (e *SupportedCurvesExtension) UnmarshalJSON(data []byte) error {
 			continue
 		}
 
-		if group, ok := godicttls.DictSupportedGroupsNameIndexed[namedGroup]; ok {
+		if group, ok := dicttls.DictSupportedGroupsNameIndexed[namedGroup]; ok {
 			e.Curves = append(e.Curves, CurveID(group))
 		} else {
 			return fmt.Errorf("unknown named group: %s", namedGroup)
@@ -363,7 +365,7 @@ func (e *SupportedPointsExtension) UnmarshalJSON(data []byte) error {
 	}
 
 	for _, pointFormat := range pointFormatList.ECPointFormatList {
-		if format, ok := godicttls.DictECPointFormatNameIndexed[pointFormat]; ok {
+		if format, ok := dicttls.DictECPointFormatNameIndexed[pointFormat]; ok {
 			e.SupportedPoints = append(e.SupportedPoints, format)
 		} else {
 			return fmt.Errorf("unknown point format: %s", pointFormat)
@@ -431,7 +433,7 @@ func (e *SignatureAlgorithmsExtension) UnmarshalJSON(data []byte) error {
 			continue
 		}
 
-		if scheme, ok := godicttls.DictSignatureSchemeNameIndexed[sigScheme]; ok {
+		if scheme, ok := dicttls.DictSignatureSchemeNameIndexed[sigScheme]; ok {
 			e.SupportedSignatureAlgorithms = append(e.SupportedSignatureAlgorithms, SignatureScheme(scheme))
 		} else {
 			return fmt.Errorf("unknown signature scheme: %s", sigScheme)
@@ -561,7 +563,7 @@ func (e *SignatureAlgorithmsCertExtension) UnmarshalJSON(data []byte) error {
 			continue
 		}
 
-		if scheme, ok := godicttls.DictSignatureSchemeNameIndexed[sigScheme]; ok {
+		if scheme, ok := dicttls.DictSignatureSchemeNameIndexed[sigScheme]; ok {
 			e.SupportedSignatureAlgorithms = append(e.SupportedSignatureAlgorithms, SignatureScheme(scheme))
 		} else {
 			return fmt.Errorf("unknown cert signature scheme: %s", sigScheme)
@@ -837,7 +839,7 @@ func (e *GenericExtension) UnmarshalJSON(b []byte) error {
 	}
 
 	// lookup extension ID by name
-	if id, ok := godicttls.DictExtTypeNameIndexed[genericExtension.Name]; ok {
+	if id, ok := dicttls.DictExtTypeNameIndexed[genericExtension.Name]; ok {
 		e.Id = id
 	} else {
 		return fmt.Errorf("unknown extension name %s", genericExtension.Name)
@@ -882,16 +884,6 @@ func (e *ExtendedMasterSecretExtension) UnmarshalJSON(_ []byte) error {
 func (e *ExtendedMasterSecretExtension) Write(_ []byte) (int, error) {
 	// https://tools.ietf.org/html/rfc7627
 	return 0, nil
-}
-
-// var extendedMasterSecretLabel = []byte("extended master secret")
-
-// extendedMasterFromPreMasterSecret generates the master secret from the pre-master
-// secret and session hash. See https://tools.ietf.org/html/rfc7627#section-4
-func extendedMasterFromPreMasterSecret(version uint16, suite *cipherSuite, preMasterSecret []byte, sessionHash []byte) []byte {
-	masterSecret := make([]byte, masterSecretLength)
-	prfForVersion(version, suite)(masterSecret, preMasterSecret, extendedMasterSecretLabel, sessionHash)
-	return masterSecret
 }
 
 // GREASE stinks with dead parrots, have to be super careful, and, if possible, not include GREASE
@@ -1062,6 +1054,23 @@ func BoringPaddingStyle(unpaddedLen int) (int, bool) {
 	return 0, false
 }
 
+// AlwaysPadToLen could be used for parsed ClientHello, since some fingerprints
+// might not use BoringSSL padding style and we want to pad to a the same length.
+func AlwaysPadToLen(padToLen int) func(int) (int, bool) {
+	return func(unpaddedLen int) (int, bool) {
+		if unpaddedLen < padToLen {
+			paddingLen := padToLen - unpaddedLen
+			if paddingLen >= 4+1 {
+				paddingLen -= 4
+			} else {
+				paddingLen = 1
+			}
+			return paddingLen, true
+		}
+		return 0, false
+	}
+}
+
 // UtlsCompressCertExtension implements compress_certificate (27) and is only implemented client-side
 // for server certificates. Alternate certificate message formats
 // (https://datatracker.ietf.org/doc/html/rfc7250) are not supported.
@@ -1137,7 +1146,7 @@ func (e *UtlsCompressCertExtension) UnmarshalJSON(b []byte) error {
 	}
 
 	for _, algorithm := range certificateCompressionAlgorithms.Algorithms {
-		if alg, ok := godicttls.DictCertificateCompressionAlgorithmNameIndexed[algorithm]; ok {
+		if alg, ok := dicttls.DictCertificateCompressionAlgorithmNameIndexed[algorithm]; ok {
 			e.Algorithms = append(e.Algorithms, CertCompressionAlgo(alg))
 		} else {
 			return fmt.Errorf("unknown certificate compression algorithm %s", algorithm)
@@ -1243,7 +1252,7 @@ func (e *KeyShareExtension) UnmarshalJSON(b []byte) error {
 			continue
 		}
 
-		if groupID, ok := godicttls.DictSupportedGroupsNameIndexed[clientShare.Group]; ok {
+		if groupID, ok := dicttls.DictSupportedGroupsNameIndexed[clientShare.Group]; ok {
 			ks := KeyShare{
 				Group: CurveID(groupID),
 				Data:  clientShare.KeyExchange,
@@ -1357,7 +1366,7 @@ func (e *PSKKeyExchangeModesExtension) UnmarshalJSON(b []byte) error {
 	}
 
 	for _, mode := range pskKeyExchangeModes.Modes {
-		if modeID, ok := godicttls.DictPSKKeyExchangeModeNameIndexed[mode]; ok {
+		if modeID, ok := dicttls.DictPSKKeyExchangeModeNameIndexed[mode]; ok {
 			e.Modes = append(e.Modes, modeID)
 		} else {
 			return fmt.Errorf("unknown PSK Key Exchange Mode %s", mode)
@@ -1544,11 +1553,11 @@ type RenegotiationInfoExtension struct {
 	// If this is the initial handshake for a connection, then the
 	// "renegotiated_connection" field is of zero length in both the
 	// ClientHello and the ServerHello.
-	// RenegotiatedConnection []byte
+	RenegotiatedConnection []byte
 }
 
 func (e *RenegotiationInfoExtension) Len() int {
-	return 5 // + len(e.RenegotiatedConnection)
+	return 5 + len(e.RenegotiatedConnection)
 }
 
 func (e *RenegotiationInfoExtension) Read(b []byte) (int, error) {
@@ -1556,15 +1565,15 @@ func (e *RenegotiationInfoExtension) Read(b []byte) (int, error) {
 		return 0, io.ErrShortBuffer
 	}
 
-	// dataLen := len(e.RenegotiatedConnection)
-	extBodyLen := 1 // + len(dataLen)
+	dataLen := len(e.RenegotiatedConnection)
+	extBodyLen := 1 + dataLen
 
 	b[0] = byte(extensionRenegotiationInfo >> 8)
 	b[1] = byte(extensionRenegotiationInfo & 0xff)
 	b[2] = byte(extBodyLen >> 8)
 	b[3] = byte(extBodyLen)
-	// b[4] = byte(dataLen)
-	// copy(b[5:], e.RenegotiatedConnection)
+	b[4] = byte(dataLen)
+	copy(b[5:], e.RenegotiatedConnection)
 
 	return e.Len(), io.EOF
 }
@@ -1574,7 +1583,7 @@ func (e *RenegotiationInfoExtension) UnmarshalJSON(_ []byte) error {
 	return nil
 }
 
-func (e *RenegotiationInfoExtension) Write(_ []byte) (int, error) {
+func (e *RenegotiationInfoExtension) Write(b []byte) (int, error) {
 	e.Renegotiation = RenegotiateOnceAsClient // none empty or other modes are unsupported
 	// extData := cryptobyte.String(b)
 	// var renegotiatedConnection cryptobyte.String
@@ -1583,7 +1592,10 @@ func (e *RenegotiationInfoExtension) Write(_ []byte) (int, error) {
 	// }
 	// e.RenegotiatedConnection = make([]byte, len(renegotiatedConnection))
 	// copy(e.RenegotiatedConnection, renegotiatedConnection)
-	return 0, nil
+
+	// we don't really want to parse it at all.
+
+	return len(b), nil
 }
 
 func (e *RenegotiationInfoExtension) writeToUConn(uc *UConn) error {
@@ -1593,6 +1605,10 @@ func (e *RenegotiationInfoExtension) writeToUConn(uc *UConn) error {
 		fallthrough
 	case RenegotiateFreelyAsClient:
 		uc.HandshakeState.Hello.SecureRenegotiationSupported = true
+		// TODO: don't do backward propagation here
+		if uc.handshakes > 0 {
+			e.RenegotiatedConnection = uc.clientFinished[:]
+		}
 	case RenegotiateNever:
 	default:
 	}
@@ -1835,7 +1851,7 @@ func (e *FakeDelegatedCredentialsExtension) UnmarshalJSON(data []byte) error {
 			continue
 		}
 
-		if scheme, ok := godicttls.DictSignatureSchemeNameIndexed[sigScheme]; ok {
+		if scheme, ok := dicttls.DictSignatureSchemeNameIndexed[sigScheme]; ok {
 			e.SupportedSignatureAlgorithms = append(e.SupportedSignatureAlgorithms, SignatureScheme(scheme))
 		} else {
 			return fmt.Errorf("unknown delegated credentials signature scheme: %s", sigScheme)
