@@ -1,0 +1,46 @@
+types:
+  SubnetReport:
+    properties:
+      subnet: string
+      total_ips: integer
+      scanned_at: datetime
+      reports: list<IPReport>
+      cancelled: optional<boolean>
+  IPReport:
+    properties:
+      ip: string
+      ptr_records: list<string>
+      asn: optional<ASNInfo>
+      ownership: optional<WhoisData>
+      hostnames: optional<list<string>>
+      tls_cert_cn: optional<string>
+      tls_san: optional<list<string>>
+      http_title: optional<string>
+      abuse_email: optional<string>
+      netblock_range: optional<string>
+      first_seen: optional<datetime>
+      service_banner: optional<string>
+      lookup_time_ms: optional<integer>
+      errors: list<string>
+
+  ASNInfo:
+    properties:
+      number: integer
+      org: string
+      country: string
+      name: optional<string>
+      prefix: optional<string>
+      registry: optional<string>
+
+  WhoisData:
+    properties:
+      registrar: optional<string>
+      created_date: optional<datetime>
+      updated_date: optional<datetime>
+      org_name: optional<string>
+      contact_name: optional<string>
+      contact_email: optional<string>
+      address: optional<string>
+      phone: optional<string>
+      country: optional<string>
+      raw: optional<string>
