@@ -42,3 +42,6 @@ generated/python/**
 
 # Repo Binary
 osintscan
+
+# Generated Code
+generated/

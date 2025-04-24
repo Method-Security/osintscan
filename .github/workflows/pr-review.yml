@@ -1,0 +1,73 @@
+name: 🔍 PR Review
+on:
+  push:
+    branches: [ "develop" ]
+  pull_request:
+    branches: [ "develop" ]
+
+env:
+  GO_VERSION: 1.24
+
+permissions:
+  id-token: write
+  packages: read
+  contents: read
+
+jobs:
+  build:
+    name: ⚒️ Build
+    uses: ./.github/workflows/reusable-build.yml
+    secrets: inherit
+
+  codeql:
+    name: 🔒 CodeQL
+    uses: ./.github/workflows/codeql.yml
+    secrets: inherit
+
+  mkdocs-develop:
+    name: 📖 Deploy Dev Docs
+    uses: ./.github/workflows/mkdocs-develop.yml
+    secrets: inherit
+
+  reusable-build:
+    name: ♻️ Reusable Build
+    uses: ./.github/workflows/reusable-build.yml
+    secrets: inherit
+
+  test-build:
+    name: 🔨 Test Build
+    uses: ./.github/workflows/test-build.yml
+    secrets: inherit
+
+  test-docs:
+    name: 📙 Test docs
+    uses: ./.github/workflows/test-docs.yml
+    secrets: inherit
+
+  test-publish:
+    name:  🔨 Publish Test
+    uses: ./.github/workflows/test-publish.yml
+    secrets: inherit
+
+  verify:
+    name: 🙏🏻 Verify
+    uses: ./.github/workflows/verify.yml
+    secrets: inherit
+
+  check:
+    name: ✅ Check
+    if: always()
+    needs:
+      - build
+      - codeql
+      - docs
+      - mkdocs
+      - test
+      - test-publish
+      - verify
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require all jobs to succeed
+        uses: re-actors/alls-green@release/v1
+        with:
+          jobs: ${{ toJSON(needs) }}

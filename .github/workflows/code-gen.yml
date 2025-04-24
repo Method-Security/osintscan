@@ -1,0 +1,62 @@
+name: 🔄 Generate Fern Code
+
+on:
+  # Allow manual triggering
+  workflow_dispatch:
+  # Optionally, run on specific push events
+  push:
+    branches:
+      - main
+      - develop
+
+env:
+  GO_VERSION: "1.24.0"
+
+jobs:
+  generate_fern_go:
+    name: Generate Fern Go Code
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Setup Node
+        uses: actions/setup-node@v4
+      
+      - name: Install Fern
+        run: npm install -g fern-api
+      
+      - name: Generate Fern Go
+        run: fern generate --group local
+        env:
+          FERN_TOKEN: ${{ secrets.FERN_TOKEN }}
+      
+      - name: Commit Go Changes
+        uses: stefanzweifel/git-auto-commit-action@v4
+        with:
+          commit_message: "chore: update generated fern go code"
+          file_pattern: '.'
+
+  generate_fern_python:
+    name: Generate Fern Python Code
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Setup Node
+        uses: actions/setup-node@v4
+      
+      - name: Install Fern
+        run: npm install -g fern-api
+      
+      - name: Generate Fern Python
+        run: fern generate --group pypi-local
+        env:
+          FERN_TOKEN: ${{ secrets.FERN_TOKEN }}
+      
+      - name: Commit Python Changes
+        uses: stefanzweifel/git-auto-commit-action@v4
+        with:
+          commit_message: "chore: update generated fern python code"
+          file_pattern: '.'
