@@ -71,7 +71,7 @@
     },
     {
       "cicd_pass": false,
-      "cname": [],
+      "cname": ["canny.io"],
       "discussion": "[Issue #114](https://github.com/EdOverflow/can-i-take-over-xyz/issues/114)",
       "documentation": "",
       "fingerprint": "Company Not Found` `There is no such company. Did you enter the right URL?",
@@ -81,7 +81,7 @@
     },
     {
       "cicd_pass": false,
-      "cname": [],
+      "cname": ["cargocollective.com", "cargo.site"],
       "discussion": "[Issue #152](https://github.com/EdOverflow/can-i-take-over-xyz/issues/152)",
       "documentation": "[Cargo Support Page](https://support.2.cargocollective.com/Using-a-Third-Party-Domain)",
       "fingerprint": "404 Not Found",
@@ -239,7 +239,7 @@
     },
     {
       "cicd_pass": false,
-      "cname": [],
+      "cname": ["pingdom.com"],
       "discussion": "[Issue #144](https://github.com/EdOverflow/can-i-take-over-xyz/issues/144)",
       "documentation": "[Support Page](https://help.pingdom.com/hc/en-us/articles/205386171-Public-Status-Page)",
       "fingerprint": "Sorry, couldn't find the status page",
@@ -259,7 +259,7 @@
     },
     {
       "cicd_pass": false,
-      "cname": [],
+      "cname": ["readthedocs.io", "readthedocs.org"],
       "discussion": "[Issue #160](https://github.com/EdOverflow/can-i-take-over-xyz/issues/160)",
       "documentation": "",
       "fingerprint": "The link you have followed or the URL that you entered does not exist.",
@@ -269,7 +269,7 @@
     },
     {
       "cicd_pass": false,
-      "cname": [],
+      "cname": ["short.io"],
       "discussion": "[Issue #260](https://github.com/EdOverflow/can-i-take-over-xyz/issues/260)",
       "documentation": "",
       "fingerprint": "Link does not exist",
@@ -289,7 +289,7 @@
     },
     {
       "cicd_pass": false,
-      "cname": [],
+      "cname": ["smugsmug.com"],
       "discussion": "[Issue #60](https://github.com/EdOverflow/can-i-take-over-xyz/issues/60)",
       "documentation": "",
       "fingerprint": "",
