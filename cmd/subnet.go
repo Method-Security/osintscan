@@ -1,7 +1,8 @@
 package cmd
 
 import (
-	"context" // Needed for context
+	"context"       // Needed for context
+	"encoding/json" // Needed for JSON output
 	"fmt"
 	"net"
 	"os"        // Needed for os.Interrupt
@@ -12,7 +13,7 @@ import (
 	// Import the internal subnet package
 	"github.com/Method-Security/osintscan/internal/subnet"
 	// NOTE: We will need imports for the actual implementation logic from internal/ later
-	// subnetgenerated "github.com/Method-Security/osintscan/generated/go/subnet" // Needed later
+	subnetgenerated "github.com/Method-Security/osintscan/generated/go/subnet" // Needed for report types
 
 	"github.com/spf13/cobra"
 )
@@ -75,37 +76,53 @@ var researchCmd = &cobra.Command{
 		}
 
 		// 4. Add a loop: for report := range resultsChan { /* Do nothing for now */ }
-		// var collectedReports []*subnetgenerated.IpReport // Slice to hold results (needed later)
+		var collectedReports []*subnetgenerated.IpReport // Slice to hold results
+		var isCancelled bool                             // Flag to track if context was cancelled
+
 		fmt.Println("Scanning IPs...") // Indicate that scanning is in progress
 		for report := range resultsChan {
-			// TODO: Aggregate reports into a final SubnetReport structure.
-			// For now, just consume the reports from the channel.
-			_ = report // Use the report variable to avoid "unused" error.
-			// If verbose logging is enabled, could print progress here:
-			// svc1log.FromContext(ctx).Info("Received report", svc1log.SafeParam("ip", report.Ip))
+			collectedReports = append(collectedReports, report)
+			// Optional: Print progress (maybe behind a verbose flag later)
+			// fmt.Printf("Received report for %s\n", report.Ip)
 		}
 
 		// Check if the context was cancelled (e.g., Ctrl-C pressed)
-		if ctx.Err() != nil && ctx.Err() != context.Canceled { // Ignore context.Canceled if it wasn't due to signal
-			fmt.Println("\nScan interrupted.")
-			// TODO: Set a 'cancelled: true' flag in the final report.
-			// a.OutputSignal.AddError(ctx.Err()) // Report the cancellation
-			return ctx.Err() // Propagate the context error (e.g., context.DeadlineExceeded or context.Canceled)
+		if ctx.Err() != nil {
+			if ctx.Err() == context.Canceled {
+				fmt.Println("\nScan cancelled by user.")
+				isCancelled = true
+				// Treat user cancellation as non-error completion for exit code
+			} else {
+				// Other context errors (like deadline exceeded, though less likely here)
+				fmt.Printf("\nScan interrupted: %v\n", ctx.Err())
+				isCancelled = true
+				// Optionally, could return ctx.Err() here if other context errors should stop execution
+				// return ctx.Err()
+			}
 		}
-		if ctx.Err() == context.Canceled {
-			fmt.Println("\nScan cancelled by user.")
-			// TODO: Set cancelled flag
-			return nil // Treat user cancellation as non-error completion for exit code
+
+		// 5. Assemble and print the final report
+		fmt.Println("Scan complete. Assembling final report...")
+
+		finalReport := subnetgenerated.SubnetReport{
+			Subnet:    subnetStr,
+			TotalIps:  len(collectedReports), // Use int, not int32
+			ScannedAt: time.Now().UTC(),
+			Reports:   collectedReports,
+			Cancelled: &isCancelled, // Use address of bool for optional field
 		}
 
-		// 5. After the loop, print a "Scan complete (stub)" message.
-		fmt.Println("Scan complete (stub).") // Placeholder for final report generation/output
+		// Marshal to JSON with indentation
+		jsonData, err := json.MarshalIndent(finalReport, "", "  ")
+		if err != nil {
+			// Handle JSON marshalling error
+			return fmt.Errorf("failed to marshal final report to JSON: %w", err)
+		}
 
-		// TODO: Assemble the final subnetgenerated.SubnetReport here using collectedReports
-		// finalReport := subnetgenerated.SubnetReport{ ... }
-		// a.OutputSignal.Content = finalReport // Set the final report for output
+		// Print the JSON report to stdout
+		fmt.Println(string(jsonData))
 
-		return nil // Return nil on successful completion
+		return nil // Return nil on successful completion (even if cancelled by user)
 	},
 }
 
