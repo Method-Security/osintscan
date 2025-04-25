@@ -115,9 +115,9 @@ func Scan(ctx context.Context, cidr string, cfg ScanConfig) (<-chan *subnetgener
 	mmdb, _ := openMaxMind(cfg.MaxMindDB)
 
 	lookupASN := chain(
-		providerPD(pdCli, cfg.PoliteWait),
 		providerMM(mmdb),
-		providerCymru(cfg.PoliteWait),
+		providerPD(pdCli, cfg.PoliteWait), // if you have the api key you get access to more data
+		providerCymru(cfg.PoliteWait),     // final fallback
 	)
 
 	// ─ Caches and singleflight groups -------------------------------------
