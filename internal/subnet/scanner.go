@@ -1,287 +1,565 @@
+// internal/subnet/scanner.go
 package subnet
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/netip"
+	"os"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
-	// Import the generated Fern types for subnet research.
 	subnetgenerated "github.com/Method-Security/osintscan/generated/go/subnet"
-	// Revert back to using the libs sub-package
+
+	lru "github.com/hashicorp/golang-lru/v2/expirable" // Reverted to expirable path
+	"github.com/likexian/whois"
+	whoisparser "github.com/likexian/whois-parser"
+	"github.com/openrdap/rdap"
+	"github.com/oschwald/geoip2-golang"
 	libs "github.com/projectdiscovery/asnmap/libs"
 	"github.com/projectdiscovery/utils/env"
+	sf "golang.org/x/sync/singleflight"
 )
 
-// ScanConfig holds the configuration options for a subnet scan, derived from CLI flags.
+/* ─────────────────────────── PUBLIC CONFIG ──────────────────────────── */
+
+// Default cache sizes
+const (
+	DefaultRDAPCacheSize = 2048
+	DefaultPTRCacheSize  = 8192
+	DefaultCacheTTL      = 1 * time.Hour // Default TTL for cache entries
+)
+
 type ScanConfig struct {
-	// Extended determines whether to perform extended OSINT gathering beyond core requirements.
-	Extended bool
-	// Timeout specifies the duration to wait for individual network lookups (e.g., PTR, WHOIS) before timing out.
-	Timeout time.Duration
-	// Workers specifies the number of concurrent goroutines to use for scanning IPs within the subnet.
-	Workers int
-	// Resolver specifies a custom DNS resolver address (e.g., "8.8.8.8:53").
-	// If empty, the system's default resolver will be used.
-	Resolver string
-	// ASNAPIKey specifies the API key for the ASN lookup service (ProjectDiscovery Cloud Platform).
-	// If empty, the PDCP_API_KEY environment variable will be used.
-	ASNAPIKey string
+	Extended      bool
+	Timeout       time.Duration
+	Workers       int
+	Resolver      string
+	ASNAPIKey     string        // key for ProjectDiscovery (optional)
+	MaxMindDB     string        // path to GeoLite2-ASN.mmdb (optional)
+	PoliteWait    time.Duration // sleep between network ASN look-ups
+	PTRTimeout    time.Duration // timeout for PTR lookups
+	RDAPCacheSize int           // default 2048
+	PTRCacheSize  int           // default 8192
+	CacheTTL      time.Duration // Time-to-live for cache entries
 }
 
-// Scan initiates the OSINT research on the given IPv4 subnet CIDR.
-// It parses the CIDR, validates it, sets up a worker pool according to the ScanConfig,
-// and distributes IP scanning tasks to the workers.
-//
-// It returns a read-only channel (`<-chan`) that streams *subnetgenerated.IpReport results
-// as they become available from the workers. The channel is closed once all IPs in the
-// subnet have been processed or if the context (`ctx`) is cancelled.
-//
-// An error is returned immediately if the initial setup fails (e.g., invalid CIDR format,
-// subnet too large). The caller is responsible for consuming all reports from the channel
-// until it is closed.
+// scannerContext holds shared resources for a single scan operation.
+type scannerContext struct {
+	cfg       ScanConfig
+	asnLookup asnProvider
+	ptrCache  *lru.LRU[netip.Addr, []string]                     // Use expirable LRU type
+	rdapCache *lru.LRU[netip.Prefix, *subnetgenerated.WhoisData] // Use expirable LRU type
+	ptrGroup  sf.Group                                           // singleflight for PTR lookups
+	rdapGroup sf.Group                                           // singleflight for RDAP/WHOIS lookups
+	// cacheTTL and ptrTimeout removed as TTL is in LRU and timeout in cfg
+}
+
+/* ──────────────────────── SCAN ENTRY POINT ──────────────────────────── */
+
 func Scan(ctx context.Context, cidr string, cfg ScanConfig) (<-chan *subnetgenerated.IpReport, error) {
-	// 1. Parse and validate the input 'cidr' string.
+	// ─ CIDR sanity
 	ip, ipNet, err := net.ParseCIDR(cidr)
 	if err != nil {
-		return nil, fmt.Errorf("invalid CIDR format: %w", err)
+		return nil, fmt.Errorf("invalid CIDR: %w", err)
 	}
-
-	// 2. Check if the subnet is IPv4 first using net.IP
-	ipV4 := ip.To4()
-	if ipV4 == nil {
-		return nil, fmt.Errorf("invalid subnet: IPv6 is not supported")
+	if ip.To4() == nil {
+		return nil, errors.New("IPv6 not supported")
 	}
-
-	// Now convert the 4-byte representation to netip.Addr
-	ipNetIP, ok := netip.AddrFromSlice(ipV4)
-	if !ok {
-		// This should theoretically not happen if ip.To4() succeeded
-		return nil, fmt.Errorf("failed to convert net.IP to netip.Addr after To4() check")
+	if ones, _ := ipNet.Mask.Size(); ones < 16 {
+		return nil, fmt.Errorf("/%d is larger than the permitted /16", ones)
 	}
+	prefix := netip.MustParsePrefix(cidr)
 
-	ones, _ := ipNet.Mask.Size()              // Capture both return values
-	prefix := netip.PrefixFrom(ipNetIP, ones) // Use only 'ones'
-	if !prefix.IsValid() {
-		return nil, fmt.Errorf("failed to create valid netip.Prefix")
+	// ─ Apply defaults
+	if cfg.RDAPCacheSize <= 0 {
+		cfg.RDAPCacheSize = DefaultRDAPCacheSize
 	}
-
-	// 2a. Check subnet size limits.
-	// We already know it's IPv4 from the ip.To4() check above.
-	if ones < 16 {
-		// Allow /16, but reject anything larger (e.g., /15, /8)
-		return nil, fmt.Errorf("invalid subnet: size /%d is larger than the maximum allowed /16", ones)
+	if cfg.PTRCacheSize <= 0 {
+		cfg.PTRCacheSize = DefaultPTRCacheSize
 	}
-
-	// 3. Create the results and jobs channels.
-	resultsChan := make(chan *subnetgenerated.IpReport)
-	jobsCh := make(chan netip.Addr, cfg.Workers) // Buffered channel
-
-	// Initialize ASN client using the libs package
-	asnClient, err := libs.NewClient()
-	if err != nil {
-		// Consider logging the error instead of returning immediately
-		// if ASN lookup is not strictly critical
-		return nil, fmt.Errorf("failed to initialize ASN client: %w", err)
+	cacheTTL := cfg.CacheTTL
+	if cacheTTL <= 0 {
+		cacheTTL = DefaultCacheTTL
 	}
-
-	// Set the ASN API key if provided in the config
-	// This will override the environment variable value only for this instance
-	if cfg.ASNAPIKey != "" {
-		// The libs package uses a package-level variable for the API key
-		// We're modifying it here to use our config-provided key
-		libs.PDCPApiKey = cfg.ASNAPIKey
-	} else if asnAPIKey := env.GetEnvOrDefault("PDCP_API_KEY", ""); asnAPIKey != "" {
-		// Double check that the environment variable is loaded
-		libs.PDCPApiKey = asnAPIKey
+	ptrTimeout := cfg.PTRTimeout
+	if ptrTimeout <= 0 {
+		ptrTimeout = 500 * time.Millisecond // Default if not set
 	}
-	// NOTE: Check if asnClient needs explicit closing (e.g., defer asnClient.Close())
+	// Persist the effective timeout back into the config
+	cfg.PTRTimeout = ptrTimeout
 
-	// 4. Start IP Enumeration Goroutine
-	go func() {
-		defer close(jobsCh) // Close jobs channel when enumeration is done
-		addr := prefix.Addr()
-		for {
-			select {
-			case <-ctx.Done(): // Check for cancellation
-				return
-			default:
-				if prefix.Contains(addr) {
-					jobsCh <- addr
-				} else {
-					// Stop if we've gone past the subnet range (handles /31, /32 correctly)
-					return
-				}
-
-				// Handle wrap-around for the last IP in the address space
-				if addr.IsUnspecified() || addr == netip.MustParseAddr("255.255.255.255") {
-					return
-				}
-				addr = addr.Next()
+	// ─ ASN providers ------------------------------------------------------
+	pdCli := initProjectDiscovery(cfg.ASNAPIKey)
+	if pdCli != nil {
+		// Perform a single test query to validate the API key early.
+		// We only care about errors indicating an invalid key.
+		_, testErr := pdCli.GetData("1.1.1.1") // Use a known public IP for the test
+		if testErr != nil {
+			// Check the error string for the known invalid key message from the library.
+			// This is brittle, but necessary if the library doesn't return specific error types.
+			if strings.Contains(testErr.Error(), "missing or invalid api key") {
+				fmt.Fprintln(os.Stderr, "Warning: ProjectDiscovery API key is invalid or missing. Skipping ProjectDiscovery provider.")
+				pdCli = nil // Disable the PD provider for this scan
 			}
+			// Note: We could handle other permanent errors here if needed.
 		}
-	}()
-
-	// 5. Start Worker Pool
-	var wg sync.WaitGroup
-	wg.Add(cfg.Workers) // Add workers to wait group
-
-	for i := 0; i < cfg.Workers; i++ {
-		go func(client *libs.Client) { // Use *libs.Client again
-			defer wg.Done() // Signal worker completion
-			for {
-				select {
-				case <-ctx.Done(): // Check for cancellation
-					return
-				case ipAddr, ok := <-jobsCh:
-					if !ok {
-						// jobsCh is closed, no more work
-						return
-					}
-
-					// Create the report structure
-					report := &subnetgenerated.IpReport{
-						Ip:     ipAddr.String(),
-						Errors: []string{}, // Initialize errors slice
-					}
-
-					// --- Create context for this IP's lookups ---
-					lookupCtx, cancel := context.WithTimeout(ctx, cfg.Timeout)
-					defer cancel() // Ensure context is cancelled even on errors
-
-					// --- 1. Get PTR Records ---
-					var resolver *net.Resolver // Use nil for default initially
-					if cfg.Resolver != "" {
-						resolver = &net.Resolver{
-							PreferGo: true,
-							Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
-								d := net.Dialer{Timeout: cfg.Timeout}
-								return d.DialContext(ctx, "udp", cfg.Resolver) // Use UDP for DNS
-							},
-						}
-					}
-
-					ptrRecords, err := getPTR(lookupCtx, ipAddr, resolver)
-					if err != nil {
-						report.Errors = append(report.Errors, fmt.Sprintf("PTR lookup failed: %v", err))
-						// Continue to other lookups even if PTR fails
-					} else {
-						report.PtrRecords = ptrRecords // Assign PTR records
-					}
-
-					// --- 2. Get ASN Information ---
-					asnInfo, err := getASN(lookupCtx, ipAddr, client) // Pass the asnClient instance
-					if err != nil {
-						// Append specific error related to ASN lookup, but don't stop processing
-						report.Errors = append(report.Errors, fmt.Sprintf("ASN lookup failed: %v", err))
-					} else if asnInfo != nil { // Only assign if ASN info was found
-						report.Asn = asnInfo
-					}
-
-					// --- TODO: Add Ownership lookup logic here ---
-
-					// --- TODO: Add Extended lookup logic here (if cfg.Extended) ---
-
-					// Send result, checking for main context cancellation
-					select {
-					case resultsChan <- report:
-					case <-ctx.Done():
-						return // Don't block if main context is cancelled
-					}
-				}
-			}
-		}(asnClient) // Pass the client instance here
 	}
 
-	// 6. Start Goroutine to Close Results Channel
-	// This goroutine waits for all workers to finish, then closes resultsChan.
-	go func() {
-		wg.Wait()          // Wait for all workers in the pool
-		close(resultsChan) // Close the results channel
-	}()
+	mmdb, _ := openMaxMind(cfg.MaxMindDB)
 
-	// 7. Return the results channel and nil error.
-	return resultsChan, nil
+	lookupASN := chain(
+		providerPD(pdCli, cfg.PoliteWait),
+		providerMM(mmdb),
+		providerCymru(cfg.PoliteWait),
+	)
+
+	// ─ Caches and singleflight groups -------------------------------------
+	// Use expirable LRU with correct constructor (size, onEvict, ttl)
+	rdapCache := lru.NewLRU[netip.Prefix, *subnetgenerated.WhoisData](cfg.RDAPCacheSize, nil, cacheTTL)
+	ptrCache := lru.NewLRU[netip.Addr, []string](cfg.PTRCacheSize, nil, cacheTTL)
+
+	// ─ Scanner context ----------------------------------------------------
+	sCtx := &scannerContext{
+		cfg:       cfg, // Pass the potentially modified cfg
+		asnLookup: lookupASN,
+		ptrCache:  ptrCache,
+		rdapCache: rdapCache,
+		// sf.Group fields are zero-value ready
+	}
+
+	// ─ producer & worker channels ----------------------------------------
+	buf := cfg.Workers * 128
+	if buf > 4096 {
+		buf = 4096
+	}
+	ipCh := make(chan netip.Addr, buf)
+	out := make(chan *subnetgenerated.IpReport)
+
+	go enumerate(ctx, prefix, ipCh)
+	var wg sync.WaitGroup
+	wg.Add(cfg.Workers)
+	for i := 0; i < cfg.Workers; i++ {
+		go func() {
+			defer wg.Done()
+			for ip := range ipCh {
+				// Pass scanner context to scanOne
+				out <- scanOne(ctx, ip, sCtx)
+			}
+		}()
+	}
+	go func() { wg.Wait(); close(out) }()
+	return out, nil
 }
 
-// getPTR performs a reverse DNS lookup for the given IP address.
-// It uses the provided resolver or net.DefaultResolver if nil.
-// Handles context cancellation/deadline and DNS "not found" errors specifically.
-func getPTR(ctx context.Context, ip netip.Addr, resolver *net.Resolver) ([]string, error) {
-	if resolver == nil {
-		resolver = net.DefaultResolver
+/* ──────────────────── ENUMERATOR ─────────────────────────────────────── */
+
+func enumerate(ctx context.Context, pfx netip.Prefix, out chan<- netip.Addr) {
+	defer close(out)
+	for ip := pfx.Addr(); pfx.Contains(ip); ip = ip.Next() {
+		select {
+		case <-ctx.Done():
+			return
+		case out <- ip:
+		}
+	}
+}
+
+/* ──────────────────── PER-IP SCAN ─────────────────────────────────────── */
+
+func scanOne(parent context.Context, ip netip.Addr, sCtx *scannerContext) *subnetgenerated.IpReport {
+	rep := &subnetgenerated.IpReport{Ip: ip.String(), Errors: []string{}}
+
+	ctx, cancel := context.WithTimeout(parent, sCtx.cfg.Timeout)
+	defer cancel()
+
+	// PTR - Use cached lookup
+	if names, err := lookupPTRCached(ctx, ip, sCtx); err != nil {
+		rep.Errors = append(rep.Errors, "PTR: "+err.Error())
+	} else {
+		rep.PtrRecords = names
 	}
 
-	names, err := resolver.LookupAddr(ctx, ip.String())
-
-	// 1. Check for context errors first
-	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-		return nil, err // Propagate context errors directly
+	// ASN - Use the provider from scannerContext
+	if asn, err := sCtx.asnLookup(ctx, ip); err == nil && asn != nil {
+		rep.Asn = asn
+	} else if err != nil {
+		rep.Errors = append(rep.Errors, "ASN: "+err.Error())
 	}
 
-	// 2. Check for DNS "not found" error
-	var dnsErr *net.DNSError
-	if errors.As(err, &dnsErr) && dnsErr.IsNotFound {
-		return []string{}, nil // No PTR record found is not an error for us
+	// RDAP / WHOIS - Use cached lookup
+	if whois, err := lookupOwnershipCached(ctx, ip, sCtx); err != nil {
+		rep.Errors = append(rep.Errors, "RDAP/WHOIS: "+err.Error())
+	} else if whois != nil {
+		rep.Ownership = whois
+	}
+	return rep
+}
+
+/* ──────────────────── DNS PTR ─────────────────────────────────────────── */
+
+// lookupPTRCached wraps the actual PTR lookup with caching and singleflight.
+func lookupPTRCached(ctx context.Context, ip netip.Addr, sCtx *scannerContext) ([]string, error) {
+	// Check cache first
+	if names, ok := sCtx.ptrCache.Get(ip); ok {
+		return names, nil
 	}
 
-	// 3. Handle other potential errors
+	// Use singleflight with string keys
+	v, err, _ := sCtx.ptrGroup.Do(ip.String(), func() (any, error) { // Use ip.String() as key
+		// Apply the effective timeout for the actual network call
+		lookupCtx, cancel := context.WithTimeout(ctx, sCtx.cfg.PTRTimeout) // Use timeout from cfg
+		defer cancel()
+
+		names, fetchErr := doPTRLookup(lookupCtx, ip, sCtx.cfg.Resolver)
+		if fetchErr == nil {
+			// Add to cache on success (including empty slice for NXDOMAIN).
+			sCtx.ptrCache.Add(ip, names)
+		}
+		// Return the result and the fetch error.
+		return names, fetchErr
+	})
+
+	// Handle error returned by singleflight.Do
 	if err != nil {
-		return nil, fmt.Errorf("lookup failed: %w", err) // Wrap other errors
+		return nil, fmt.Errorf("ptr lookup failed for %s: %w", ip, err)
 	}
+	// Type assertion is safe here because Do func returns ([]string, error).
+	return v.([]string), nil
+}
 
-	// 4. Handle success (even if names slice is nil/empty)
-	if names == nil {
-		return []string{}, nil // Ensure we always return a non-nil slice
+// doPTRLookup performs the actual DNS PTR lookup.
+// (Renamed from original lookupPTR)
+func doPTRLookup(ctx context.Context, ip netip.Addr, resolver string) ([]string, error) {
+	r := net.DefaultResolver
+	if resolver != "" {
+		r = &net.Resolver{
+			PreferGo: true,
+			Dial: func(ctx context.Context, _, _ string) (net.Conn, error) {
+				// Use the timeout from the already time-limited context passed in
+				return (&net.Dialer{}).DialContext(ctx, "udp", resolver)
+			},
+		}
 	}
-
+	names, err := r.LookupAddr(ctx, ip.String())
+	if err != nil {
+		// Handle NXDOMAIN specifically - return empty slice, no error
+		if dnsErr, ok := err.(*net.DNSError); ok && dnsErr.IsNotFound {
+			return []string{}, nil // Cacheable result for "not found"
+		}
+		return nil, err // Return other errors
+	}
 	return names, nil
 }
 
-// getASN performs an ASN lookup for the given IP address using the provided asnmap client.
-// It handles context cancellation/deadline and returns ASN information or an error.
-func getASN(ctx context.Context, ip netip.Addr, client *libs.Client) (*subnetgenerated.AsnInfo, error) {
-	// Perform the ASN lookup
-	results, err := client.GetData(ip.String())
+/* ──────────────────── ASN PROVIDERS ───────────────────────────────────── */
 
-	// Check for context errors first
-	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-		return nil, err // Propagate context errors directly
+type asnProvider func(ctx context.Context, ip netip.Addr) (*subnetgenerated.AsnInfo, error)
+
+func chain(providers ...asnProvider) asnProvider {
+	return func(ctx context.Context, ip netip.Addr) (*subnetgenerated.AsnInfo, error) {
+		for _, p := range providers {
+			if info, err := p(ctx, ip); err == nil && info != nil {
+				return info, nil
+			}
+		}
+		return nil, errors.New("no ASN data")
 	}
-
-	// Handle other potential errors during lookup
-	if err != nil {
-		// This could be a temporary network issue or an internal asnmap error
-		return nil, fmt.Errorf("asnmap lookup failed: %w", err)
-	}
-
-	// Handle cases where no ASN data is found for the IP
-	if len(results) == 0 {
-		return nil, nil // No ASN found is not treated as an error
-	}
-
-	// Map the first result to the ASNInfo struct
-	// Assuming GetData returns a slice and the first element is the most relevant
-	asnData := results[0]
-	asnInfo := &subnetgenerated.AsnInfo{
-		Number:  asnData.ASN,
-		Org:     asnData.Org,
-		Country: asnData.Country,
-		// Name, Prefix, Registry could be mapped here if available and needed
-		// Name: asnData.Name,
-		// Prefix: asnData.Prefix,
-		// Registry: asnData.Registry,
-	}
-
-	return asnInfo, nil
 }
 
-// TODO: Implement processIP function or integrate scanning logic directly
-// into the worker goroutine above.
-// func processIP(ctx context.Context, ip netip.Addr, cfg ScanConfig) *subnetgenerated.IpReport {
-//	 // Placeholder for actual scanning logic (PTR, ASN, WHOIS, etc.)
-//	 return &subnetgenerated.IpReport{Ip: ip.String()}
-// }
+/* ProjectDiscovery ------------------------------------------------------- */
+
+func initProjectDiscovery(key string) *libs.Client {
+	if key == "" {
+		key = env.GetEnvOrDefault("PDCP_API_KEY", "")
+	}
+	if key == "" {
+		return nil
+	}
+	libs.PDCPApiKey = key
+	cli, _ := libs.NewClient()
+	return cli
+}
+
+func providerPD(cli *libs.Client, wait time.Duration) asnProvider {
+	return func(ctx context.Context, ip netip.Addr) (*subnetgenerated.AsnInfo, error) {
+		if cli == nil {
+			return nil, nil
+		}
+		data, err := cli.GetData(ip.String())
+		if err != nil || len(data) == 0 {
+			return nil, err
+		}
+		d := data[0]
+		// Sleep *before* returning, only on success
+		time.Sleep(wait)
+		return &subnetgenerated.AsnInfo{
+			Number:  d.ASN,
+			Org:     strPtr(d.Org),
+			Country: strPtr(d.Country),
+			Source:  "projectdiscovery",
+		}, nil
+	}
+}
+
+/* MaxMind GeoLite2-ASN --------------------------------------------------- */
+
+func openMaxMind(path string) (*geoip2.Reader, error) {
+	if path == "" {
+		return nil, nil
+	}
+	return geoip2.Open(path)
+}
+
+func providerMM(db *geoip2.Reader) asnProvider {
+	return func(_ context.Context, ip netip.Addr) (*subnetgenerated.AsnInfo, error) {
+		if db == nil {
+			return nil, nil
+		}
+		// Convert netip.Addr bytes to net.IP for geoip2
+		ipBytes := ip.AsSlice()
+		rec, err := db.ASN(net.IP(ipBytes))
+		if err != nil {
+			// Don't treat geoip lookup errors as fatal for the whole ASN process
+			return nil, nil // Return nil, nil to allow fallback to next provider
+		}
+		return &subnetgenerated.AsnInfo{
+			Number: int(rec.AutonomousSystemNumber),
+			Org:    strPtr(rec.AutonomousSystemOrganization),
+			Source: "maxmind",
+		}, nil
+	}
+}
+
+/* Team Cymru WHOIS ------------------------------------------------------- */
+
+func providerCymru(wait time.Duration) asnProvider {
+	return func(ctx context.Context, ip netip.Addr) (*subnetgenerated.AsnInfo, error) {
+		conn, err := (&net.Dialer{Timeout: 3 * time.Second}).DialContext(ctx, "tcp", "whois.cymru.com:43")
+		if err != nil {
+			return nil, err
+		}
+		defer conn.Close()
+
+		io.WriteString(conn, "begin\nverbose\n"+ip.String()+"\nend\n")
+		r := bufio.NewReader(conn)
+		r.ReadString('\n') // header
+		line, _ := r.ReadString('\n')
+		f := strings.Split(line, "|")
+		if len(f) < 8 {
+			return nil, errors.New("cymru: unexpected response")
+		}
+		asn, _ := strconv.Atoi(strings.TrimSpace(f[0]))
+		country := strings.TrimSpace(f[3])
+		org := strings.TrimSpace(f[7])
+
+		time.Sleep(wait)
+		return &subnetgenerated.AsnInfo{
+			Number:  asn,
+			Org:     strPtr(org),
+			Country: strPtr(country),
+			Source:  "cymru",
+		}, nil
+	}
+}
+
+/* ──────────────────── OWNERSHIP (RDAP → WHOIS) ────────────────────────── */
+
+// lookupOwnershipCached wraps the ownership lookup with caching and singleflight.
+func lookupOwnershipCached(ctx context.Context, ip netip.Addr, sCtx *scannerContext) (*subnetgenerated.WhoisData, error) {
+	// Key cache by /24 prefix
+	// We assume IPv4 based on initial Scan checks.
+	netPrefix := netip.PrefixFrom(ip, 24) // Create prefix, implicitly masks
+
+	// Check cache first
+	if data, ok := sCtx.rdapCache.Get(netPrefix); ok {
+		return data, nil
+	}
+
+	// Use singleflight with string keys
+	v, err, _ := sCtx.rdapGroup.Do(netPrefix.String(), func() (any, error) { // Use netPrefix.String() as key
+		// Note: The context passed to fetchOwnership uses the overall scanOne timeout.
+		data, fetchErr := fetchOwnership(ctx, ip)
+		if fetchErr == nil && data != nil {
+			// Add to cache on success
+			sCtx.rdapCache.Add(netPrefix, data)
+		}
+		// Return result and fetch error
+		return data, fetchErr
+	})
+
+	// Handle error returned by singleflight.Do
+	if err != nil {
+		return nil, fmt.Errorf("ownership lookup failed for %s: %w", ip, err)
+	}
+	// Type assertion is safe here.
+	return v.(*subnetgenerated.WhoisData), nil
+}
+
+// fetchOwnership performs the actual RDAP/WHOIS lookup.
+// (Renamed from original lookupOwnership)
+func fetchOwnership(ctx context.Context, ip netip.Addr) (*subnetgenerated.WhoisData, error) {
+	// Attempt RDAP lookup first
+	cli := &rdap.Client{}
+	// RDAP client doesn't seem to directly support context cancellation easily in QueryIP.
+	// We rely on the overall scanOne timeout.
+	if ipNet, err := cli.QueryIP(ip.String()); err == nil && ipNet != nil {
+		return parseRDAP(ipNet), nil
+	}
+	// Fallback to WHOIS
+
+	// Apply context timeout to WHOIS connection attempt (if possible, likexian/whois doesn't directly support context)
+	// We can use a custom transport/dialer if needed, but let's rely on the higher-level timeout for now.
+	raw, err := whois.Whois(ip.String()) // Consider adding timeout wrapper if needed
+	if err != nil {
+		return nil, err
+	}
+	return parseWHOIS(raw), nil
+}
+
+// ---- RDAP -----------------------------------------------------------------
+
+func parseRDAP(net *rdap.IPNetwork) *subnetgenerated.WhoisData {
+	wd := &subnetgenerated.WhoisData{}
+
+	// helper to extract first simple string value from the VCard
+	property := func(vc *rdap.VCard, key string) string {
+		if vc == nil {
+			return ""
+		}
+		if p := vc.GetFirst(key); p != nil {
+			if v, ok := p.Value.(string); ok {
+				return v
+			}
+			if vs, ok := p.Value.([]interface{}); ok { // adr is []interface{}
+				var parts []string
+				for _, x := range vs {
+					if s, ok := x.(string); ok && s != "" {
+						parts = append(parts, s)
+					}
+				}
+				return strings.Join(parts, ", ")
+			}
+		}
+		return ""
+	}
+
+	// entities --------------------------------------------------------------
+	walkEntities(net.Entities, func(e rdap.Entity) {
+		if e.VCard == nil {
+			return
+		}
+		switch {
+		case hasRole(e, "registrant") && wd.OrgName == nil:
+			wd.OrgName = strPtr(property(e.VCard, "org"))
+			wd.ContactName = strPtr(property(e.VCard, "fn"))
+			wd.Address = strPtr(property(e.VCard, "adr"))
+			wd.Country = strPtr(property(e.VCard, "country"))
+		case hasRole(e, "administrative") && wd.ContactEmail == nil:
+			wd.ContactEmail = strPtr(property(e.VCard, "email"))
+			wd.Phone = strPtr(property(e.VCard, "tel"))
+		}
+	})
+
+	// dates -----------------------------------------------------------------
+	for _, ev := range net.Events {
+		switch ev.Action {
+		case "registration":
+			wd.CreatedDate = parseTime(ev.Date)
+		case "last changed":
+			wd.UpdatedDate = parseTime(ev.Date)
+		}
+	}
+	return wd
+}
+
+func walkEntities(list []rdap.Entity, f func(rdap.Entity)) {
+	for _, e := range list {
+		f(e)
+		walkEntities(e.Entities, f)
+	}
+}
+func hasRole(e rdap.Entity, role string) bool {
+	for _, r := range e.Roles {
+		if r == role {
+			return true
+		}
+	}
+	return false
+}
+
+// ---- WHOIS (likexian) -----------------------------------------------------
+
+func parseWHOIS(raw string) *subnetgenerated.WhoisData {
+	wd := &subnetgenerated.WhoisData{Raw: &raw}
+	p, err := whoisparser.Parse(raw)
+	if err != nil {
+		return wd
+	}
+	// registrar & dates
+	wd.Registrar = strPtr(p.Registrar.Name)
+	wd.CreatedDate = parseTime(p.Domain.CreatedDate)
+	wd.UpdatedDate = parseTime(p.Domain.UpdatedDate)
+
+	// registrant block
+	r := p.Registrant
+	wd.OrgName = strPtr(r.Organization)
+	wd.ContactName = strPtr(r.Name)
+	wd.ContactEmail = strPtr(r.Email)
+	wd.Phone = strPtr(r.Phone)
+	wd.Country = strPtr(r.Country)
+
+	var adrParts []string
+	if r.Street != "" {
+		adrParts = append(adrParts, r.Street)
+	}
+	if r.City != "" {
+		adrParts = append(adrParts, r.City)
+	}
+	if r.Province != "" {
+		adrParts = append(adrParts, r.Province)
+	}
+	if r.PostalCode != "" {
+		adrParts = append(adrParts, r.PostalCode)
+	}
+	if r.Country != "" {
+		adrParts = append(adrParts, r.Country)
+	}
+	if len(adrParts) > 0 {
+		addr := strings.Join(adrParts, ", ")
+		wd.Address = &addr
+	}
+	return wd
+}
+
+// ---- helpers --------------------------------------------------------------
+
+func parseTime(s string) *time.Time {
+	if s == "" {
+		return nil
+	}
+	layouts := []string{
+		time.RFC3339,
+		"2006-01-02T15:04:05Z07:00",
+		"2006-01-02 15:04:05",
+		"02-Jan-2006",
+	}
+	for _, l := range layouts {
+		if t, err := time.Parse(l, s); err == nil {
+			return &t
+		}
+	}
+	return nil
+}
+func strPtr(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
+}

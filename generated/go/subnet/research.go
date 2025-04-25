@@ -11,11 +11,12 @@ import (
 
 type AsnInfo struct {
 	Number   int     `json:"number" url:"number"`
-	Org      string  `json:"org" url:"org"`
-	Country  string  `json:"country" url:"country"`
+	Org      *string `json:"org,omitempty" url:"org,omitempty"`
+	Country  *string `json:"country,omitempty" url:"country,omitempty"`
 	Name     *string `json:"name,omitempty" url:"name,omitempty"`
 	Prefix   *string `json:"prefix,omitempty" url:"prefix,omitempty"`
 	Registry *string `json:"registry,omitempty" url:"registry,omitempty"`
+	Source   string  `json:"source" url:"source"`
 
 	extraProperties map[string]interface{}
 	rawJSON         json.RawMessage
@@ -28,16 +29,16 @@ func (a *AsnInfo) GetNumber() int {
 	return a.Number
 }
 
-func (a *AsnInfo) GetOrg() string {
+func (a *AsnInfo) GetOrg() *string {
 	if a == nil {
-		return ""
+		return nil
 	}
 	return a.Org
 }
 
-func (a *AsnInfo) GetCountry() string {
+func (a *AsnInfo) GetCountry() *string {
 	if a == nil {
-		return ""
+		return nil
 	}
 	return a.Country
 }
@@ -61,6 +62,13 @@ func (a *AsnInfo) GetRegistry() *string {
 		return nil
 	}
 	return a.Registry
+}
+
+func (a *AsnInfo) GetSource() string {
+	if a == nil {
+		return ""
+	}
+	return a.Source
 }
 
 func (a *AsnInfo) GetExtraProperties() map[string]interface{} {

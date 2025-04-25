@@ -7,7 +7,12 @@ toolchain go1.24.2
 require (
 	github.com/Method-Security/pkg v0.0.6
 	github.com/google/uuid v1.3.1
+	github.com/hashicorp/golang-lru/v2 v2.0.6
+	github.com/likexian/whois v1.15.6
+	github.com/likexian/whois-parser v1.24.20
 	github.com/miekg/dns v1.1.65
+	github.com/openrdap/rdap v0.9.1
+	github.com/oschwald/geoip2-golang v1.11.0
 	github.com/palantir/pkg/datetime v1.1.0
 	github.com/palantir/witchcraft-go-logging v1.57.0
 	github.com/projectdiscovery/asnmap v1.1.0
@@ -18,7 +23,13 @@ require (
 )
 
 require (
+	github.com/alecthomas/kingpin/v2 v2.3.2 // indirect
+	github.com/alecthomas/units v0.0.0-20211218093645-b94a6e3cc137 // indirect
+	github.com/likexian/gokit v0.25.15 // indirect
+	github.com/mitchellh/go-homedir v1.1.0 // indirect
+	github.com/oschwald/maxminddb-golang v1.13.0 // indirect
 	github.com/projectdiscovery/mapcidr v1.1.16 // indirect
+	github.com/xhit/go-str2duration/v2 v2.1.0 // indirect
 	github.com/ysmood/fetchup v0.2.3 // indirect
 	github.com/ysmood/goob v0.4.0 // indirect
 	github.com/ysmood/got v0.40.0 // indirect
@@ -104,7 +115,7 @@ require (
 	github.com/projectdiscovery/ratelimit v0.0.34 // indirect
 	github.com/projectdiscovery/retryabledns v1.0.58 // indirect
 	github.com/projectdiscovery/retryablehttp-go v1.0.58 // indirect
-	github.com/projectdiscovery/utils v0.0.92 // indirect
+	github.com/projectdiscovery/utils v0.0.92
 	github.com/quic-go/quic-go v0.48.2 // indirect
 	github.com/refraction-networking/utls v1.5.4 // indirect
 	github.com/rivo/uniseg v0.4.4 // indirect
@@ -143,7 +154,7 @@ require (
 	golang.org/x/mod v0.23.0 // indirect
 	golang.org/x/net v0.38.0 // indirect
 	golang.org/x/oauth2 v0.11.0 // indirect
-	golang.org/x/sync v0.12.0 // indirect
+	golang.org/x/sync v0.12.0
 	golang.org/x/sys v0.31.0 // indirect
 	golang.org/x/text v0.23.0 // indirect
 	golang.org/x/tools v0.30.0 // indirect

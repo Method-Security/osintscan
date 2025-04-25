@@ -20,12 +20,14 @@ import (
 
 // Variables to hold flag values for the research subcommand
 var (
-	subnetStr string
-	workers   int
-	timeout   int // Timeout in seconds
-	extended  bool
-	resolver  string
-	apiKey    string // Added API key
+	subnetStr  string
+	workers    int
+	timeout    int // Timeout in seconds
+	extended   bool
+	resolver   string
+	apiKey     string // Added API key
+	maxMindDB  string
+	ptrTimeout time.Duration
 )
 
 // researchCmd represents the research command
@@ -56,11 +58,13 @@ var researchCmd = &cobra.Command{
 
 		// 2. Build ScanConfig struct from parsed flags
 		cfg := subnet.ScanConfig{
-			Extended:  extended,
-			Timeout:   time.Duration(timeout) * time.Second, // Convert int seconds to time.Duration
-			Workers:   workers,
-			Resolver:  resolver,
-			ASNAPIKey: apiKey, // Pass the API key to the scanner
+			Extended:   extended,
+			Timeout:    time.Duration(timeout) * time.Second, // Convert int seconds to time.Duration
+			Workers:    workers,
+			Resolver:   resolver,
+			ASNAPIKey:  apiKey,                 // Pass the API key to the scanner
+			MaxMindDB:  maxMindDB,              // path to MaxMind GeoIP2 ASN database
+			PoliteWait: 200 * time.Millisecond, // optional throttle for net providers
 		}
 
 		// 3. Call scanner.Scan(ctx, cidr, cfg)
@@ -136,7 +140,8 @@ func initResearchCmdFlags() {
 	researchCmd.Flags().BoolVarP(&extended, "extended", "x", false, "Perform extended OSINT gathering")
 	researchCmd.Flags().StringVarP(&resolver, "resolver", "r", "", "Custom DNS resolver address (e.g., 8.8.8.8:53)")
 	researchCmd.Flags().StringVar(&apiKey, "asn-api-key", "", "API key for ASN lookups (from https://cloud.projectdiscovery.io). Alternatively, set PDCP_API_KEY env var")
-
+	researchCmd.Flags().StringVar(&maxMindDB, "maxmind-db", "", "Path to MaxMind GeoIP2 ASN database")
+	researchCmd.Flags().DurationVar(&ptrTimeout, "ptr-timeout", 400*time.Millisecond, "Per-PTR lookup timeout (e.g. 500ms, 1s)")
 	err := researchCmd.MarkFlagRequired("subnet")
 	if err != nil {
 		// Panicking during init is generally acceptable for CLI tools if a flag setup fails.

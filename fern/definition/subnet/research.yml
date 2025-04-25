@@ -25,12 +25,13 @@ types:
 
   ASNInfo:
     properties:
-      number: integer
-      org: string
-      country: string
-      name: optional<string>
-      prefix: optional<string>
-      registry: optional<string>
+      number:          integer                 
+      org:             optional<string>       
+      country:         optional<string>       
+      name:            optional<string>         
+      prefix:          optional<string>        
+      registry:        optional<string>        
+      source:          string                 
 
   WhoisData:
     properties:
