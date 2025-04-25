@@ -329,6 +329,9 @@ github.com/pmezard/go-difflib/difflib
 # github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c
 ## explicit; go 1.14
 github.com/power-devops/perfstat
+# github.com/projectdiscovery/asnmap v1.1.0
+## explicit; go 1.21
+github.com/projectdiscovery/asnmap/libs
 # github.com/projectdiscovery/blackrock v0.0.1
 ## explicit; go 1.18
 github.com/projectdiscovery/blackrock
@@ -363,6 +366,9 @@ github.com/projectdiscovery/hmap/store/hybrid
 # github.com/projectdiscovery/machineid v0.0.0-20240226150047-2e2c51e35983
 ## explicit; go 1.21
 github.com/projectdiscovery/machineid
+# github.com/projectdiscovery/mapcidr v1.1.16
+## explicit; go 1.21
+github.com/projectdiscovery/mapcidr
 # github.com/projectdiscovery/networkpolicy v0.0.8
 ## explicit; go 1.21
 github.com/projectdiscovery/networkpolicy
@@ -424,6 +430,7 @@ github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/whoisxmlapi
 github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/zoomeyeapi
 # github.com/projectdiscovery/utils v0.0.92
 ## explicit; go 1.21
+github.com/projectdiscovery/utils/auth/pdcp
 github.com/projectdiscovery/utils/consts
 github.com/projectdiscovery/utils/context
 github.com/projectdiscovery/utils/conversion
@@ -674,9 +681,13 @@ golang.org/x/sync/semaphore
 # golang.org/x/sys v0.31.0
 ## explicit; go 1.23.0
 golang.org/x/sys/cpu
+golang.org/x/sys/plan9
 golang.org/x/sys/unix
 golang.org/x/sys/windows
 golang.org/x/sys/windows/registry
+# golang.org/x/term v0.30.0
+## explicit; go 1.23.0
+golang.org/x/term
 # golang.org/x/text v0.23.0
 ## explicit; go 1.23.0
 golang.org/x/text/encoding

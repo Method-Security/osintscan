@@ -10,6 +10,7 @@ require (
 	github.com/miekg/dns v1.1.65
 	github.com/palantir/pkg/datetime v1.1.0
 	github.com/palantir/witchcraft-go-logging v1.57.0
+	github.com/projectdiscovery/asnmap v1.1.0
 	github.com/projectdiscovery/dnsx v1.2.1
 	github.com/projectdiscovery/subfinder/v2 v2.6.6
 	github.com/spf13/cobra v1.8.1
@@ -17,11 +18,13 @@ require (
 )
 
 require (
+	github.com/projectdiscovery/mapcidr v1.1.16 // indirect
 	github.com/ysmood/fetchup v0.2.3 // indirect
 	github.com/ysmood/goob v0.4.0 // indirect
 	github.com/ysmood/got v0.40.0 // indirect
 	github.com/ysmood/gson v0.7.3 // indirect
 	github.com/ysmood/leakless v0.9.0 // indirect
+	golang.org/x/term v0.30.0 // indirect
 )
 
 require (

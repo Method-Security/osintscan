@@ -11,6 +11,9 @@ import (
 
 	// Import the generated Fern types for subnet research.
 	subnetgenerated "github.com/Method-Security/osintscan/generated/go/subnet"
+	// Revert back to using the libs sub-package
+	libs "github.com/projectdiscovery/asnmap/libs"
+	"github.com/projectdiscovery/utils/env"
 )
 
 // ScanConfig holds the configuration options for a subnet scan, derived from CLI flags.
@@ -24,6 +27,9 @@ type ScanConfig struct {
 	// Resolver specifies a custom DNS resolver address (e.g., "8.8.8.8:53").
 	// If empty, the system's default resolver will be used.
 	Resolver string
+	// ASNAPIKey specifies the API key for the ASN lookup service (ProjectDiscovery Cloud Platform).
+	// If empty, the PDCP_API_KEY environment variable will be used.
+	ASNAPIKey string
 }
 
 // Scan initiates the OSINT research on the given IPv4 subnet CIDR.
@@ -74,6 +80,26 @@ func Scan(ctx context.Context, cidr string, cfg ScanConfig) (<-chan *subnetgener
 	resultsChan := make(chan *subnetgenerated.IpReport)
 	jobsCh := make(chan netip.Addr, cfg.Workers) // Buffered channel
 
+	// Initialize ASN client using the libs package
+	asnClient, err := libs.NewClient()
+	if err != nil {
+		// Consider logging the error instead of returning immediately
+		// if ASN lookup is not strictly critical
+		return nil, fmt.Errorf("failed to initialize ASN client: %w", err)
+	}
+
+	// Set the ASN API key if provided in the config
+	// This will override the environment variable value only for this instance
+	if cfg.ASNAPIKey != "" {
+		// The libs package uses a package-level variable for the API key
+		// We're modifying it here to use our config-provided key
+		libs.PDCPApiKey = cfg.ASNAPIKey
+	} else if asnAPIKey := env.GetEnvOrDefault("PDCP_API_KEY", ""); asnAPIKey != "" {
+		// Double check that the environment variable is loaded
+		libs.PDCPApiKey = asnAPIKey
+	}
+	// NOTE: Check if asnClient needs explicit closing (e.g., defer asnClient.Close())
+
 	// 4. Start IP Enumeration Goroutine
 	go func() {
 		defer close(jobsCh) // Close jobs channel when enumeration is done
@@ -104,7 +130,7 @@ func Scan(ctx context.Context, cidr string, cfg ScanConfig) (<-chan *subnetgener
 	wg.Add(cfg.Workers) // Add workers to wait group
 
 	for i := 0; i < cfg.Workers; i++ {
-		go func() {
+		go func(client *libs.Client) { // Use *libs.Client again
 			defer wg.Done() // Signal worker completion
 			for {
 				select {
@@ -146,7 +172,14 @@ func Scan(ctx context.Context, cidr string, cfg ScanConfig) (<-chan *subnetgener
 						report.PtrRecords = ptrRecords // Assign PTR records
 					}
 
-					// --- TODO: Add ASN lookup logic here ---
+					// --- 2. Get ASN Information ---
+					asnInfo, err := getASN(lookupCtx, ipAddr, client) // Pass the asnClient instance
+					if err != nil {
+						// Append specific error related to ASN lookup, but don't stop processing
+						report.Errors = append(report.Errors, fmt.Sprintf("ASN lookup failed: %v", err))
+					} else if asnInfo != nil { // Only assign if ASN info was found
+						report.Asn = asnInfo
+					}
 
 					// --- TODO: Add Ownership lookup logic here ---
 
@@ -160,7 +193,7 @@ func Scan(ctx context.Context, cidr string, cfg ScanConfig) (<-chan *subnetgener
 					}
 				}
 			}
-		}()
+		}(asnClient) // Pass the client instance here
 	}
 
 	// 6. Start Goroutine to Close Results Channel
@@ -206,6 +239,44 @@ func getPTR(ctx context.Context, ip netip.Addr, resolver *net.Resolver) ([]strin
 	}
 
 	return names, nil
+}
+
+// getASN performs an ASN lookup for the given IP address using the provided asnmap client.
+// It handles context cancellation/deadline and returns ASN information or an error.
+func getASN(ctx context.Context, ip netip.Addr, client *libs.Client) (*subnetgenerated.AsnInfo, error) {
+	// Perform the ASN lookup
+	results, err := client.GetData(ip.String())
+
+	// Check for context errors first
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return nil, err // Propagate context errors directly
+	}
+
+	// Handle other potential errors during lookup
+	if err != nil {
+		// This could be a temporary network issue or an internal asnmap error
+		return nil, fmt.Errorf("asnmap lookup failed: %w", err)
+	}
+
+	// Handle cases where no ASN data is found for the IP
+	if len(results) == 0 {
+		return nil, nil // No ASN found is not treated as an error
+	}
+
+	// Map the first result to the ASNInfo struct
+	// Assuming GetData returns a slice and the first element is the most relevant
+	asnData := results[0]
+	asnInfo := &subnetgenerated.AsnInfo{
+		Number:  asnData.ASN,
+		Org:     asnData.Org,
+		Country: asnData.Country,
+		// Name, Prefix, Registry could be mapped here if available and needed
+		// Name: asnData.Name,
+		// Prefix: asnData.Prefix,
+		// Registry: asnData.Registry,
+	}
+
+	return asnInfo, nil
 }
 
 // TODO: Implement processIP function or integrate scanning logic directly
