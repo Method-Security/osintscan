@@ -14,7 +14,7 @@ func DetectDomainTakeover(targets []string, config dnsfern.DnsTakeoverConfig) (*
 	errs := []string{}
 
 	// Create HTTP client
-	httpClient := createHTTPClient(config.TlsVerify, config.OnlyHttps, config.Timeout)
+	httpClient := createHTTPClient(config.TlsVerify, config.Timeout)
 
 	var takeoverResults []*dnsfern.DomainTakeover
 	for _, target := range targets {
