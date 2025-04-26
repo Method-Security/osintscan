@@ -39,9 +39,9 @@ func RetrieveFingerprints(fingerprintsPath string) ([]*dnsfern.DnsTakeoverFinger
 }
 
 // createHTTPClient creates an HTTP client with the given TLS verification and timeout
-func createHTTPClient(verifyTLS bool, onlyHTTPS bool, timeout int) *http.Client {
+func createHTTPClient(verifyTLS bool, timeout int) *http.Client {
 	// Check to see if only HTTP is enabled and if the User has requested TLS verification
-	skipTLS := !verifyTLS && onlyHTTPS
+	skipTLS := !verifyTLS
 
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: skipTLS},
