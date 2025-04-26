@@ -53,17 +53,14 @@ type ScanConfig struct {
 type scannerContext struct {
 	cfg       ScanConfig
 	asnLookup asnProvider
-	ptrCache  *ristretto.Cache[string, []string]                   // Use Ristretto type (pointer) with string key
 	rdapCache *ristretto.Cache[uint32, *subnetgenerated.WhoisData] // Use Ristretto type (pointer) with uint32 key
-	ptrGroup  sf.Group                                             // singleflight for PTR lookups
 	rdapGroup sf.Group                                             // singleflight for RDAP/WHOIS lookups
 	metrics   *scanMetrics                                         // Internal metrics holder
 }
 
 // scanMetrics holds the atomic counters and timing information.
 type scanMetrics struct {
-	ipTotal atomic.Int64
-	// No need for ipSuccess/ipFailed here, derive from OpStats
+	ipTotal     atomic.Int64
 	opStatsPTR  *OpStats
 	opStatsASN  *OpStats
 	opStatsRDAP *OpStats
@@ -86,7 +83,7 @@ func NewOpStats() *OpStats {
 func (o *OpStats) IncCalls()     { o.calls.Add(1) }
 func (o *OpStats) IncSucceeded() { o.succeeded.Add(1) }
 func (o *OpStats) IncFailed()    { o.failed.Add(1) }
-func (o *OpStats) IncTimeouts()  { o.timeouts.Add(1) } // Called alongside IncFailed for timeouts
+func (o *OpStats) IncTimeouts()  { o.timeouts.Add(1) }
 
 // Get returns the current values as a generated OpStats struct.
 func (o *OpStats) Get() *subnetgenerated.OpStats {
@@ -110,9 +107,6 @@ func int64PtrToIntPtr(val int64) *int {
 	if val == 0 {
 		return nil
 	}
-	// Convert int64 to int before taking the address.
-	// Be mindful of potential overflow on 32-bit systems if val is large,
-	// but for counters, this is unlikely to be an issue.
 	intVal := int(val)
 	return &intVal
 }
@@ -181,7 +175,10 @@ func Scan(ctx context.Context, cidr string, cfg ScanConfig) (<-chan *subnetgener
 		}
 	}
 
-	mmdb, _ := openMaxMind(cfg.MaxMindDB)
+	mmdb, err := openMaxMind(cfg.MaxMindDB)
+	if err != nil {
+		return nil, fmt.Errorf("opening MaxMind DB at %q: %w", cfg.MaxMindDB, err)
+	}
 
 	lookupASN := chain(
 		providerMM(mmdb),
@@ -190,18 +187,6 @@ func Scan(ctx context.Context, cidr string, cfg ScanConfig) (<-chan *subnetgener
 	)
 
 	// ─ Caches and singleflight groups -------------------------------------
-	ptrCache, err := ristretto.NewCache(&ristretto.Config[string, []string]{
-		NumCounters: int64(cfg.PTRCacheSize * 10), // * 10 per Ristretto docs
-		MaxCost:     int64(cfg.PTRCacheSize),      // Max items (cost 1 per item)
-		BufferItems: 64,                           // Default
-		Metrics:     true,                         // Enable metrics
-		// OnEvict:     func(item *ristretto.Item[string, []string]) { /* TODO: Atomic counter increment */ },
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to create PTR cache: %w", err)
-	}
-
-	// Use uint32 key for RDAP cache to pack /24 prefix
 	rdapCache, err := ristretto.NewCache(&ristretto.Config[uint32, *subnetgenerated.WhoisData]{
 		NumCounters: 1 << 18, // ~260 K counters (tuned for /16)
 		MaxCost:     1 << 17, // 131 072 items (tuned for /16)
@@ -210,8 +195,6 @@ func Scan(ctx context.Context, cidr string, cfg ScanConfig) (<-chan *subnetgener
 		// OnEvict:     func(item *ristretto.Item[uint32, *subnetgenerated.WhoisData]) { /* TODO: Atomic counter increment */ },
 	})
 	if err != nil {
-		// Clean up ptrCache if rdapCache creation fails
-		ptrCache.Close()
 		return nil, fmt.Errorf("failed to create RDAP cache: %w", err)
 	}
 
@@ -219,10 +202,9 @@ func Scan(ctx context.Context, cidr string, cfg ScanConfig) (<-chan *subnetgener
 	sCtx := &scannerContext{
 		cfg:       cfg, // Pass the potentially modified cfg
 		asnLookup: lookupASN,
-		ptrCache:  ptrCache,
 		rdapCache: rdapCache,
 		metrics:   scanMetrics, // Assign initialized metrics
-		// sf.Group fields are zero-value ready
+		// rdapGroup is zero-value ready
 	}
 
 	// ─ producer & worker channels ----------------------------------------
@@ -269,17 +251,8 @@ func Scan(ctx context.Context, cidr string, cfg ScanConfig) (<-chan *subnetgener
 		cfg.Metrics.Rdap = scanMetrics.opStatsRDAP.Get()
 
 		// Cache Stats (Requires ptrCache and rdapCache to be accessible here)
-		ptrMetrics := ptrCache.Metrics
 		rdapMetrics := rdapCache.Metrics
 		cacheStats := &subnetgenerated.CacheStats{}
-		if ptrMetrics != nil {
-			ptrHits := ptrMetrics.Hits()
-			ptrMisses := ptrMetrics.Misses()
-			ptrEvicted := ptrMetrics.CostEvicted() // Assumes cost=1 per item
-			cacheStats.PtrHits = uint64PtrToIntPtr(ptrHits)
-			cacheStats.PtrMisses = uint64PtrToIntPtr(ptrMisses)
-			cacheStats.PtrEvictions = uint64PtrToIntPtr(ptrEvicted)
-		}
 		if rdapMetrics != nil {
 			rdapHits := rdapMetrics.Hits()
 			rdapMisses := rdapMetrics.Misses()
@@ -319,7 +292,6 @@ func Scan(ctx context.Context, cidr string, cfg ScanConfig) (<-chan *subnetgener
 		}
 
 		// Close caches after metrics are collected
-		ptrCache.Close()
 		rdapCache.Close()
 		close(out)
 	}()
@@ -348,8 +320,8 @@ func scanOne(parent context.Context, ip netip.Addr, sCtx *scannerContext) *subne
 	ctx, cancel := context.WithTimeout(parent, sCtx.cfg.Timeout)
 	defer cancel()
 
-	// PTR - Use cached lookup
-	if names, err := lookupPTRCached(ctx, ip, sCtx); err != nil {
+	// PTR - Direct lookup
+	if names, err := doPTRLookup(ctx, ip, sCtx); err != nil { // Pass scanner context
 		rep.Errors = append(rep.Errors, "PTR: "+err.Error())
 	} else {
 		rep.PtrRecords = names
@@ -381,55 +353,15 @@ func scanOne(parent context.Context, ip netip.Addr, sCtx *scannerContext) *subne
 
 /* ──────────────────── DNS PTR ─────────────────────────────────────────── */
 
-// lookupPTRCached wraps the actual PTR lookup with caching and singleflight.
-func lookupPTRCached(ctx context.Context, ip netip.Addr, sCtx *scannerContext) ([]string, error) {
-	ipStr := ip.String()
-	// Check cache first
-	if names, ok := sCtx.ptrCache.Get(ipStr); ok {
-		return names, nil
-	}
+// doPTRLookup performs the actual DNS PTR lookup and updates metrics.
+func doPTRLookup(ctx context.Context, ip netip.Addr, sCtx *scannerContext) ([]string, error) {
+	sCtx.metrics.opStatsPTR.IncCalls() // Increment calls
 
-	// Use singleflight with string keys
-	v, err, _ := sCtx.ptrGroup.Do(ipStr, func() (any, error) { // Use ipStr as key
-		sCtx.metrics.opStatsPTR.IncCalls() // Increment calls
+	// Apply the effective timeout for the actual network call
+	lookupCtx, cancel := context.WithTimeout(ctx, sCtx.cfg.PTRTimeout) // Use timeout from cfg
+	defer cancel()
 
-		// Apply the effective timeout for the actual network call
-		lookupCtx, cancel := context.WithTimeout(ctx, sCtx.cfg.PTRTimeout) // Use timeout from cfg
-		defer cancel()
-
-		names, fetchErr := doPTRLookup(lookupCtx, ip, sCtx.cfg.Resolver)
-		if fetchErr == nil {
-			// Add to cache on success (including empty slice for NXDOMAIN).
-			// Cost is 1, TTL comes from config.
-			sCtx.ptrCache.SetWithTTL(ipStr, names, 1, sCtx.cfg.CacheTTL) // Use string key
-		}
-
-		// Track success/failure/timeout
-		if fetchErr != nil {
-			sCtx.metrics.opStatsPTR.IncFailed()
-			// Check if the error is a context deadline exceeded error
-			if errors.Is(fetchErr, context.DeadlineExceeded) || (lookupCtx.Err() == context.DeadlineExceeded) {
-				sCtx.metrics.opStatsPTR.IncTimeouts()
-			}
-		} else {
-			sCtx.metrics.opStatsPTR.IncSucceeded()
-		}
-
-		// Return the result and the fetch error.
-		return names, fetchErr
-	})
-
-	// Handle error returned by singleflight.Do
-	if err != nil {
-		return nil, fmt.Errorf("ptr lookup failed for %s: %w", ip, err)
-	}
-	// Type assertion is safe here because Do func returns ([]string, error).
-	return v.([]string), nil
-}
-
-// doPTRLookup performs the actual DNS PTR lookup.
-// (Renamed from original lookupPTR)
-func doPTRLookup(ctx context.Context, ip netip.Addr, resolver string) ([]string, error) {
+	resolver := sCtx.cfg.Resolver // Get resolver from context
 	r := net.DefaultResolver
 	if resolver != "" {
 		r = &net.Resolver{
@@ -440,14 +372,23 @@ func doPTRLookup(ctx context.Context, ip netip.Addr, resolver string) ([]string,
 			},
 		}
 	}
-	names, err := r.LookupAddr(ctx, ip.String())
+	names, err := r.LookupAddr(lookupCtx, ip.String())
 	if err != nil {
-		// Handle NXDOMAIN specifically - return empty slice, no error
+		// NXDOMAIN / not-found is not a real "failure" for us
 		if dnsErr, ok := err.(*net.DNSError); ok && dnsErr.IsNotFound {
-			return []string{}, nil // Cacheable result for "not found"
+			sCtx.metrics.opStatsPTR.IncSucceeded() // 1 negative success
+			return []string{}, nil
 		}
-		return nil, err // Return other errors
+		// only now count it as a failure
+		sCtx.metrics.opStatsPTR.IncFailed()
+		if errors.Is(err, context.DeadlineExceeded) {
+			sCtx.metrics.opStatsPTR.IncTimeouts()
+		}
+		return nil, err
 	}
+
+	// on real success
+	sCtx.metrics.opStatsPTR.IncSucceeded()
 	return names, nil
 }
 
@@ -780,10 +721,5 @@ func uint64PtrToIntPtr(val uint64) *int {
 		return nil
 	}
 	intVal := int(val)
-	// Add check for potential overflow although unlikely for these metrics
-	if uint64(intVal) != val {
-		// Handle overflow case if necessary, e.g., return max int or log warning
-		// For simplicity here, we'll proceed, but be aware.
-	}
 	return &intVal
 }

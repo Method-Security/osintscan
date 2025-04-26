@@ -63,9 +63,6 @@ types:
 
   CacheStats:
     properties:
-      ptr_hits:       optional<integer>
-      ptr_misses:     optional<integer>
-      ptr_evictions:  optional<integer>
       rdap_hits:      optional<integer>
       rdap_misses:    optional<integer>
       rdap_evictions: optional<integer>

@@ -104,36 +104,12 @@ func (a *AsnInfo) String() string {
 }
 
 type CacheStats struct {
-	PtrHits       *int `json:"ptr_hits,omitempty" url:"ptr_hits,omitempty"`
-	PtrMisses     *int `json:"ptr_misses,omitempty" url:"ptr_misses,omitempty"`
-	PtrEvictions  *int `json:"ptr_evictions,omitempty" url:"ptr_evictions,omitempty"`
 	RdapHits      *int `json:"rdap_hits,omitempty" url:"rdap_hits,omitempty"`
 	RdapMisses    *int `json:"rdap_misses,omitempty" url:"rdap_misses,omitempty"`
 	RdapEvictions *int `json:"rdap_evictions,omitempty" url:"rdap_evictions,omitempty"`
 
 	extraProperties map[string]interface{}
 	rawJSON         json.RawMessage
-}
-
-func (c *CacheStats) GetPtrHits() *int {
-	if c == nil {
-		return nil
-	}
-	return c.PtrHits
-}
-
-func (c *CacheStats) GetPtrMisses() *int {
-	if c == nil {
-		return nil
-	}
-	return c.PtrMisses
-}
-
-func (c *CacheStats) GetPtrEvictions() *int {
-	if c == nil {
-		return nil
-	}
-	return c.PtrEvictions
 }
 
 func (c *CacheStats) GetRdapHits() *int {
