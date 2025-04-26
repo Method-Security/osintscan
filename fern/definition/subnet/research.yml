@@ -5,6 +5,7 @@ types:
       total_ips: integer
       scanned_at: datetime
       reports: list<IPReport>
+      metrics: RunMetrics
       cancelled: optional<boolean>
   IPReport:
     properties:
@@ -45,3 +46,33 @@ types:
       phone: optional<string>
       country: optional<string>
       raw: optional<string>
+    
+  RunMetrics:
+    properties:
+      started_at:     optional<datetime>
+      finished_at:    optional<datetime>
+      runtime_ms:     optional<integer>       # finished - started
+      ip_total:       optional<integer>
+      ip_success:     optional<integer>
+      ip_failed:      optional<integer>
+      avg_ip_ms:      optional<integer>
+      cache:          optional<CacheStats>
+      ptr:            optional<OpStats>
+      asn:            optional<OpStats>
+      rdap:           optional<OpStats>
+
+  CacheStats:
+    properties:
+      ptr_hits:       optional<integer>
+      ptr_misses:     optional<integer>
+      ptr_evictions:  optional<integer>
+      rdap_hits:      optional<integer>
+      rdap_misses:    optional<integer>
+      rdap_evictions: optional<integer>
+
+  OpStats:           # one instance for PTR, ASN, RDAP
+    properties:
+      calls:         optional<integer>
+      succeeded:     optional<integer>
+      failed:        optional<integer>
+      timeouts:      optional<integer>

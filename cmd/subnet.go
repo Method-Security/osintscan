@@ -57,6 +57,7 @@ var researchCmd = &cobra.Command{
 		// --- End Flag Parsing & Validation ---
 
 		// 2. Build ScanConfig struct from parsed flags
+		metrics := &subnetgenerated.RunMetrics{} // Initialize metrics struct
 		cfg := subnet.ScanConfig{
 			Extended:   extended,
 			Timeout:    time.Duration(timeout) * time.Second, // Convert int seconds to time.Duration
@@ -65,6 +66,8 @@ var researchCmd = &cobra.Command{
 			ASNAPIKey:  apiKey,                 // Pass the API key to the scanner
 			MaxMindDB:  maxMindDB,              // path to MaxMind GeoIP2 ASN database
 			PoliteWait: 200 * time.Millisecond, // optional throttle for net providers
+			PTRTimeout: ptrTimeout,             // Pass the parsed PTR timeout
+			Metrics:    metrics,                // Pass pointer to metrics struct
 		}
 
 		// 3. Call scanner.Scan(ctx, cidr, cfg)
@@ -116,6 +119,7 @@ var researchCmd = &cobra.Command{
 			ScannedAt: time.Now().UTC(),
 			Reports:   collectedReports,
 			Cancelled: &isCancelled, // Use address of bool for optional field
+			Metrics:   metrics,      // Assign the populated metrics
 		}
 
 		// Marshal to JSON with indentation

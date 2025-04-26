@@ -103,6 +103,92 @@ func (a *AsnInfo) String() string {
 	return fmt.Sprintf("%#v", a)
 }
 
+type CacheStats struct {
+	PtrHits       *int `json:"ptr_hits,omitempty" url:"ptr_hits,omitempty"`
+	PtrMisses     *int `json:"ptr_misses,omitempty" url:"ptr_misses,omitempty"`
+	PtrEvictions  *int `json:"ptr_evictions,omitempty" url:"ptr_evictions,omitempty"`
+	RdapHits      *int `json:"rdap_hits,omitempty" url:"rdap_hits,omitempty"`
+	RdapMisses    *int `json:"rdap_misses,omitempty" url:"rdap_misses,omitempty"`
+	RdapEvictions *int `json:"rdap_evictions,omitempty" url:"rdap_evictions,omitempty"`
+
+	extraProperties map[string]interface{}
+	rawJSON         json.RawMessage
+}
+
+func (c *CacheStats) GetPtrHits() *int {
+	if c == nil {
+		return nil
+	}
+	return c.PtrHits
+}
+
+func (c *CacheStats) GetPtrMisses() *int {
+	if c == nil {
+		return nil
+	}
+	return c.PtrMisses
+}
+
+func (c *CacheStats) GetPtrEvictions() *int {
+	if c == nil {
+		return nil
+	}
+	return c.PtrEvictions
+}
+
+func (c *CacheStats) GetRdapHits() *int {
+	if c == nil {
+		return nil
+	}
+	return c.RdapHits
+}
+
+func (c *CacheStats) GetRdapMisses() *int {
+	if c == nil {
+		return nil
+	}
+	return c.RdapMisses
+}
+
+func (c *CacheStats) GetRdapEvictions() *int {
+	if c == nil {
+		return nil
+	}
+	return c.RdapEvictions
+}
+
+func (c *CacheStats) GetExtraProperties() map[string]interface{} {
+	return c.extraProperties
+}
+
+func (c *CacheStats) UnmarshalJSON(data []byte) error {
+	type unmarshaler CacheStats
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*c = CacheStats(value)
+	extraProperties, err := internal.ExtractExtraProperties(data, *c)
+	if err != nil {
+		return err
+	}
+	c.extraProperties = extraProperties
+	c.rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (c *CacheStats) String() string {
+	if len(c.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(c.rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := internal.StringifyJSON(c); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", c)
+}
+
 type IpReport struct {
 	Ip            string     `json:"ip" url:"ip"`
 	PtrRecords    []string   `json:"ptr_records,omitempty" url:"ptr_records,omitempty"`
@@ -271,11 +357,230 @@ func (i *IpReport) String() string {
 	return fmt.Sprintf("%#v", i)
 }
 
+type OpStats struct {
+	Calls     *int `json:"calls,omitempty" url:"calls,omitempty"`
+	Succeeded *int `json:"succeeded,omitempty" url:"succeeded,omitempty"`
+	Failed    *int `json:"failed,omitempty" url:"failed,omitempty"`
+	Timeouts  *int `json:"timeouts,omitempty" url:"timeouts,omitempty"`
+
+	extraProperties map[string]interface{}
+	rawJSON         json.RawMessage
+}
+
+func (o *OpStats) GetCalls() *int {
+	if o == nil {
+		return nil
+	}
+	return o.Calls
+}
+
+func (o *OpStats) GetSucceeded() *int {
+	if o == nil {
+		return nil
+	}
+	return o.Succeeded
+}
+
+func (o *OpStats) GetFailed() *int {
+	if o == nil {
+		return nil
+	}
+	return o.Failed
+}
+
+func (o *OpStats) GetTimeouts() *int {
+	if o == nil {
+		return nil
+	}
+	return o.Timeouts
+}
+
+func (o *OpStats) GetExtraProperties() map[string]interface{} {
+	return o.extraProperties
+}
+
+func (o *OpStats) UnmarshalJSON(data []byte) error {
+	type unmarshaler OpStats
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*o = OpStats(value)
+	extraProperties, err := internal.ExtractExtraProperties(data, *o)
+	if err != nil {
+		return err
+	}
+	o.extraProperties = extraProperties
+	o.rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (o *OpStats) String() string {
+	if len(o.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(o.rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := internal.StringifyJSON(o); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", o)
+}
+
+type RunMetrics struct {
+	StartedAt  *time.Time  `json:"started_at,omitempty" url:"started_at,omitempty"`
+	FinishedAt *time.Time  `json:"finished_at,omitempty" url:"finished_at,omitempty"`
+	RuntimeMs  *int        `json:"runtime_ms,omitempty" url:"runtime_ms,omitempty"`
+	IpTotal    *int        `json:"ip_total,omitempty" url:"ip_total,omitempty"`
+	IpSuccess  *int        `json:"ip_success,omitempty" url:"ip_success,omitempty"`
+	IpFailed   *int        `json:"ip_failed,omitempty" url:"ip_failed,omitempty"`
+	AvgIpMs    *int        `json:"avg_ip_ms,omitempty" url:"avg_ip_ms,omitempty"`
+	Cache      *CacheStats `json:"cache,omitempty" url:"cache,omitempty"`
+	Ptr        *OpStats    `json:"ptr,omitempty" url:"ptr,omitempty"`
+	Asn        *OpStats    `json:"asn,omitempty" url:"asn,omitempty"`
+	Rdap       *OpStats    `json:"rdap,omitempty" url:"rdap,omitempty"`
+
+	extraProperties map[string]interface{}
+	rawJSON         json.RawMessage
+}
+
+func (r *RunMetrics) GetStartedAt() *time.Time {
+	if r == nil {
+		return nil
+	}
+	return r.StartedAt
+}
+
+func (r *RunMetrics) GetFinishedAt() *time.Time {
+	if r == nil {
+		return nil
+	}
+	return r.FinishedAt
+}
+
+func (r *RunMetrics) GetRuntimeMs() *int {
+	if r == nil {
+		return nil
+	}
+	return r.RuntimeMs
+}
+
+func (r *RunMetrics) GetIpTotal() *int {
+	if r == nil {
+		return nil
+	}
+	return r.IpTotal
+}
+
+func (r *RunMetrics) GetIpSuccess() *int {
+	if r == nil {
+		return nil
+	}
+	return r.IpSuccess
+}
+
+func (r *RunMetrics) GetIpFailed() *int {
+	if r == nil {
+		return nil
+	}
+	return r.IpFailed
+}
+
+func (r *RunMetrics) GetAvgIpMs() *int {
+	if r == nil {
+		return nil
+	}
+	return r.AvgIpMs
+}
+
+func (r *RunMetrics) GetCache() *CacheStats {
+	if r == nil {
+		return nil
+	}
+	return r.Cache
+}
+
+func (r *RunMetrics) GetPtr() *OpStats {
+	if r == nil {
+		return nil
+	}
+	return r.Ptr
+}
+
+func (r *RunMetrics) GetAsn() *OpStats {
+	if r == nil {
+		return nil
+	}
+	return r.Asn
+}
+
+func (r *RunMetrics) GetRdap() *OpStats {
+	if r == nil {
+		return nil
+	}
+	return r.Rdap
+}
+
+func (r *RunMetrics) GetExtraProperties() map[string]interface{} {
+	return r.extraProperties
+}
+
+func (r *RunMetrics) UnmarshalJSON(data []byte) error {
+	type embed RunMetrics
+	var unmarshaler = struct {
+		embed
+		StartedAt  *internal.DateTime `json:"started_at,omitempty"`
+		FinishedAt *internal.DateTime `json:"finished_at,omitempty"`
+	}{
+		embed: embed(*r),
+	}
+	if err := json.Unmarshal(data, &unmarshaler); err != nil {
+		return err
+	}
+	*r = RunMetrics(unmarshaler.embed)
+	r.StartedAt = unmarshaler.StartedAt.TimePtr()
+	r.FinishedAt = unmarshaler.FinishedAt.TimePtr()
+	extraProperties, err := internal.ExtractExtraProperties(data, *r)
+	if err != nil {
+		return err
+	}
+	r.extraProperties = extraProperties
+	r.rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (r *RunMetrics) MarshalJSON() ([]byte, error) {
+	type embed RunMetrics
+	var marshaler = struct {
+		embed
+		StartedAt  *internal.DateTime `json:"started_at,omitempty"`
+		FinishedAt *internal.DateTime `json:"finished_at,omitempty"`
+	}{
+		embed:      embed(*r),
+		StartedAt:  internal.NewOptionalDateTime(r.StartedAt),
+		FinishedAt: internal.NewOptionalDateTime(r.FinishedAt),
+	}
+	return json.Marshal(marshaler)
+}
+
+func (r *RunMetrics) String() string {
+	if len(r.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(r.rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := internal.StringifyJSON(r); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", r)
+}
+
 type SubnetReport struct {
 	Subnet    string      `json:"subnet" url:"subnet"`
 	TotalIps  int         `json:"total_ips" url:"total_ips"`
 	ScannedAt time.Time   `json:"scanned_at" url:"scanned_at"`
 	Reports   []*IpReport `json:"reports,omitempty" url:"reports,omitempty"`
+	Metrics   *RunMetrics `json:"metrics,omitempty" url:"metrics,omitempty"`
 	Cancelled *bool       `json:"cancelled,omitempty" url:"cancelled,omitempty"`
 
 	extraProperties map[string]interface{}
@@ -308,6 +613,13 @@ func (s *SubnetReport) GetReports() []*IpReport {
 		return nil
 	}
 	return s.Reports
+}
+
+func (s *SubnetReport) GetMetrics() *RunMetrics {
+	if s == nil {
+		return nil
+	}
+	return s.Metrics
 }
 
 func (s *SubnetReport) GetCancelled() *bool {

@@ -2,22 +2,20 @@
 package subnet
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"net"
 	"net/netip"
 	"os"
-	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	subnetgenerated "github.com/Method-Security/osintscan/generated/go/subnet"
 
-	lru "github.com/hashicorp/golang-lru/v2/expirable" // Reverted to expirable path
+	ristretto "github.com/dgraph-io/ristretto/v2"
 	"github.com/likexian/whois"
 	whoisparser "github.com/likexian/whois-parser"
 	"github.com/openrdap/rdap"
@@ -41,24 +39,82 @@ type ScanConfig struct {
 	Timeout       time.Duration
 	Workers       int
 	Resolver      string
-	ASNAPIKey     string        // key for ProjectDiscovery (optional)
-	MaxMindDB     string        // path to GeoLite2-ASN.mmdb (optional)
-	PoliteWait    time.Duration // sleep between network ASN look-ups
-	PTRTimeout    time.Duration // timeout for PTR lookups
-	RDAPCacheSize int           // default 2048
-	PTRCacheSize  int           // default 8192
-	CacheTTL      time.Duration // Time-to-live for cache entries
+	ASNAPIKey     string                      // key for ProjectDiscovery (optional)
+	MaxMindDB     string                      // path to GeoLite2-ASN.mmdb (optional)
+	PoliteWait    time.Duration               // sleep between network ASN look-ups
+	PTRTimeout    time.Duration               // timeout for PTR lookups
+	RDAPCacheSize int                         // default 2048
+	PTRCacheSize  int                         // default 8192
+	CacheTTL      time.Duration               // Time-to-live for cache entries
+	Metrics       *subnetgenerated.RunMetrics // Pointer to store collected metrics
 }
 
 // scannerContext holds shared resources for a single scan operation.
 type scannerContext struct {
 	cfg       ScanConfig
 	asnLookup asnProvider
-	ptrCache  *lru.LRU[netip.Addr, []string]                     // Use expirable LRU type
-	rdapCache *lru.LRU[netip.Prefix, *subnetgenerated.WhoisData] // Use expirable LRU type
-	ptrGroup  sf.Group                                           // singleflight for PTR lookups
-	rdapGroup sf.Group                                           // singleflight for RDAP/WHOIS lookups
-	// cacheTTL and ptrTimeout removed as TTL is in LRU and timeout in cfg
+	ptrCache  *ristretto.Cache[string, []string]                   // Use Ristretto type (pointer) with string key
+	rdapCache *ristretto.Cache[uint32, *subnetgenerated.WhoisData] // Use Ristretto type (pointer) with uint32 key
+	ptrGroup  sf.Group                                             // singleflight for PTR lookups
+	rdapGroup sf.Group                                             // singleflight for RDAP/WHOIS lookups
+	metrics   *scanMetrics                                         // Internal metrics holder
+}
+
+// scanMetrics holds the atomic counters and timing information.
+type scanMetrics struct {
+	ipTotal atomic.Int64
+	// No need for ipSuccess/ipFailed here, derive from OpStats
+	opStatsPTR  *OpStats
+	opStatsASN  *OpStats
+	opStatsRDAP *OpStats
+	startTime   time.Time
+}
+
+// OpStats holds atomic counters for a specific operation type (PTR, ASN, RDAP).
+type OpStats struct {
+	calls     atomic.Int64
+	succeeded atomic.Int64
+	failed    atomic.Int64
+	timeouts  atomic.Int64
+}
+
+// NewOpStats creates a new OpStats with initialized counters.
+func NewOpStats() *OpStats {
+	return &OpStats{} // Atomics are zero-initialized
+}
+
+func (o *OpStats) IncCalls()     { o.calls.Add(1) }
+func (o *OpStats) IncSucceeded() { o.succeeded.Add(1) }
+func (o *OpStats) IncFailed()    { o.failed.Add(1) }
+func (o *OpStats) IncTimeouts()  { o.timeouts.Add(1) } // Called alongside IncFailed for timeouts
+
+// Get returns the current values as a generated OpStats struct.
+func (o *OpStats) Get() *subnetgenerated.OpStats {
+	calls := o.calls.Load()
+	succeeded := o.succeeded.Load()
+	failed := o.failed.Load()
+	timeouts := o.timeouts.Load()
+	// Use helper to convert int64 to *int, handling zero
+	return &subnetgenerated.OpStats{
+		Calls:     int64PtrToIntPtr(calls),
+		Succeeded: int64PtrToIntPtr(succeeded),
+		Failed:    int64PtrToIntPtr(failed),
+		Timeouts:  int64PtrToIntPtr(timeouts),
+	}
+}
+
+/* ──────────────────── HELPERS ─────────────────────────────────────── */
+
+// Helper to convert int64 to *int, returning nil if the value is 0.
+func int64PtrToIntPtr(val int64) *int {
+	if val == 0 {
+		return nil
+	}
+	// Convert int64 to int before taking the address.
+	// Be mindful of potential overflow on 32-bit systems if val is large,
+	// but for counters, this is unlikely to be an issue.
+	intVal := int(val)
+	return &intVal
 }
 
 /* ──────────────────────── SCAN ENTRY POINT ──────────────────────────── */
@@ -95,6 +151,19 @@ func Scan(ctx context.Context, cidr string, cfg ScanConfig) (<-chan *subnetgener
 	// Persist the effective timeout back into the config
 	cfg.PTRTimeout = ptrTimeout
 
+	if cfg.Metrics == nil {
+		return nil, errors.New("ScanConfig.Metrics cannot be nil")
+	}
+
+	// Initialize internal metrics struct
+	scanMetrics := &scanMetrics{
+		startTime:   time.Now(),
+		opStatsPTR:  NewOpStats(),
+		opStatsASN:  NewOpStats(),
+		opStatsRDAP: NewOpStats(),
+		// ipTotal is initialized to 0 by default
+	}
+
 	// ─ ASN providers ------------------------------------------------------
 	pdCli := initProjectDiscovery(cfg.ASNAPIKey)
 	if pdCli != nil {
@@ -116,14 +185,35 @@ func Scan(ctx context.Context, cidr string, cfg ScanConfig) (<-chan *subnetgener
 
 	lookupASN := chain(
 		providerMM(mmdb),
-		providerPD(pdCli, cfg.PoliteWait), // if you have the api key you get access to more data
-		providerCymru(cfg.PoliteWait),     // final fallback
+		// providerPD(pdCli, cfg.PoliteWait), // if you have the api key you get access to more data
+		// providerCymru(cfg.PoliteWait),     // final fallback
 	)
 
 	// ─ Caches and singleflight groups -------------------------------------
-	// Use expirable LRU with correct constructor (size, onEvict, ttl)
-	rdapCache := lru.NewLRU[netip.Prefix, *subnetgenerated.WhoisData](cfg.RDAPCacheSize, nil, cacheTTL)
-	ptrCache := lru.NewLRU[netip.Addr, []string](cfg.PTRCacheSize, nil, cacheTTL)
+	ptrCache, err := ristretto.NewCache(&ristretto.Config[string, []string]{
+		NumCounters: int64(cfg.PTRCacheSize * 10), // * 10 per Ristretto docs
+		MaxCost:     int64(cfg.PTRCacheSize),      // Max items (cost 1 per item)
+		BufferItems: 64,                           // Default
+		Metrics:     true,                         // Enable metrics
+		// OnEvict:     func(item *ristretto.Item[string, []string]) { /* TODO: Atomic counter increment */ },
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create PTR cache: %w", err)
+	}
+
+	// Use uint32 key for RDAP cache to pack /24 prefix
+	rdapCache, err := ristretto.NewCache(&ristretto.Config[uint32, *subnetgenerated.WhoisData]{
+		NumCounters: 1 << 18, // ~260 K counters (tuned for /16)
+		MaxCost:     1 << 17, // 131 072 items (tuned for /16)
+		BufferItems: 256,     // match Workers concurrency
+		Metrics:     true,
+		// OnEvict:     func(item *ristretto.Item[uint32, *subnetgenerated.WhoisData]) { /* TODO: Atomic counter increment */ },
+	})
+	if err != nil {
+		// Clean up ptrCache if rdapCache creation fails
+		ptrCache.Close()
+		return nil, fmt.Errorf("failed to create RDAP cache: %w", err)
+	}
 
 	// ─ Scanner context ----------------------------------------------------
 	sCtx := &scannerContext{
@@ -131,6 +221,7 @@ func Scan(ctx context.Context, cidr string, cfg ScanConfig) (<-chan *subnetgener
 		asnLookup: lookupASN,
 		ptrCache:  ptrCache,
 		rdapCache: rdapCache,
+		metrics:   scanMetrics, // Assign initialized metrics
 		// sf.Group fields are zero-value ready
 	}
 
@@ -142,7 +233,7 @@ func Scan(ctx context.Context, cidr string, cfg ScanConfig) (<-chan *subnetgener
 	ipCh := make(chan netip.Addr, buf)
 	out := make(chan *subnetgenerated.IpReport)
 
-	go enumerate(ctx, prefix, ipCh)
+	go enumerate(ctx, prefix, ipCh, sCtx)
 	var wg sync.WaitGroup
 	wg.Add(cfg.Workers)
 	for i := 0; i < cfg.Workers; i++ {
@@ -154,15 +245,93 @@ func Scan(ctx context.Context, cidr string, cfg ScanConfig) (<-chan *subnetgener
 			}
 		}()
 	}
-	go func() { wg.Wait(); close(out) }()
+	go func() {
+		wg.Wait()
+		finishTime := time.Now()
+
+		// --- Populate Final Metrics ---
+		cfg.Metrics.StartedAt = &scanMetrics.startTime
+		cfg.Metrics.FinishedAt = &finishTime
+		runtimeMs := finishTime.Sub(scanMetrics.startTime).Milliseconds()
+		cfg.Metrics.RuntimeMs = int64PtrToIntPtr(runtimeMs) // Use helper
+
+		ipTotal := scanMetrics.ipTotal.Load()
+		cfg.Metrics.IpTotal = int64PtrToIntPtr(ipTotal) // Use helper
+
+		if ipTotal > 0 && runtimeMs > 0 {
+			avgIpMs := runtimeMs / ipTotal
+			cfg.Metrics.AvgIpMs = int64PtrToIntPtr(avgIpMs) // Use helper
+		}
+
+		// Op Stats
+		cfg.Metrics.Ptr = scanMetrics.opStatsPTR.Get()
+		cfg.Metrics.Asn = scanMetrics.opStatsASN.Get()
+		cfg.Metrics.Rdap = scanMetrics.opStatsRDAP.Get()
+
+		// Cache Stats (Requires ptrCache and rdapCache to be accessible here)
+		ptrMetrics := ptrCache.Metrics
+		rdapMetrics := rdapCache.Metrics
+		cacheStats := &subnetgenerated.CacheStats{}
+		if ptrMetrics != nil {
+			ptrHits := ptrMetrics.Hits()
+			ptrMisses := ptrMetrics.Misses()
+			ptrEvicted := ptrMetrics.CostEvicted() // Assumes cost=1 per item
+			cacheStats.PtrHits = uint64PtrToIntPtr(ptrHits)
+			cacheStats.PtrMisses = uint64PtrToIntPtr(ptrMisses)
+			cacheStats.PtrEvictions = uint64PtrToIntPtr(ptrEvicted)
+		}
+		if rdapMetrics != nil {
+			rdapHits := rdapMetrics.Hits()
+			rdapMisses := rdapMetrics.Misses()
+			rdapEvicted := rdapMetrics.CostEvicted() // Assumes cost=1 per item
+			cacheStats.RdapHits = uint64PtrToIntPtr(rdapHits)
+			cacheStats.RdapMisses = uint64PtrToIntPtr(rdapMisses)
+			cacheStats.RdapEvictions = uint64PtrToIntPtr(rdapEvicted)
+		}
+		cfg.Metrics.Cache = cacheStats
+
+		// TODO: Populate ip_success and ip_failed if needed, potentially derived from OpStats
+		// Example derivation:
+		if cfg.Metrics.Ptr != nil && cfg.Metrics.Asn != nil && cfg.Metrics.Rdap != nil {
+			success := int64(0)
+			failed := int64(0)
+			if cfg.Metrics.Ptr.Succeeded != nil {
+				success += int64(*cfg.Metrics.Ptr.Succeeded)
+			}
+			if cfg.Metrics.Asn.Succeeded != nil {
+				success += int64(*cfg.Metrics.Asn.Succeeded)
+			}
+			if cfg.Metrics.Rdap.Succeeded != nil {
+				success += int64(*cfg.Metrics.Rdap.Succeeded)
+			}
+			if cfg.Metrics.Ptr.Failed != nil {
+				failed += int64(*cfg.Metrics.Ptr.Failed)
+			}
+			if cfg.Metrics.Asn.Failed != nil {
+				failed += int64(*cfg.Metrics.Asn.Failed)
+			}
+			if cfg.Metrics.Rdap.Failed != nil {
+				failed += int64(*cfg.Metrics.Rdap.Failed)
+			}
+			// Note: This sums *operations*, not IPs. A single IP could have multiple successes/failures.
+			// A better 'ip_success' might be ipTotal - 'ips with any failure'. This requires tracking failures per IP.
+			// For now, let's leave IpSuccess/IpFailed nil as their definition is ambiguous.
+		}
+
+		// Close caches after metrics are collected
+		ptrCache.Close()
+		rdapCache.Close()
+		close(out)
+	}()
 	return out, nil
 }
 
 /* ──────────────────── ENUMERATOR ─────────────────────────────────────── */
 
-func enumerate(ctx context.Context, pfx netip.Prefix, out chan<- netip.Addr) {
+func enumerate(ctx context.Context, pfx netip.Prefix, out chan<- netip.Addr, sCtx *scannerContext) {
 	defer close(out)
 	for ip := pfx.Addr(); pfx.Contains(ip); ip = ip.Next() {
+		sCtx.metrics.ipTotal.Add(1) // Increment total IP count
 		select {
 		case <-ctx.Done():
 			return
@@ -187,15 +356,23 @@ func scanOne(parent context.Context, ip netip.Addr, sCtx *scannerContext) *subne
 	}
 
 	// ASN - Use the provider from scannerContext
+	sCtx.metrics.opStatsASN.IncCalls()
 	if asn, err := sCtx.asnLookup(ctx, ip); err == nil && asn != nil {
 		rep.Asn = asn
+		sCtx.metrics.opStatsASN.IncSucceeded()
 	} else if err != nil {
 		rep.Errors = append(rep.Errors, "ASN: "+err.Error())
+		sCtx.metrics.opStatsASN.IncFailed()
+		// TODO: Check if err is a timeout error if more granular ASN timeout tracking is needed
+	} else {
+		// Case where asn is nil but error is also nil (e.g., provider skipped or returned no data)
+		sCtx.metrics.opStatsASN.IncSucceeded() // Count as success if no error occurred
 	}
 
 	// RDAP / WHOIS - Use cached lookup
 	if whois, err := lookupOwnershipCached(ctx, ip, sCtx); err != nil {
 		rep.Errors = append(rep.Errors, "RDAP/WHOIS: "+err.Error())
+		// Note: We don't increment failure count here, it's done in lookupOwnershipCached
 	} else if whois != nil {
 		rep.Ownership = whois
 	}
@@ -206,13 +383,16 @@ func scanOne(parent context.Context, ip netip.Addr, sCtx *scannerContext) *subne
 
 // lookupPTRCached wraps the actual PTR lookup with caching and singleflight.
 func lookupPTRCached(ctx context.Context, ip netip.Addr, sCtx *scannerContext) ([]string, error) {
+	ipStr := ip.String()
 	// Check cache first
-	if names, ok := sCtx.ptrCache.Get(ip); ok {
+	if names, ok := sCtx.ptrCache.Get(ipStr); ok {
 		return names, nil
 	}
 
 	// Use singleflight with string keys
-	v, err, _ := sCtx.ptrGroup.Do(ip.String(), func() (any, error) { // Use ip.String() as key
+	v, err, _ := sCtx.ptrGroup.Do(ipStr, func() (any, error) { // Use ipStr as key
+		sCtx.metrics.opStatsPTR.IncCalls() // Increment calls
+
 		// Apply the effective timeout for the actual network call
 		lookupCtx, cancel := context.WithTimeout(ctx, sCtx.cfg.PTRTimeout) // Use timeout from cfg
 		defer cancel()
@@ -220,8 +400,21 @@ func lookupPTRCached(ctx context.Context, ip netip.Addr, sCtx *scannerContext) (
 		names, fetchErr := doPTRLookup(lookupCtx, ip, sCtx.cfg.Resolver)
 		if fetchErr == nil {
 			// Add to cache on success (including empty slice for NXDOMAIN).
-			sCtx.ptrCache.Add(ip, names)
+			// Cost is 1, TTL comes from config.
+			sCtx.ptrCache.SetWithTTL(ipStr, names, 1, sCtx.cfg.CacheTTL) // Use string key
 		}
+
+		// Track success/failure/timeout
+		if fetchErr != nil {
+			sCtx.metrics.opStatsPTR.IncFailed()
+			// Check if the error is a context deadline exceeded error
+			if errors.Is(fetchErr, context.DeadlineExceeded) || (lookupCtx.Err() == context.DeadlineExceeded) {
+				sCtx.metrics.opStatsPTR.IncTimeouts()
+			}
+		} else {
+			sCtx.metrics.opStatsPTR.IncSucceeded()
+		}
+
 		// Return the result and the fetch error.
 		return names, fetchErr
 	})
@@ -337,69 +530,86 @@ func providerMM(db *geoip2.Reader) asnProvider {
 	}
 }
 
-/* Team Cymru WHOIS ------------------------------------------------------- */
-
-func providerCymru(wait time.Duration) asnProvider {
-	return func(ctx context.Context, ip netip.Addr) (*subnetgenerated.AsnInfo, error) {
-		conn, err := (&net.Dialer{Timeout: 3 * time.Second}).DialContext(ctx, "tcp", "whois.cymru.com:43")
-		if err != nil {
-			return nil, err
-		}
-		defer conn.Close()
-
-		io.WriteString(conn, "begin\nverbose\n"+ip.String()+"\nend\n")
-		r := bufio.NewReader(conn)
-		r.ReadString('\n') // header
-		line, _ := r.ReadString('\n')
-		f := strings.Split(line, "|")
-		if len(f) < 8 {
-			return nil, errors.New("cymru: unexpected response")
-		}
-		asn, _ := strconv.Atoi(strings.TrimSpace(f[0]))
-		country := strings.TrimSpace(f[3])
-		org := strings.TrimSpace(f[7])
-
-		time.Sleep(wait)
-		return &subnetgenerated.AsnInfo{
-			Number:  asn,
-			Org:     strPtr(org),
-			Country: strPtr(country),
-			Source:  "cymru",
-		}, nil
-	}
-}
-
 /* ──────────────────── OWNERSHIP (RDAP → WHOIS) ────────────────────────── */
 
 // lookupOwnershipCached wraps the ownership lookup with caching and singleflight.
 func lookupOwnershipCached(ctx context.Context, ip netip.Addr, sCtx *scannerContext) (*subnetgenerated.WhoisData, error) {
-	// Key cache by /24 prefix
-	// We assume IPv4 based on initial Scan checks.
-	netPrefix := netip.PrefixFrom(ip, 24) // Create prefix, implicitly masks
+	// Define a sentinel for negative caching
+	var rdapNegative = &subnetgenerated.WhoisData{}
+
+	// Pack the /24 network into a uint32 key (host bits zeroed)
+	network24Key := func(ip netip.Addr) uint32 {
+		b := ip.As4() // 4-byte IPv4
+		return uint32(b[0])<<24 |
+			uint32(b[1])<<16 |
+			uint32(b[2])<<8 // host byte = 0
+	}
+
+	k := network24Key(ip)
 
 	// Check cache first
-	if data, ok := sCtx.rdapCache.Get(netPrefix); ok {
+	if data, ok := sCtx.rdapCache.Get(k); ok {
 		return data, nil
 	}
 
-	// Use singleflight with string keys
-	v, err, _ := sCtx.rdapGroup.Do(netPrefix.String(), func() (any, error) { // Use netPrefix.String() as key
+	// Use singleflight with uint32 keys
+	v, err, _ := sCtx.rdapGroup.Do(fmt.Sprintf("rdap-%d", k), func() (any, error) { // Key needs to be string for singleflight
+		sCtx.metrics.opStatsRDAP.IncCalls() // Increment calls
+
 		// Note: The context passed to fetchOwnership uses the overall scanOne timeout.
 		data, fetchErr := fetchOwnership(ctx, ip)
-		if fetchErr == nil && data != nil {
-			// Add to cache on success
-			sCtx.rdapCache.Add(netPrefix, data)
+
+		// Use the pre-defined sentinel for negative caching
+		// var rdapNegative = &subnetgenerated.WhoisData{} // No longer needed here
+
+		if fetchErr != nil {
+			// Cache the failure for 1 minute to back off
+			sCtx.rdapCache.SetWithTTL(k, rdapNegative, 1, time.Minute)
+
+			// Track failure/timeout (original logic moved here)
+			sCtx.metrics.opStatsRDAP.IncFailed()
+			// RDAP/WHOIS clients might not wrap context errors nicely.
+			// Check the main context passed to fetchOwnership as a proxy for timeout.
+			if ctx.Err() == context.DeadlineExceeded {
+				sCtx.metrics.opStatsRDAP.IncTimeouts()
+			}
+			// Return the error to singleflight
+			return nil, fetchErr
 		}
-		// Return result and fetch error
-		return data, fetchErr
+
+		// Add to cache on success
+		if data != nil {
+			// Cost is 1, TTL comes from config.
+			sCtx.rdapCache.SetWithTTL(k, data, 1, sCtx.cfg.CacheTTL)
+		} else {
+			// If fetchOwnership succeeded but returned nil data (shouldn't happen often?),
+			// cache the negative sentinel as well to avoid re-fetching immediately.
+			negTTL := 10 * time.Second
+			sCtx.rdapCache.SetWithTTL(k, rdapNegative, 1, negTTL)
+		}
+
+		// Track success (only if fetchErr is nil)
+		sCtx.metrics.opStatsRDAP.IncSucceeded()
+
+		// Return result and nil fetch error
+		return data, nil
 	})
 
 	// Handle error returned by singleflight.Do
 	if err != nil {
+		// Don't return the negative cache sentinel on error
 		return nil, fmt.Errorf("ownership lookup failed for %s: %w", ip, err)
 	}
-	// Type assertion is safe here.
-	return v.(*subnetgenerated.WhoisData), nil
+
+	// Check if the result is the negative cache sentinel
+	resultData := v.(*subnetgenerated.WhoisData)
+	if resultData == rdapNegative { // Compare pointers
+		// It was a cached failure, return nil data and no error
+		return nil, nil
+	}
+
+	// Type assertion is safe here, return the actual data.
+	return resultData, nil
 }
 
 // fetchOwnership performs the actual RDAP/WHOIS lookup.
@@ -562,4 +772,18 @@ func strPtr(s string) *string {
 		return nil
 	}
 	return &s
+}
+
+// Add a helper function to convert uint64 to *int
+func uint64PtrToIntPtr(val uint64) *int {
+	if val == 0 {
+		return nil
+	}
+	intVal := int(val)
+	// Add check for potential overflow although unlikely for these metrics
+	if uint64(intVal) != val {
+		// Handle overflow case if necessary, e.g., return max int or log warning
+		// For simplicity here, we'll proceed, but be aware.
+	}
+	return &intVal
 }
