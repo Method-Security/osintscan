@@ -13,26 +13,26 @@ types:
       ptr_records: list<string>
       asn: optional<ASNInfo>
       ownership: optional<WhoisData>
-      hostnames: optional<list<string>>
-      tls_cert_cn: optional<string>
-      tls_san: optional<list<string>>
-      http_title: optional<string>
-      abuse_email: optional<string>
-      netblock_range: optional<string>
-      first_seen: optional<datetime>
-      service_banner: optional<string>
-      lookup_time_ms: optional<integer>
+      hostnames: optional<list<string>> # to do: extended mode
+      tls_cert_cn: optional<string> # to do: extended mode
+      tls_san: optional<list<string>> # to do: extended mode
+      http_title: optional<string> # to do: extended mode
+      abuse_email: optional<string> # to do: extended mode
+      netblock_range: optional<string> # to do: extended mode
+      first_seen: optional<datetime> # to do: extended mode
+      service_banner: optional<string> # to do: extended mode
+      lookup_time_ms: optional<integer> # to do: extended mode
       errors: list<string>
 
   ASNInfo:
     properties:
       number:          integer                 
       org:             optional<string>       
-      country:         optional<string>       
-      name:            optional<string>         
-      prefix:          optional<string>        
-      registry:        optional<string>        
-      source:          string                 
+      country:         optional<string>       # this is variable based on the asn source used
+      name:            optional<string>       # this is variable based on the asn source used
+      prefix:          optional<string>       # this is variable based on the asn source used
+      registry:        optional<string>       # this is variable based on the asn source used
+      source:          string                 # this is variable based on the asn source used
 
   WhoisData:
     properties:
@@ -53,8 +53,6 @@ types:
       finished_at:    optional<datetime>
       runtime_ms:     optional<integer>       # finished - started
       ip_total:       optional<integer>
-      ip_success:     optional<integer>
-      ip_failed:      optional<integer>
       avg_ip_ms:      optional<integer>
       cache:          optional<CacheStats>
       ptr:            optional<OpStats>
@@ -65,7 +63,7 @@ types:
     properties:
       rdap_hits:      optional<integer>
       rdap_misses:    optional<integer>
-      rdap_evictions: optional<integer>
+      rdap_evictions: optional<integer> # currently not used
 
   OpStats:           # one instance for PTR, ASN, RDAP
     properties:

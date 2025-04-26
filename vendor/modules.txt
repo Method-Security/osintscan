@@ -209,8 +209,6 @@ github.com/gorilla/css/scanner
 # github.com/hako/durafmt v0.0.0-20210316092057-3a2c319c1acd
 ## explicit; go 1.11
 github.com/hako/durafmt
-# github.com/hashicorp/golang-lru/v2 v2.0.6
-## explicit; go 1.18
 # github.com/inconshreveable/mousetrap v1.1.0
 ## explicit; go 1.18
 github.com/inconshreveable/mousetrap
@@ -237,6 +235,10 @@ github.com/klauspost/pgzip
 github.com/lib/pq
 github.com/lib/pq/oid
 github.com/lib/pq/scram
+# github.com/libp2p/go-cidranger v1.1.0
+## explicit; go 1.14
+github.com/libp2p/go-cidranger
+github.com/libp2p/go-cidranger/net
 # github.com/likexian/gokit v0.25.15
 ## explicit; go 1.21
 github.com/likexian/gokit/assert

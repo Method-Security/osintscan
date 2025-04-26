@@ -408,8 +408,6 @@ type RunMetrics struct {
 	FinishedAt *time.Time  `json:"finished_at,omitempty" url:"finished_at,omitempty"`
 	RuntimeMs  *int        `json:"runtime_ms,omitempty" url:"runtime_ms,omitempty"`
 	IpTotal    *int        `json:"ip_total,omitempty" url:"ip_total,omitempty"`
-	IpSuccess  *int        `json:"ip_success,omitempty" url:"ip_success,omitempty"`
-	IpFailed   *int        `json:"ip_failed,omitempty" url:"ip_failed,omitempty"`
 	AvgIpMs    *int        `json:"avg_ip_ms,omitempty" url:"avg_ip_ms,omitempty"`
 	Cache      *CacheStats `json:"cache,omitempty" url:"cache,omitempty"`
 	Ptr        *OpStats    `json:"ptr,omitempty" url:"ptr,omitempty"`
@@ -446,20 +444,6 @@ func (r *RunMetrics) GetIpTotal() *int {
 		return nil
 	}
 	return r.IpTotal
-}
-
-func (r *RunMetrics) GetIpSuccess() *int {
-	if r == nil {
-		return nil
-	}
-	return r.IpSuccess
-}
-
-func (r *RunMetrics) GetIpFailed() *int {
-	if r == nil {
-		return nil
-	}
-	return r.IpFailed
 }
 
 func (r *RunMetrics) GetAvgIpMs() *int {

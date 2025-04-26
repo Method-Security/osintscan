@@ -6,8 +6,9 @@ toolchain go1.24.2
 
 require (
 	github.com/Method-Security/pkg v0.0.6
+	github.com/dgraph-io/ristretto/v2 v2.2.0
 	github.com/google/uuid v1.3.1
-	github.com/hashicorp/golang-lru/v2 v2.0.6
+	github.com/libp2p/go-cidranger v1.1.0
 	github.com/likexian/whois v1.15.6
 	github.com/likexian/whois-parser v1.24.20
 	github.com/miekg/dns v1.1.65
@@ -26,7 +27,6 @@ require (
 	github.com/alecthomas/kingpin/v2 v2.3.2 // indirect
 	github.com/alecthomas/units v0.0.0-20211218093645-b94a6e3cc137 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/dgraph-io/ristretto/v2 v2.2.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/likexian/gokit v0.25.15 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
