@@ -1,7 +1,6 @@
 package passive
 
 import (
-	"fmt"
 	"strings"
 
 	"golang.org/x/exp/maps"
@@ -30,11 +29,11 @@ import (
 	"github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/fullhunt"
 	"github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/github"
 	"github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/hackertarget"
+	"github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/hudsonrock"
 	"github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/hunter"
 	"github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/intelx"
 	"github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/leakix"
 	"github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/netlas"
-	"github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/passivetotal"
 	"github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/quake"
 	"github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/rapiddns"
 	"github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/redhuntlabs"
@@ -43,10 +42,12 @@ import (
 	"github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/shodan"
 	"github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/sitedossier"
 	"github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/threatbook"
+	"github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/threatcrowd"
 	"github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/virustotal"
 	"github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/waybackarchive"
 	"github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/whoisxmlapi"
 	"github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/zoomeyeapi"
+	"github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/digitalyama"
 	mapsutil "github.com/projectdiscovery/utils/maps"
 )
 
@@ -75,7 +76,6 @@ var AllSources = [...]subscraping.Source{
 	&intelx.Source{},
 	&netlas.Source{},
 	&leakix.Source{},
-	&passivetotal.Source{},
 	&quake.Source{},
 	&rapiddns.Source{},
 	&redhuntlabs.Source{},
@@ -85,6 +85,7 @@ var AllSources = [...]subscraping.Source{
 	&shodan.Source{},
 	&sitedossier.Source{},
 	&threatbook.Source{},
+	&threatcrowd.Source{},
 	&virustotal.Source{},
 	&waybackarchive.Source{},
 	&whoisxmlapi.Source{},
@@ -93,12 +94,12 @@ var AllSources = [...]subscraping.Source{
 	// &threatminer.Source{}, // failing  api
 	// &reconcloud.Source{}, // failing due to cloudflare bot protection
 	&builtwith.Source{},
+	&hudsonrock.Source{},
+	&digitalyama.Source{},
 }
 
 var sourceWarnings = mapsutil.NewSyncLockMap[string, string](
-	mapsutil.WithMap(mapsutil.Map[string, string]{
-		"passivetotal": "New API credentials for PassiveTotal can't be generated, but existing user account credentials are still functional. Please ensure your integrations are using valid credentials.",
-	}))
+	mapsutil.WithMap(mapsutil.Map[string, string]{}))
 
 var NameSourceMap = make(map[string]subscraping.Source, len(AllSources))
 
@@ -125,7 +126,7 @@ func New(sourceNames, excludedSourceNames []string, useAllSources, useSourcesSup
 		if len(sourceNames) > 0 {
 			for _, source := range sourceNames {
 				if NameSourceMap[source] == nil {
-					gologger.Fatal().Msgf("There is no source with the name: %s", source)
+					gologger.Warning().Msgf("There is no source with the name: %s", source)
 				} else {
 					sources[source] = NameSourceMap[source]
 				}
@@ -153,7 +154,11 @@ func New(sourceNames, excludedSourceNames []string, useAllSources, useSourcesSup
 		}
 	}
 
-	gologger.Debug().Msgf(fmt.Sprintf("Selected source(s) for this search: %s", strings.Join(maps.Keys(sources), ", ")))
+	if len(sources) == 0 {
+		gologger.Fatal().Msg("No sources selected for this search")
+	}
+
+	gologger.Debug().Msgf("Selected source(s) for this search: %s", strings.Join(maps.Keys(sources), ", "))
 
 	for _, currentSource := range sources {
 		if warning, ok := sourceWarnings.Get(strings.ToLower(currentSource.Name())); ok {

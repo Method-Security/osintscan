@@ -1,6 +1,7 @@
 package goflags
 
 import (
+	"bufio"
 	"bytes"
 	"flag"
 	"fmt"
@@ -14,6 +15,7 @@ import (
 	"time"
 
 	"github.com/cnf/structhash"
+	"github.com/google/shlex"
 	fileutil "github.com/projectdiscovery/utils/file"
 	folderutil "github.com/projectdiscovery/utils/folder"
 	permissionutil "github.com/projectdiscovery/utils/permission"
@@ -106,10 +108,14 @@ func (flagSet *FlagSet) MergeConfigFile(file string) error {
 }
 
 // Parse parses the flags provided to the library.
-func (flagSet *FlagSet) Parse() error {
+func (flagSet *FlagSet) Parse(args ...string) error {
 	flagSet.CommandLine.SetOutput(os.Stdout)
 	flagSet.CommandLine.Usage = flagSet.usageFunc
-	_ = flagSet.CommandLine.Parse(os.Args[1:])
+	toParse := os.Args[1:]
+	if len(args) > 0 {
+		toParse = args
+	}
+	_ = flagSet.CommandLine.Parse(toParse)
 	configFilePath, _ := flagSet.GetConfigFilePath()
 
 	// migrate data from old config dir to new one
@@ -217,6 +223,14 @@ func (flagSet *FlagSet) CreateGroup(groupName, description string, flags ...*Fla
 //
 // Command line flags however always take precedence over config file ones.
 func (flagSet *FlagSet) readConfigFile(filePath string) error {
+	if empty, err := fileutil.IsEmpty(filePath); err == nil && empty {
+		return nil
+	}
+
+	if isCommentOnly(filePath) {
+		return nil
+	}
+
 	file, err := os.Open(filePath)
 	if err != nil {
 		return err
@@ -280,6 +294,24 @@ func (flagSet *FlagSet) readConfigFile(filePath string) error {
 		}
 	})
 	return nil
+}
+
+// TODO: move to fileutil
+func isCommentOnly(filePath string) bool {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return false
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if line != "" && !strings.HasPrefix(line, "#") {
+			return false
+		}
+	}
+	return true
 }
 
 // VarP adds a Var flag with a shortname and longname
@@ -692,7 +724,7 @@ func (flagSet *FlagSet) displayGroupUsageFunc(uniqueDeduper *uniqueDeduper, grou
 }
 
 // displaySingleFlagUsageFunc displays usage for a single flag
-func (flagSet *FlagSet) displaySingleFlagUsageFunc(name string, data *FlagData, cliOutput io.Writer, writer *tabwriter.Writer) {
+func (flagSet *FlagSet) displaySingleFlagUsageFunc(name string, data *FlagData, _ io.Writer, writer *tabwriter.Writer) {
 	if currentFlag := flagSet.CommandLine.Lookup(name); currentFlag != nil {
 		result := createUsageString(data, currentFlag)
 		fmt.Fprint(writer, result, "\n")
@@ -811,4 +843,11 @@ func isZeroValue(f *flag.Flag, value string) bool {
 // normalizeGroupDescription returns normalized description field for group
 func normalizeGroupDescription(description string) string {
 	return strings.ToUpper(description)
+}
+
+// GetArgsFromString allows splitting a string into arguments
+// following the same rules as the shell.
+func GetArgsFromString(str string) []string {
+	args, _ := shlex.Split(str)
+	return args
 }

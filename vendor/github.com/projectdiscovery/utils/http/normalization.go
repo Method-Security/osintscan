@@ -2,14 +2,15 @@ package httputil
 
 import (
 	"bytes"
-	"compress/gzip"
-	"compress/zlib"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
 
-	"github.com/andybalholm/brotli"
+	"github.com/dsnet/compress/brotli"
+	"github.com/klauspost/compress/gzip"
+	"github.com/klauspost/compress/zlib"
+	"github.com/klauspost/compress/zstd"
 	"github.com/pkg/errors"
 	"golang.org/x/text/encoding/simplifiedchinese"
 	"golang.org/x/text/transform"
@@ -38,8 +39,10 @@ func readNNormalizeRespBody(rc *ResponseChain, body *bytes.Buffer) (err error) {
 	if err != nil {
 		wrapped = origBody
 	}
+	limitReader := io.LimitReader(wrapped, 2*MaxBodyRead)
+
 	// read response body to buffer
-	_, err = body.ReadFrom(wrapped)
+	_, err = body.ReadFrom(limitReader)
 	if err != nil {
 		if strings.Contains(err.Error(), "gzip: invalid header") {
 			// its invalid gzip but we will still use it from original body
@@ -70,7 +73,14 @@ func wrapDecodeReader(resp *http.Response) (rc io.ReadCloser, err error) {
 	case "deflate":
 		rc, err = zlib.NewReader(resp.Body)
 	case "br":
-		rc = io.NopCloser(brotli.NewReader(resp.Body))
+		rc, err = brotli.NewReader(resp.Body, nil)
+	case "zstd":
+		var zstdReader *zstd.Decoder
+		zstdReader, err = zstd.NewReader(resp.Body)
+		if err != nil {
+			return nil, err
+		}
+		rc = io.NopCloser(zstdReader)
 	default:
 		rc = resp.Body
 	}
