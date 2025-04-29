@@ -56,12 +56,17 @@ func createHTTPClient(verifyTLS bool, timeout int) *http.Client {
 func isVulnerable(cname string, body *string, returnsNXDomain bool, fp dnsfern.DnsTakeoverFingerprint) bool {
 	if fp.Fingerprint != "" {
 		// Return false if there is a CNAME defined in the fingerprint and the CNAME does not match
+		cnameMatch := false
 		if len(fp.Cname) > 0 {
 			for _, fingerprintCname := range fp.Cname {
-				if !strings.Contains(cname, fingerprintCname) {
-					return false
+				if strings.Contains(cname, fingerprintCname) {
+					cnameMatch = true
 				}
 			}
+		}
+
+		if !cnameMatch {
+			return false
 		}
 
 		// Check if the fingerprint is for NXDOMAIN
