@@ -121,6 +121,26 @@
     },
     {
       "cicd_pass": false,
+      "cname": ["github.io", "github.com"],
+      "discussion": "Method.Security",
+      "documentation": "",
+      "fingerprint": "There isn't a GitHub Pages site here",
+      "http_status": null,
+      "nxdomain": false,
+      "service": "Github Pages"
+    },
+    {
+      "cicd_pass": false,
+      "cname": ["github.io", "github.com"],
+      "discussion": "Method.Security",
+      "documentation": "",
+      "fingerprint": "This is not the web page you are looking for",
+      "http_status": null,
+      "nxdomain": false,
+      "service": "Github"
+    },
+    {
+      "cicd_pass": false,
       "cname": ["ghost.io"],
       "discussion": "[Issue #89](https://github.com/EdOverflow/can-i-take-over-xyz/issues/89)",
       "documentation": "",
