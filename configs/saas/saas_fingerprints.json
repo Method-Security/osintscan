@@ -1,10 +1,100 @@
 {
     "fingerprints": {
+        "grafana": {
+            "fingerprintProfile": {
+                "headers": {
+                    "Server": [
+                        "Grafana"
+                    ],
+                    "X-Grafana-Org-Id": [],
+                    "Set-Cookie": [
+                        "grafana_session"
+                    ]
+                },
+                "body": [
+                    "grafana-app",
+                    "window.grafanaBootData",
+                    "Welcome to Grafana",
+                    "grafanaVersion",
+                    "grafana_session",
+                    "Grafana Labs"
+                ],
+                "pageNotFound": [
+                    "Not found"
+                ]
+            },
+            "domainSlugs": [
+                "grafana.INPUT_ORG.com",
+                "monitoring.INPUT_ORG.com",
+                "dashboards.INPUT_ORG.internal",
+                "INPUT_ORG.grafana.net",
+                "INPUT_ORG.monitoring.local"
+            ]
+        },
+        "jenkins": {
+            "fingerprintProfile": {
+                "headers": {
+                    "X-Jenkins": [],
+                    "X-Jenkins-Session": [],
+                    "Set-Cookie": [
+                        "JSESSIONID"
+                    ]
+                },
+                "body": [
+                    "Dashboard [Jenkins]",
+                    "jenkins.model",
+                    "window.jenkins",
+                    "Jenkins.instance"
+                ],
+                "pageNotFound": [
+                    "Error 404 Not Found",
+                    "Oops - Page Not Found",
+                    "Jenkins - Error"
+                ]
+            },
+            "domainSlugs": [
+                "jenkins.INPUT_ORG.com",
+                "build.INPUT_ORG.com",
+                "ci.INPUT_ORG.com",
+                "INPUT_ORG.jenkins.io",
+                "jenkins.INPUT_ORG.internal"
+            ]
+        },
+        "jira": {
+            "fingerprintProfile": {
+                "headers": {
+                    "Server": [
+                        "AtlassianProxy"
+                    ],
+                    "X-AREQUESTID": [],
+                    "X-ASESSIONID": []
+                },
+                "body": [
+                    "jira.atlassian.com",
+                    "atlToken",
+                    "jiraApp",
+                    "jira-view-issue",
+                    "jira.issue"
+                ],
+                "pageNotFound": [
+                    "Issue Does Not Exist",
+                    "You can't view this issue",
+                    "Page Not Found"
+                ]
+            },
+            "domainSlugs": [
+                "jira.INPUT_ORG.atlassian.net",
+                "issues.INPUT_ORG.atlassian.net"
+            ]
+        },
         "salesforce": {
             "fingerprintProfile": {
                 "headers": {
                     "Salesforce-Proxy-Response": [],
-                    "Server": ["Salesforce.com", "sfdcedge"],
+                    "Server": [
+                        "Salesforce.com",
+                        "sfdcedge"
+                    ],
                     "X-Sfdc-Request-Id": [],
                     "x-Sfdc-Edge-Cache": [],
                     "X-Sfdc-Login-Request": [],
@@ -39,7 +129,9 @@
             "fingerprintProfile": {
                 "headers": {
                     "X-Servicenow-Request-Id": [],
-                    "Server": ["ServiceNow"]
+                    "Server": [
+                        "ServiceNow"
+                    ]
                 },
                 "body": [
                     "glide.domain",
@@ -73,7 +165,9 @@
                 "headers": {
                     "X-Snowflake-Authorization-Token-Type": [],
                     "X-Snowflake-Organization-Id": [],
-                    "Server": ["Snowflake"]
+                    "Server": [
+                        "Snowflake"
+                    ]
                 },
                 "body": [
                     "Welcome to Snowflake",
@@ -165,6 +259,32 @@
                 "wd3-impl.myworkday.com/INPUT_ORG",
                 "impl.workday.com/INPUT_ORG",
                 "wd3.services.workday.com/ccx/service/custom/INPUT_ORG"
+            ]
+        },
+        "zendesk": {
+            "fingerprintProfile": {
+                "headers": {
+                    "X-Zendesk-Request-Id": [],
+                    "X-Zendesk-Origin-Server": [],
+                    "Server": [
+                        "nginx",
+                        "Zendesk"
+                    ]
+                },
+                "body": [
+                    "zendesk.com",
+                    "zE('webWidget'",
+                    "zendeskHost"
+                ],
+                "pageNotFound": [
+                    "Oops, this help center no longer exists",
+                    "Page Not Found"
+                ]
+            },
+            "domainSlugs": [
+                "support.INPUT_ORG.zendesk.com",
+                "help.INPUT_ORG.zendesk.com",
+                "INPUT_ORG.zendesk.com"
             ]
         }
     }
