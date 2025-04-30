@@ -267,7 +267,6 @@
                     "X-Zendesk-Request-Id": [],
                     "X-Zendesk-Origin-Server": [],
                     "Server": [
-                        "nginx",
                         "Zendesk"
                     ]
                 },
