@@ -1,9 +1,7 @@
 name: 📙 Test docs
 on:
-  pull_request:
-    paths:
-      - "docs/**"
-      - "mkdocs.yml"
+  workflow_call:
+
 jobs:
   build-documents:
     name: Test Documentation Build
@@ -15,6 +13,7 @@ jobs:
         uses: actions/checkout@v4.1.6
         with:
           fetch-depth: 0
+
       - name: Configure Git Credentials
         run: |
           git config user.name github-actions[bot]
@@ -29,9 +28,11 @@ jobs:
           path: .cache
           restore-keys: |
             mkdocs-material-
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip setuptools wheel
           pip install -r docs/build/requirements.txt
+          
       - name: Test Build
         run: mkdocs build --verbose --strict

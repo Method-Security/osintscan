@@ -1,13 +1,15 @@
-name: 🔨 Build Test
+name: 🔨 Test Build
+
 on:
-  pull_request:
-  push:
-    branches:
-      - develop
+  workflow_call:
+
+concurrency:
+  group: ${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
-    name: Test Build
+    name: 🔨 Reusable Go Build
     uses: ./.github/workflows/reusable-build.yml
     with:
       goreleaser_config: goreleaser.yml

@@ -1,0 +1,67 @@
+name: 🔍 PR Review
+
+on:
+  pull_request:
+    paths:
+      - "**.*"
+  push:
+    branches:
+      - develop
+
+permissions:
+  id-token: write 
+  packages: write 
+  contents: write 
+  security-events: write
+  actions: read
+
+jobs:
+  code-gen:
+    name: 🔄 Generate Fern Code
+    uses: ./.github/workflows/code-gen.yml
+    secrets: inherit
+
+  codeql:
+    name: 🚨 CodeQL Analysis
+    uses: ./.github/workflows/codeql.yml
+    secrets: inherit
+
+  test-build:
+    name: 🔨 Test Build
+    uses: ./.github/workflows/test-build.yml
+    needs: code-gen
+    secrets: inherit
+
+  test-docs:
+    name: 📙 Test docs
+    uses: ./.github/workflows/test-docs.yml
+    secrets: inherit
+
+  test-publish:
+    name: 🎉 Test Publish
+    uses: ./.github/workflows/test-publish.yml
+    secrets: inherit
+
+  verify:
+    name: 🙏🏻 Verify
+    uses: ./.github/workflows/verify.yml
+    needs: code-gen
+    secrets: inherit
+
+  check:
+    name: ✅ Check
+    if: always()
+    needs:
+      - codeql
+      - test-build
+      - test-docs
+      - test-publish
+      - verify
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Require all jobs to succeed
+        uses: re-actors/alls-green@release/v1
+        with:
+          jobs: ${{ toJSON(needs) }}

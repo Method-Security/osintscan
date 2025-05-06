@@ -1,9 +1,7 @@
 name: 🎉 Release
 
 on:
-  push:
-    tags:
-      - "*"
+  workflow_call:
 
 jobs:
   release:
@@ -17,21 +15,26 @@ jobs:
       id-token: write # For cosign
       packages: write # For GHCR
       contents: write # To upload archives as release assets
+
   publish:
     name: Publish PyPi
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+
       - name: Setup Node
         uses: actions/setup-node@v4
+
       - name: Install Fern
         run: npm install -g fern-api
+
       - name: Generate Fern
-        run: fern generate --group pypi --version ${{  github.ref_name }}
+        run: fern generate --group pypi --version ${{ github.ref_name }}
         env:
           FERN_TOKEN: ${{ secrets.FERN_TOKEN }}
           PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
+          
     permissions:
       id-token: write # For cosign
       packages: write # For GHCR
