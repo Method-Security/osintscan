@@ -5,9 +5,6 @@ version: 2
 
 project_name: osintscan
 
-partial:
-  by: target
-
 builds:
   - id: build-linux
     main: .

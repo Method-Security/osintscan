@@ -1,0 +1,32 @@
+name: 🎉 Publish
+
+on:
+  push:
+    tags:
+      - "*" # Trigger on all tags
+
+permissions:
+  id-token: write 
+  packages: write 
+  contents: write 
+  security-events: write
+  actions: read
+
+jobs:
+  release:
+    name: 🎉 Release
+    uses: ./.github/workflows/release.yml
+    secrets: inherit
+
+  publish:
+    name: 🎉 Publish
+    if: always()
+    needs: release
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Require all jobs to succeed
+        uses: re-actors/alls-green@release/v1
+        with:
+          jobs: ${{ toJSON(needs) }}

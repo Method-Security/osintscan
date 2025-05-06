@@ -1,0 +1,33 @@
+name: 🔄 Generate Fern Code
+
+on:
+  workflow_call:
+
+permissions:
+  contents: write
+
+jobs:
+  generate_fern_go:
+    name: Generate Fern Code (Go)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4.1.6
+        with:
+          fetch-depth: 0
+
+      - name: Install Fern CLI
+        run: npm install -g fern-api
+
+      - name: Generate Fern Go Code
+        run: fern generate --group local
+        env:
+          FERN_TOKEN: ${{ secrets.FERN_TOKEN }}
+
+      - name: Upload Fern Generated Code
+        uses: actions/upload-artifact@v4
+        with:
+          name: fern-generated-code
+          path: generated/
+          retention-days: 3

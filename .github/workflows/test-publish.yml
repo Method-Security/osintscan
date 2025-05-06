@@ -1,21 +1,27 @@
-name: 🔨 Publish Test
+name: 🎉 Publish Test
+
 on:
-  push:
-    branches:
-      - develop
+  workflow_call:
+
+permissions:
+  contents: write
 
 jobs:
   test_fern_publish:
     name: Test Fern Python Publish
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-      - name: Setup Node
+
+      - name: Set up Node.js
         uses: actions/setup-node@v4
-      - name: Install Fern
+
+      - name: Install Fern CLI
         run: npm install -g fern-api
-      - name: Generate Fern
+
+      - name: Generate Fern to Test PyPI
         run: fern generate --group pypi-test
         env:
           FERN_TOKEN: ${{ secrets.FERN_TOKEN }}

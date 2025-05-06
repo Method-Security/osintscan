@@ -31,8 +31,8 @@ go.work.sum
 .env/
 !.env/example.env
 
-# Fern Python
-generated/python/**
+# Fern 
+generated/*
 
 # mkdocs
 /site
