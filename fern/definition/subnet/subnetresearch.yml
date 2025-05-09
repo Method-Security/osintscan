@@ -1,0 +1,27 @@
+types:
+  SubnetResearchOutput:
+    properties:
+      subnet: string
+      hosts: list<IPInfo>
+
+  IPInfo:
+    properties:
+      ip: string
+      ptr: optional<string>
+      asn: optional<ASNInfo>
+      whois: optional<WhoisInfo>
+
+  ASNInfo:
+    properties:
+      number: integer
+      name: string
+
+  WhoisInfo:
+    properties:
+      organization: optional<string>
+      handle: optional<string>
+      country: optional<string>
+      range: optional<string>
+      registrationDate: optional<datetime>
+      contactEmail: optional<string>
+

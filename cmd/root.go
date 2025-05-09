@@ -29,6 +29,7 @@ type OsintScan struct {
 	DNSCmd       *cobra.Command
 	SaasCmd      *cobra.Command
 	ShodanCmd    *cobra.Command
+	SubnetCmd    *cobra.Command
 }
 
 // NewOsintScan creates a new OsintScan struct with the given version. It initializes the root command and all subcommands

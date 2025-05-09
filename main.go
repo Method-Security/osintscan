@@ -17,6 +17,7 @@ func main() {
 	osintscan.InitDNSCommand()
 	osintscan.InitShodanCommand()
 	osintscan.InitSaasCommand()
+	osintscan.InitSubnetCommand()
 
 	if err := osintscan.RootCmd.Execute(); err != nil {
 		os.Exit(1)

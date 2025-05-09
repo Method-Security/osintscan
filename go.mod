@@ -8,6 +8,7 @@ require (
 	github.com/Method-Security/pkg v0.0.6
 	github.com/google/uuid v1.3.1
 	github.com/miekg/dns v1.1.65
+	github.com/openrdap/rdap v0.9.1
 	github.com/palantir/pkg/datetime v1.1.0
 	github.com/palantir/witchcraft-go-logging v1.57.0
 	github.com/projectdiscovery/dnsx v1.2.1
@@ -17,6 +18,10 @@ require (
 )
 
 require (
+	github.com/alecthomas/kingpin/v2 v2.3.2 // indirect
+	github.com/alecthomas/units v0.0.0-20211218093645-b94a6e3cc137 // indirect
+	github.com/mitchellh/go-homedir v1.1.0 // indirect
+	github.com/xhit/go-str2duration/v2 v2.1.0 // indirect
 	github.com/ysmood/fetchup v0.2.3 // indirect
 	github.com/ysmood/goob v0.4.0 // indirect
 	github.com/ysmood/got v0.40.0 // indirect
