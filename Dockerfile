@@ -10,18 +10,14 @@ RUN \
   mkdir -p /opt/method/${CLI_NAME}/ && \
   mkdir -p /opt/method/${CLI_NAME}/var/data && \
   mkdir -p /opt/method/${CLI_NAME}/var/data/tmp && \
-  mkdir -p /opt/method/${CLI_NAME}/var/conf && \
-  mkdir -p /opt/method/${CLI_NAME}/var/conf/dns && \
-  mkdir -p /opt/method/${CLI_NAME}/var/conf/dns/subenum && \
-  mkdir -p /opt/method/${CLI_NAME}/var/conf/dns/takeover && \
-  mkdir -p /opt/method/${CLI_NAME}/var/conf/saas && \
+  mkdir -p /opt/method/${CLI_NAME}/var/conf/discover/dns/subdomain && \
+  mkdir -p /opt/method/${CLI_NAME}/var/conf/pentest/dns/takeover && \
   mkdir -p /opt/method/${CLI_NAME}/var/log && \
   mkdir -p /opt/method/${CLI_NAME}/service/bin && \
   mkdir -p /mnt/output
   
-COPY configs/dns/subenum/*                   /opt/method/${CLI_NAME}/var/conf/dns/subenum/
-COPY configs/dns/takeover/*                  /opt/method/${CLI_NAME}/var/conf/dns/takeover/
-COPY configs/saas/*                          /opt/method/${CLI_NAME}/var/conf/saas/
+COPY configs/discover/dns/subdomain/*                   /opt/method/${CLI_NAME}/var/conf/discover/dns/subdomain/
+COPY configs/pentest/dns/takeover/*                  /opt/method/${CLI_NAME}/var/conf/pentest/dns/takeover/
 COPY ${CLI_NAME}                             /opt/method/${CLI_NAME}/service/bin/${CLI_NAME}
 
 RUN \
