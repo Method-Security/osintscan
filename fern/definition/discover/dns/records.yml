@@ -13,7 +13,7 @@ types:
       txt: optional<list<DnsRecord>>
       ns: optional<list<DnsRecord>>
       cname: optional<list<DnsRecord>>
-  DnsRecordsReport:
+  DiscoverDnsRecordsReport:
     properties:
       domain: string
       dnsRecords: DnsRecords

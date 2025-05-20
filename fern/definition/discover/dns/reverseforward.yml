@@ -3,7 +3,7 @@ types:
     properties:
       ip: string
       dnsPtrs: optional<list<string>>
-  DnsReverseForwardReport:
+  DiscoverDnsReverseForwardReport:
     properties:
       domain: string
       lookUps: optional<list<LookUpDetails>>

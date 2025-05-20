@@ -1,5 +1,5 @@
 types:
-  DnsRecordEnum:
+  DnsRecordType:
     enum:
       - A
       - AAAA
@@ -11,14 +11,14 @@ types:
   DnsZoneTransferRecord:
     properties:
       Name: string
-      Type: DnsRecordEnum
+      Type: DnsRecordType
       Value: string
   DnsZoneTransferDetails:
     properties:
       Domain: string
       DNSRecords: optional<list<DnsZoneTransferRecord>>
       Success: optional<boolean>
-  DnsZoneTransferReport:
+  EnumerateDnsZoneTransferReport:
     properties:
       Domains: list<string>
       ZoneTransfer: optional<list<DnsZoneTransferDetails>>
