@@ -1,29 +1,29 @@
 package cmd
 
 import (
-	zonetransfer "github.com/Method-Security/osintscan/internal/dns/zonetransfer"
+	"github.com/Method-Security/osintscan/internal/enumerate/dns/zonetransfer"
 	"github.com/spf13/cobra"
 )
 
 func (a *OsintScan) InitEnumerateCommand() {
 	enumerateCmd := &cobra.Command{
 		Use:   "enumerate",
-		Short: "Enumerate information using open-source intelligence sources",
-		Long:  `Enumerate information using open-source intelligence sources`,
+		Short: "Enumerate data using open-source intelligence techniques",
+		Long:  `Enumerate information from various sources using open-source intelligence (OSINT) methods, focusing on DNS and related assets.`,
 	}
 
 	enumerateDNSCmd := &cobra.Command{
 		Use:   "dns",
-		Short: "Enumerate information about DNS services",
-		Long:  `Enumerate information about DNS services`,
+		Short: "Enumerate DNS-related information",
+		Long:  `Enumerate DNS data, including zone transfers and other DNS-based intelligence gathering techniques.`,
 	}
 
 	enumerateCmd.AddCommand(enumerateDNSCmd)
 
 	enumerateDNSZoneTransferCmd := &cobra.Command{
 		Use:   "zonetransfer",
-		Short: "Perform zone transfers for a given domain",
-		Long:  `Perform zone transfers for a given domain`,
+		Short: "Attempt DNS zone transfers (AXFR) for domains",
+		Long:  `Attempt DNS zone transfers (AXFR) for the specified domains to enumerate all DNS records, if the server allows it. This can reveal all subdomains and records managed by the DNS server.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			domains, err := cmd.Flags().GetStringSlice("domains")
 			if err != nil {
@@ -45,8 +45,8 @@ func (a *OsintScan) InitEnumerateCommand() {
 		},
 	}
 
-	enumerateDNSZoneTransferCmd.Flags().StringSlice("domains", []string{}, "Domains to perform zone transfers for")
-	enumerateDNSZoneTransferCmd.Flags().Int("timeout", 30, "Request timeout in seconds")
+	enumerateDNSZoneTransferCmd.Flags().StringSlice("domains", []string{}, "A list of domain names to attempt zone transfers on")
+	enumerateDNSZoneTransferCmd.Flags().Int("timeout", 30, "Timeout in seconds for each zone transfer request")
 	_ = enumerateDNSZoneTransferCmd.MarkFlagRequired("domains")
 	enumerateDNSCmd.AddCommand(enumerateDNSZoneTransferCmd)
 

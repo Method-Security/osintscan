@@ -4,30 +4,30 @@ import (
 	"context"
 	"slices"
 
-	dnsfern "github.com/Method-Security/osintscan/generated/go/dns"
+	dnsFern "github.com/Method-Security/osintscan/generated/go/discover/dns"
 	"github.com/miekg/dns"
 	"github.com/projectdiscovery/dnsx/libs/dnsx"
 )
 
-func getDNSRecords(domain string, questionTypes []uint16) (dnsfern.DnsRecords, error) {
+func getDNSRecords(domain string, questionTypes []uint16) (dnsFern.DnsRecords, error) {
 	options := dnsx.DefaultOptions
 	options.QuestionTypes = questionTypes
 	client, err := dnsx.New(options)
 	if err != nil {
-		return dnsfern.DnsRecords{}, err
+		return dnsFern.DnsRecords{}, err
 	}
 
-	dnsRecords := dnsfern.DnsRecords{}
+	dnsRecords := dnsFern.DnsRecords{}
 
 	results, err := client.QueryMultiple(domain)
 	if err != nil {
-		return dnsfern.DnsRecords{}, err
+		return dnsFern.DnsRecords{}, err
 	}
 
-	populateRecords := func(records []string, recordType string) []*dnsfern.DnsRecord {
-		var dnsRecordsSlice []*dnsfern.DnsRecord
+	populateRecords := func(records []string, recordType string) []*dnsFern.DnsRecord {
+		var dnsRecordsSlice []*dnsFern.DnsRecord
 		for _, record := range records {
-			dnsRecord := dnsfern.DnsRecord{
+			dnsRecord := dnsFern.DnsRecord{
 				Name:  domain,
 				Ttl:   int(results.TTL), // This assumes a common TTL for all records; adjust if needed
 				Type:  recordType,
@@ -60,9 +60,9 @@ func getDNSRecords(domain string, questionTypes []uint16) (dnsfern.DnsRecords, e
 	return dnsRecords, nil
 }
 
-// GetDomainDNSRecords queries DNS for all records for a given domain. It returns a RecordsReport struct containing
+// DiscoverDomainDNSRecords queries DNS for all records for a given domain. It returns a RecordsReport struct containing
 // all records that were and any non-fatal errors that occurred.
-func GetDomainDNSRecords(ctx context.Context, domain string) (dnsfern.DnsRecordsReport, error) {
+func DiscoverDomainDNSRecords(ctx context.Context, domain string) (*dnsFern.DiscoverDnsRecordsReport, error) {
 	errors := []string{}
 
 	// Get all the DNS records
@@ -81,7 +81,7 @@ func GetDomainDNSRecords(ctx context.Context, domain string) (dnsfern.DnsRecords
 	// The DKIM record is always in the _domainkey subdomain (RFC-6376) and therefore must be fetched separately.
 	// To complicate matters, the _domainkey subdomain itself includes a subdomain named after a selector which we
 	// don't know in advance, so we need to check each common selector that we're aware of.
-	dkimRecords := dnsfern.DnsRecords{}
+	dkimRecords := dnsFern.DnsRecords{}
 	var selectors []string = []string{"default", "selector1", "selector2", "google", "amazonses", "microsoft"}
 	for _, selector := range selectors {
 		dkimRecordForSelector, err := getDNSRecords(selector+"._domainkey."+domain, []uint16{dns.TypeTXT})
@@ -92,7 +92,7 @@ func GetDomainDNSRecords(ctx context.Context, domain string) (dnsfern.DnsRecords
 	}
 
 	// Create report and write to file
-	report := dnsfern.DnsRecordsReport{
+	report := dnsFern.DiscoverDnsRecordsReport{
 		Domain:          domain,
 		DnsRecords:      &dnsRecords,
 		DmarcDnsRecords: &dmarcRecords,
@@ -108,6 +108,5 @@ func GetDomainDNSRecords(ctx context.Context, domain string) (dnsfern.DnsRecords
 		report.DkimDomain = &dkimRecords.Txt[0].Name
 	}
 
-	return report, nil
-
+	return &report, nil
 }
