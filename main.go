@@ -14,9 +14,9 @@ func main() {
 
 	osintscan := cmd.NewOsintScan(version)
 	osintscan.InitRootCommand()
-	osintscan.InitDNSCommand()
-	osintscan.InitShodanCommand()
-	osintscan.InitSaasCommand()
+	osintscan.InitDiscoverCommand()
+	osintscan.InitEnumerateCommand()
+	osintscan.InitPentestCommand()
 
 	if err := osintscan.RootCmd.Execute(); err != nil {
 		os.Exit(1)

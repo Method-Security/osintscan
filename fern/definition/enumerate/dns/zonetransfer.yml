@@ -1,0 +1,25 @@
+types:
+  DnsRecordType:
+    enum:
+      - A
+      - AAAA
+      - CNAME
+      - MX
+      - NS
+      - SOA
+      - TXT
+  DnsZoneTransferRecord:
+    properties:
+      Name: string
+      Type: DnsRecordType
+      Value: string
+  DnsZoneTransferDetails:
+    properties:
+      Domain: string
+      DNSRecords: optional<list<DnsZoneTransferRecord>>
+      Success: optional<boolean>
+  EnumerateDnsZoneTransferReport:
+    properties:
+      Domains: list<string>
+      ZoneTransfer: optional<list<DnsZoneTransferDetails>>
+      Errors: optional<list<string>>

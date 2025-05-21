@@ -1,0 +1,11 @@
+types:
+  DiscoverDnsSubdomainType:
+    enum:
+      - BRUTE
+      - PASSIVE
+  DiscoverDnsSubdomainReport:
+    properties:
+      domain: string
+      discoveryType: DiscoverDnsSubdomainType
+      subdomains: optional<list<string>>
+      errors: optional<list<string>>
