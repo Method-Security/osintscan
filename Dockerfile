@@ -1,5 +1,3 @@
-FROM chromedp/headless-shell:129.0.6643.2 
-
 ARG CLI_NAME="osintscan"
 ARG TARGETARCH
 
