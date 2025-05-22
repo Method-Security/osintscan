@@ -1,15 +1,15 @@
 # Shodan
 
-The `osintscan shodan` family of commands leverage the [Shodan](https://www.shodan.io/) search engine to provide open source intelligence on exposed internet assets.
+The `osintscan discover shodan` family of commands leverage the [Shodan](https://www.shodan.io/) search engine to provide open source intelligence on exposed internet assets.
 
 ## Authentication
 
-All the `osintscan shodan` commands leverage the Shodan API, which needs an API key in order to authenticate. All commands read from a `SHODAN_API_KEY` environment variable or from a `--apikey` flag where you can include your Shodan API key.
+All the `osintscan discover shodan` commands leverage the Shodan API, which needs an API key in order to authenticate. All commands read from a `SHODAN_API_KEY` environment variable or from a `--apikey` flag where you can include your Shodan API key.
 
 ## Usage
 
 ```bash
-osintscan shodan [command]
+osintscan discover shodan [command]
 ```
 
 ## Commands
@@ -19,17 +19,17 @@ osintscan shodan [command]
 #### Usage
 
 ```bash
-osintscan shodan hostname --hostname example.com
+osintscan discover shodan hostname --hostname example.com
 ```
 
 #### Help Text
 
 ```bash
-$ osintscan shodan hostname -h
+$ osintscan discover shodan hostname -h
 Query Shodan for a hostname string search
 
 Usage:
-  osintscan shodan hostname [flags]
+  osintscan discover shodan hostname [flags]
 
 Flags:
       --apikey string     Shodan API Key (reads from SHODAN_API_KEY env by default)

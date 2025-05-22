@@ -31,11 +31,11 @@ For the full list of available installation options, please see the [Installatio
 #### Examples
 
 ```bash
-osintscan dns records --domain example.com
+osintscan discover dns records --domain example.com
 ```
 
 ```bash
-osintscan dns certs --domain example.com
+osintscan discover dns certs --domain example.com
 
 ### Building a Statically Compiled Container for Local Testing
 (Reference reusable-build.yaml)
@@ -50,7 +50,7 @@ osintscan dns certs --domain example.com
 
 5. Open shell: `docker run -it --rm --entrypoint /bin/bash osintscan:local`
 
-6. OR run command without shell example: `docker run osintscan:local discovery saas --org example -o json`
+6. OR run command without shell example: `docker run osintscan:local discover dns certs --domain example.com -o json`
 
 
 ### Note:

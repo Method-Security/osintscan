@@ -2,8 +2,22 @@
 
 osintscan offers a variety of techniques that allow security teams to leverage open source intelligence (OSINT) capabilities to better understand their internet facing exposure. Each of the below pages offers you an in depth look at a osintscan capability related to a unique technique.
 
-- [DNS](./dns.md)
-- [Shodan](./shodan.md)
+## Top Level Commands
+
+osintscan organizes functionality under three primary command groups and their modules:
+
+### discover
+
+- [DNS](./dns.md) – records, certificates, subdomain enumeration, reverse lookups
+- [Shodan](./shodan.md) – query the Shodan search engine
+
+### enumerate
+
+- [DNS zone transfer](./dns.md) – attempt AXFR zone transfers
+
+### pentest
+
+- [DNS takeover](./dns.md) – detect domain takeover vulnerabilities
 
 ## Top Level Flags
 

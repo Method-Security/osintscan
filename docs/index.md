@@ -28,11 +28,11 @@ For the full list of available installation options, please see the [Installatio
 #### Examples
 
 ```bash
-osintscan dns records --domain example.com
+osintscan discover dns records --domain example.com
 ```
 
 ```bash
-osintscan dns certs --domain example.com
+osintscan discover dns certs --domain example.com
 ```
 
 ## Contributing
