@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-// UnmarshalJSON customizes the time unmarshalling
+// UnmarshalJSON customizes the time unmarshalling for shodanTime.
 func (ct *shodanTime) UnmarshalJSON(b []byte) (err error) {
 	const layout = "2006-01-02T15:04:05.999999" // Custom layout matching the JSON format
 	str := string(b)
@@ -21,6 +21,8 @@ func (ct *shodanTime) UnmarshalJSON(b []byte) (err error) {
 	return
 }
 
+// queryShodanHost queries the Shodan API for hosts matching the given query string.
+// Returns a slice of Record structs or an error.
 func queryShodanHost(apiKey string, query string) ([]Record, error) {
 	url := fmt.Sprintf("https://api.shodan.io/shodan/host/search?key=%s&query=%s", apiKey, query)
 	resp, err := http.Get(url)
@@ -50,6 +52,7 @@ func queryShodanHost(apiKey string, query string) ([]Record, error) {
 	}
 
 	var records []Record
+	// Unmarshal each record in the response
 	for _, rawMessage := range shodanResponse.Matches {
 		var record Record
 		err = json.Unmarshal(rawMessage, &record)

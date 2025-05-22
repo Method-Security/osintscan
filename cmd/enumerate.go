@@ -45,8 +45,11 @@ func (a *OsintScan) InitEnumerateCommand() {
 		},
 	}
 
+	// Target Flags
 	enumerateDNSZoneTransferCmd.Flags().StringSlice("domains", []string{}, "A list of domain names to attempt zone transfers on")
+	// Config Flags
 	enumerateDNSZoneTransferCmd.Flags().Int("timeout", 30, "Timeout in seconds for each zone transfer request")
+	// Mark Required Flags
 	_ = enumerateDNSZoneTransferCmd.MarkFlagRequired("domains")
 	enumerateDNSCmd.AddCommand(enumerateDNSZoneTransferCmd)
 

@@ -9,6 +9,8 @@ import (
 	"github.com/miekg/dns"
 )
 
+// sendAXFRRequest attempts a DNS zone transfer (AXFR) from the given nameserver for the specified domain.
+// Returns the records, whether the transfer was successful, and any errors encountered.
 func sendAXFRRequest(ns, domain string, timeout int) ([]*dnsfern.DnsZoneTransferRecord, bool, []string) {
 	errors := []string{}
 	addr := fmt.Sprintf("%s:53", ns)
@@ -25,6 +27,7 @@ func sendAXFRRequest(ns, domain string, timeout int) ([]*dnsfern.DnsZoneTransfer
 	transfer := new(dns.Transfer)
 	transfer.DialTimeout = time.Duration(timeout) * time.Second
 
+	// Initiate the AXFR transfer
 	conn, err := transfer.In(msg, addr)
 	if err != nil {
 		errors = append(errors, fmt.Sprintf("failed to initiate AXFR transfer: %v", err))
@@ -34,6 +37,7 @@ func sendAXFRRequest(ns, domain string, timeout int) ([]*dnsfern.DnsZoneTransfer
 	var records []*dnsfern.DnsZoneTransferRecord
 	axfrSuccessful := false
 
+	// Read all responses from the transfer
 	for response := range conn {
 		if response.Error != nil {
 			errors = append(errors, fmt.Sprintf("error during AXFR transfer: %v", response.Error))
@@ -57,6 +61,7 @@ func sendAXFRRequest(ns, domain string, timeout int) ([]*dnsfern.DnsZoneTransfer
 	return records, false, errors
 }
 
+// convertRecord converts a DNS resource record to a DnsZoneTransferRecord, if supported.
 func convertRecord(rr dns.RR) *dnsfern.DnsZoneTransferRecord {
 	switch r := rr.(type) {
 	case *dns.A:

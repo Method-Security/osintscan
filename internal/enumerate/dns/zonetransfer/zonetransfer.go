@@ -8,7 +8,8 @@ import (
 	dnsfern "github.com/Method-Security/osintscan/generated/go/enumerate/dns"
 )
 
-// TestZoneTransfer checks if a domain is vulnerable to a DNS zone transfer attack
+// TestZoneTransfer checks if a domain is vulnerable to a DNS zone transfer attack (AXFR).
+// Returns a report containing details for each domain and any errors encountered.
 func TestZoneTransfer(ctx context.Context, domains []string, timeout int) (*dnsfern.EnumerateDnsZoneTransferReport, error) {
 	report := &dnsfern.EnumerateDnsZoneTransferReport{Domains: domains}
 	errors := []string{}
@@ -18,6 +19,7 @@ func TestZoneTransfer(ctx context.Context, domains []string, timeout int) (*dnsf
 		axfrSuccessful := false
 
 		fmt.Printf("[Debug] Retrieving NS records for %s\n", domain)
+		// Lookup NS records for the domain
 		nsRecords, err := net.LookupNS(domain)
 		if err != nil {
 			fmt.Printf("[Error] Failed to retrieve NS records for %s: %v\n", domain, err)
@@ -33,6 +35,7 @@ func TestZoneTransfer(ctx context.Context, domains []string, timeout int) (*dnsf
 				Value: ns.Host,
 			})
 			fmt.Printf("[Debug] Testing zone transfer on NS: %s\n", ns.Host)
+			// Attempt AXFR (zone transfer) on each NS
 			records, success, err := sendAXFRRequest(ns.Host, domain, timeout)
 			if len(err) > 0 {
 				errors = append(errors, err...)

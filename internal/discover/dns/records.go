@@ -9,6 +9,7 @@ import (
 	"github.com/projectdiscovery/dnsx/libs/dnsx"
 )
 
+// getDNSRecords queries DNS for the specified record types for a domain and returns a DnsRecords struct.
 func getDNSRecords(domain string, questionTypes []uint16) (dnsfern.DnsRecords, error) {
 	options := dnsx.DefaultOptions
 	options.QuestionTypes = questionTypes
@@ -19,11 +20,13 @@ func getDNSRecords(domain string, questionTypes []uint16) (dnsfern.DnsRecords, e
 
 	dnsRecords := dnsfern.DnsRecords{}
 
+	// Query all requested DNS record types
 	results, err := client.QueryMultiple(domain)
 	if err != nil {
 		return dnsfern.DnsRecords{}, err
 	}
 
+	// Helper to convert raw records to DnsRecord structs
 	populateRecords := func(records []string, recordType string) []*dnsfern.DnsRecord {
 		var dnsRecordsSlice []*dnsfern.DnsRecord
 		for _, record := range records {
@@ -38,6 +41,7 @@ func getDNSRecords(domain string, questionTypes []uint16) (dnsfern.DnsRecords, e
 		return dnsRecordsSlice
 	}
 
+	// Populate each record type if requested
 	if slices.Contains(questionTypes, dns.TypeA) {
 		dnsRecords.A = populateRecords(results.A, "A")
 	}
@@ -60,8 +64,8 @@ func getDNSRecords(domain string, questionTypes []uint16) (dnsfern.DnsRecords, e
 	return dnsRecords, nil
 }
 
-// DiscoverDomainDNSRecords queries DNS for all records for a given domain. It returns a RecordsReport struct containing
-// all records that were and any non-fatal errors that occurred.
+// DiscoverDomainDNSRecords queries DNS for all records for a given domain.
+// Returns a report containing all records and any non-fatal errors encountered.
 func DiscoverDomainDNSRecords(ctx context.Context, domain string) (*dnsfern.DiscoverDnsRecordsReport, error) {
 	errors := []string{}
 
@@ -72,15 +76,14 @@ func DiscoverDomainDNSRecords(ctx context.Context, domain string) (*dnsfern.Disc
 		errors = append(errors, err.Error())
 	}
 
-	// The DMARC record is always in the _dmarc subdomain (RFC-7489) and therefore must be fetched separately
+	// The DMARC record is always in the _dmarc subdomain (RFC-7489)
 	dmarcRecords, err := getDNSRecords("_dmarc."+domain, []uint16{dns.TypeTXT})
 	if err != nil {
 		errors = append(errors, err.Error())
 	}
 
-	// The DKIM record is always in the _domainkey subdomain (RFC-6376) and therefore must be fetched separately.
-	// To complicate matters, the _domainkey subdomain itself includes a subdomain named after a selector which we
-	// don't know in advance, so we need to check each common selector that we're aware of.
+	// The DKIM record is always in the _domainkey subdomain (RFC-6376),
+	// but the selector is not known in advance, so check common selectors.
 	dkimRecords := dnsfern.DnsRecords{}
 	var selectors []string = []string{"default", "selector1", "selector2", "google", "amazonses", "microsoft"}
 	for _, selector := range selectors {
@@ -91,7 +94,7 @@ func DiscoverDomainDNSRecords(ctx context.Context, domain string) (*dnsfern.Disc
 		dkimRecords.Txt = append(dkimRecords.Txt, dkimRecordForSelector.Txt...)
 	}
 
-	// Create report and write to file
+	// Create the report
 	report := dnsfern.DiscoverDnsRecordsReport{
 		Domain:          domain,
 		DnsRecords:      &dnsRecords,

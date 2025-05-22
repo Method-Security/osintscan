@@ -13,8 +13,8 @@ import (
 	"github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
-// GetDomainSubdomainsBrute queries subfinder for all subdomains for a given domain. It returns a SubdomainsEnumReport struct containing
-// all subdomains and any errors that occurred.
+// GetDomainSubdomainsBrute performs active (bruteforce) subdomain enumeration for a given domain.
+// Returns a report containing all discovered subdomains and any errors encountered.
 func GetDomainSubdomainsBrute(ctx context.Context, domain string, subdomainList []string, parallelThreads int, recursiveDepth int, timeout int, dnsServerAddress string) (dnsfern.DiscoverDnsSubdomainReport, error) {
 	report := dnsfern.DiscoverDnsSubdomainReport{
 		Domain:        domain,
@@ -22,6 +22,7 @@ func GetDomainSubdomainsBrute(ctx context.Context, domain string, subdomainList 
 	}
 	errors := []string{}
 
+	// Run the bruteforce subdomain enumeration
 	subdomains, err := getSubdomainsBrute(ctx, domain, subdomainList, parallelThreads, recursiveDepth, timeout, dnsServerAddress)
 	if err != nil {
 		errors = append(errors, err.Error())
@@ -30,10 +31,10 @@ func GetDomainSubdomainsBrute(ctx context.Context, domain string, subdomainList 
 	report.Subdomains = subdomains
 	report.Errors = errors
 	return report, nil
-
 }
 
 // detectWildcardDNS tests a random high-entropy subdomain to check if a wildcard DNS record is present.
+// Returns the wildcard domain if detected, otherwise nil.
 func detectWildcardDNS(ctx context.Context, domain string, resolver *net.Resolver) (*string, error) {
 	// Generate a high-entropy 16-character random subdomain
 	randomSubdomain, err := generateRandomSubdomain(domain)
@@ -54,6 +55,7 @@ func detectWildcardDNS(ctx context.Context, domain string, resolver *net.Resolve
 	return nil, nil
 }
 
+// getSubdomainsBrute performs recursive bruteforce subdomain enumeration with concurrency and wildcard detection.
 func getSubdomainsBrute(ctx context.Context, domain string, subdomainList []string, parallelThreads int, recursiveDepth int, timeout int, dnsServerAddress string) ([]string, error) {
 	log := svc1log.FromContext(ctx)
 	subdomains := []string{}
@@ -85,7 +87,7 @@ func getSubdomainsBrute(ctx context.Context, domain string, subdomainList []stri
 		}
 	}
 
-	// First iteration - test all base subdomains
+	// First iteration - test all base subdomains for wildcards
 	wildcardDNS, err := detectWildcardDNS(ctx, domain, resolver)
 	if err != nil {
 		return []string{}, err
@@ -127,6 +129,8 @@ func getSubdomainsBrute(ctx context.Context, domain string, subdomainList []stri
 	return subdomains, nil
 }
 
+// testPermutations concurrently tests a list of subdomain permutations for DNS resolution.
+// Uses a semaphore to limit concurrency and mutexes to protect shared state.
 func testPermutations(ctx context.Context, permutations []string, resolver *net.Resolver, semaphore chan struct{}, wg *sync.WaitGroup, subdomainsMutex *sync.Mutex, subdomainsSet map[string]struct{}, subdomains *[]string) []string {
 	var validSubdomains []string
 	validSubdomainsMutex := &sync.Mutex{}
@@ -164,6 +168,7 @@ func testPermutations(ctx context.Context, permutations []string, resolver *net.
 	return validSubdomains
 }
 
+// generatePermutations creates all possible subdomain permutations for the given base subdomains and subdomain list.
 func generatePermutations(validSubdomains []string, subdomainList []string) []string {
 	results := make([]string, 0, len(validSubdomains)*len(subdomainList))
 	for _, subdomain := range subdomainList {

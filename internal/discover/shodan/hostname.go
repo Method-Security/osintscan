@@ -5,6 +5,7 @@ import (
 	"strings"
 )
 
+// filterShodanRecordsByHostname filters Shodan records to only those with a hostname ending in endString.
 func filterShodanRecordsByHostname(records []Record, endString string) []Record {
 	if endString == "" {
 		return records
@@ -22,7 +23,8 @@ func filterShodanRecordsByHostname(records []Record, endString string) []Record 
 	return filteredRecords
 }
 
-// QueryShodanHostStrictHostnameMatch queries Shodan for a given query string and ensures that the hostname contains the given hostname string.
+// QueryShodanHostStrictHostnameMatch queries Shodan for a given query string and filters results to hostnames ending with the given string.
+// Returns a report containing the filtered records and any errors encountered.
 func QueryShodanHostStrictHostnameMatch(ctx context.Context, apiKey string, query string, hostname string) (Report, error) {
 	errors := []string{}
 
