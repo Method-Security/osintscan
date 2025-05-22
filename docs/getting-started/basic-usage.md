@@ -5,7 +5,7 @@
 Running as a binary allows you to skip dealing with any container related networking issues and leverage the same network interface that the host machine is using.
 
 ```bash
-osintscan dns certs --domain example.com
+osintscan discover dns certs --domain example.com
 ```
 
 ## Docker
@@ -16,6 +16,7 @@ If you're running on a Docker container on a MacOS machine and you are trying to
 
 ```bash
 docker run methodsecurity/osintscan \
+  discover \
   dns \
   certs \
   --domain example.com
