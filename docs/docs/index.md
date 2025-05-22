@@ -2,6 +2,31 @@
 
 osintscan offers a variety of techniques that allow security teams to leverage open source intelligence (OSINT) capabilities to better understand their internet facing exposure. Each of the below pages offers you an in depth look at a osintscan capability related to a unique technique.
 
+## Top Level Commands
+
+osintscan organizes functionality under three primary command groups:
+
+- `discover` – gather information about targets
+- `enumerate` – list known data from targets
+- `pentest` – run security testing modules
+
+### Modules
+
+**discover**
+
+- `dns` – records, certificates, reverse/forward lookups, subdomain enumeration
+- `shodan` – search Shodan for host data
+
+**enumerate**
+
+- `dns` – zone transfers
+
+**pentest**
+
+- `dns` – takeover detection
+
+### Module Documentation
+
 - [DNS](./dns.md)
 - [Shodan](./shodan.md)
 
