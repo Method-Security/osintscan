@@ -16,19 +16,52 @@ env:
   GO_VERSION: "1.24"
 
 jobs:
-  prepare-linux:
-    name: Prepare Linux
+  prepare-linux-arm:
+    name: Prepare Linux (arm64)
+    runs-on: ubuntu-22.04-arm
+    steps:
+      - uses: actions/checkout@v4.1.6
+        with:
+          fetch-depth: 0
+      - name: Generate Fern Go Code
+        run: |
+          npm install -g fern-api
+          fern generate --group local
+        env:
+          FERN_TOKEN: ${{ secrets.FERN_TOKEN }}
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      - uses: goreleaser/goreleaser-action@v4
+        with:
+          distribution: goreleaser-pro
+          version: latest
+          args: >-
+            build --single-target --clean --snapshot --timeout 60m
+            -f .goreleaser/goreleaser-build.yml ${{ inputs.goreleaser_options }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
+          GOOS: linux
+          GOARCH: arm64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-arm64-dist
+          path: dist/
+          retention-days: 7
+
+  prepare-linux-amd64:
+    name: Prepare Linux (amd64)
     runs-on: ubuntu-latest
     env:
       DOCKER_CLI_EXPERIMENTAL: "enabled"
     steps:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
-
       - name: Set up Docker Buildx
         id: buildx
         uses: docker/setup-buildx-action@v3
-
       - name: Login to ghcr.io registry
         uses: docker/login-action@v3
         with:
@@ -40,33 +73,25 @@ jobs:
         uses: actions/checkout@v4.1.6
         with:
           fetch-depth: 0
-
       - name: Generate Fern Go Code
         run: |
           npm install -g fern-api
           fern generate --group local
         env:
           FERN_TOKEN: ${{ secrets.FERN_TOKEN }}
-
-      - name: Build ARM64 Builder Image
-        shell: bash
-        run: docker buildx build . --platform linux/arm64 --load --tag armbuilder -f Dockerfile.builder
-
       - name: Build AMD64 Builder Image
-        shell: bash
         run: docker buildx build . --platform linux/amd64 --load --tag amdbuilder -f Dockerfile.builder
-
-      - name: Build ARM64 Image
-        shell: bash
-        run: docker run -v .:/app/osintscan -e GOARCH=arm64 -e GOOS=linux -e GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }} -e GORELEASER_KEY=${{ secrets.GORELEASER_KEY }} --rm armbuilder goreleaser build --single-target -f .goreleaser/goreleaser-build.yml ${{ inputs.goreleaser_options}}
-
       - name: Build AMD64 Image
-        shell: bash
-        run: docker run -v .:/app/osintscan -e GOARCH=amd64 -e GOOS=linux -e GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }} -e GORELEASER_KEY=${{ secrets.GORELEASER_KEY }} --rm amdbuilder goreleaser build --single-target -f .goreleaser/goreleaser-build.yml ${{ inputs.goreleaser_options}}
-
+        run: |
+          docker run -v $PWD:/app/osintscan \
+            -e GOARCH=amd64 -e GOOS=linux \
+            -e GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }} \
+            -e GORELEASER_KEY=${{ secrets.GORELEASER_KEY }} \
+            --rm amdbuilder goreleaser build --single-target \
+            -f .goreleaser/goreleaser-build.yml ${{ inputs.goreleaser_options }}
       - uses: actions/upload-artifact@v4
         with:
-          name: linux-dist
+          name: linux-amd64-dist
           path: dist/
           retention-days: 7
 
@@ -87,16 +112,13 @@ jobs:
           brew install libpcap docker
           echo "LD_LIBRARY_PATH=$(brew --prefix)/Cellar/libpcap/*/lib" >> $GITHUB_ENV
         if: matrix.os == 'macos-latest'
-
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
         if: matrix.os == 'ubuntu-latest'
-
       - name: Set up Docker Buildx
         id: buildx
         uses: docker/setup-buildx-action@v3
         if: matrix.os == 'ubuntu-latest'
-
       - name: Login to ghcr.io registry
         uses: docker/login-action@v3
         with:
@@ -109,20 +131,17 @@ jobs:
         uses: actions/checkout@v4.1.6
         with:
           fetch-depth: 0
-
       - name: Generate Fern Go Code
         run: |
           npm install -g fern-api
           fern generate --group local
         env:
           FERN_TOKEN: ${{ secrets.FERN_TOKEN }}
-
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
-
       - uses: goreleaser/goreleaser-action@v4
         with:
           distribution: goreleaser-pro
@@ -131,7 +150,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
-
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.os }}-dist
@@ -142,7 +160,8 @@ jobs:
     name: Build
     needs:
       - prepare
-      - prepare-linux
+      - prepare-linux-arm
+      - prepare-linux-amd64
     runs-on: ubuntu-latest
     env:
       DOCKER_CLI_EXPERIMENTAL: "enabled"
@@ -150,38 +169,30 @@ jobs:
       - name: Maximize build space
         uses: easimon/maximize-build-space@v10
         with:
-          root-reserve-mb: 32768 # The Go cache (`~/.cache/go-build` and `~/go/pkg`) requires a lot of storage space.
+          root-reserve-mb: 32768
           remove-android: "true"
           remove-docker-images: "true"
           remove-dotnet: "true"
           remove-haskell: "true"
-
       - name: Install Dependences
         run: sudo apt install libpcap-dev
-
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
-
       - name: Set up Docker Buildx
         id: buildx
         uses: docker/setup-buildx-action@v3
-
       - name: Show available Docker Buildx platforms
         run: echo ${{ steps.buildx.outputs.platforms }}
-
       - name: Install cosign
         uses: sigstore/cosign-installer@v3.5.0
-
       - name: Install Syft
         uses: anchore/sbom-action/download-syft@v0.16.0
-
       - name: Login to ghcr.io registry
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Login to docker.io registry
         uses: docker/login-action@v3
         with:
@@ -192,28 +203,23 @@ jobs:
         uses: actions/checkout@v4.1.6
         with:
           fetch-depth: 0
-
       - name: Generate Fern Go Code
         run: |
           npm install -g fern-api
           fern generate --group local
         env:
           FERN_TOKEN: ${{ secrets.FERN_TOKEN }}
-
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
-
       - name: Download Artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
-
       - name: View Artifacts
         run: ls -al artifacts artifacts/*
-
       - name: Arrange Artifacts
         run: |
           mkdir -p output/build-linux_arm64/
@@ -221,16 +227,14 @@ jobs:
           mkdir -p output/build-darwin_arm64/
           mkdir -p output/build-linux_amd64/
           mkdir -p output/build-windows_amd64/
-          mv artifacts/linux-dist/linux_arm64/build-linux_linux_arm64/* output/build-linux_arm64/
-          mv artifacts/linux-dist/linux_amd64/build-linux_linux_amd64_v1/* output/build-linux_amd64/
+          mv artifacts/linux-arm64-dist/linux_arm64/build-linux_linux_arm64_v8.0/* output/build-linux_arm64/
+          mv artifacts/linux-amd64-dist/linux_amd64/build-linux_linux_amd64_v1/* output/build-linux_amd64/
           mv artifacts/windows-latest-dist/windows_amd64/build-windows_windows_amd64_v1/* output/build-windows_amd64/
           mv artifacts/macos-latest-dist/darwin_arm64/build-macos_darwin_arm64_v8.0/* output/build-darwin_arm64/
         shell: bash
 
       - name: View Output
         run: ls -al output output/*
-
-      # release
       - uses: goreleaser/goreleaser-action@v4
         if: steps.cache.outputs.cache-hit != 'true'
         with:
@@ -240,4 +244,4 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
-          COSIGN_EXPERIMENTAL: "true" 
+          COSIGN_EXPERIMENTAL: "true"

@@ -25,6 +25,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 		Long:  `Discover and analyze DNS services, including records, certificates, and subdomains for a given domain.`,
 	}
 
+	// Add command to the 'discover' command
 	discoverCmd.AddCommand(discoverDNSCmd)
 
 	discoverDNSCertsCmd := &cobra.Command{
@@ -46,8 +47,13 @@ func (a *OsintScan) InitDiscoverCommand() {
 		},
 	}
 
+	// Target Flags
 	discoverDNSCertsCmd.Flags().String("domain", "", "The domain name to retrieve SSL/TLS certificates for")
+
+	// Mark Required Flags
 	_ = discoverDNSCertsCmd.MarkFlagRequired("domain")
+
+	// Add command to 'dns' command
 	discoverDNSCmd.AddCommand(discoverDNSCertsCmd)
 
 	discoverDNSRecordsCmd := &cobra.Command{
@@ -69,8 +75,13 @@ func (a *OsintScan) InitDiscoverCommand() {
 		},
 	}
 
+	// Target Flags
 	discoverDNSRecordsCmd.Flags().String("domain", "", "The domain name to query for DNS records")
+
+	// Mark Required Flags
 	_ = discoverDNSRecordsCmd.MarkFlagRequired("domain")
+
+	// Add command to 'dns' command
 	discoverDNSCmd.AddCommand(discoverDNSRecordsCmd)
 
 	discoverDNSReverseForwardCmd := &cobra.Command{
@@ -89,8 +100,13 @@ func (a *OsintScan) InitDiscoverCommand() {
 		},
 	}
 
+	// Target Flags
 	discoverDNSReverseForwardCmd.Flags().String("domain", "", "The domain name to perform reverse and forward lookups on")
+
+	// Mark Required Flags
 	_ = discoverDNSReverseForwardCmd.MarkFlagRequired("domain")
+
+	// Add command to 'dns' command
 	discoverDNSCmd.AddCommand(discoverDNSReverseForwardCmd)
 
 	discoverDNSSubdomainCmd := &cobra.Command{
@@ -120,8 +136,13 @@ func (a *OsintScan) InitDiscoverCommand() {
 		},
 	}
 
+	// Target Flags
 	discoverDNSSubdomainPassiveCmd.Flags().String("domain", "", "The domain name to passively enumerate subdomains for")
+
+	// Mark Required Flags
 	_ = discoverDNSSubdomainPassiveCmd.MarkFlagRequired("domain")
+
+	// Add command to 'subdomain' command
 	discoverDNSSubdomainCmd.AddCommand(discoverDNSSubdomainPassiveCmd)
 
 	discoverDNSSubdomainBruteCmd := &cobra.Command{
@@ -140,13 +161,11 @@ func (a *OsintScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-
 			subdomainlistFiles, err := cmd.Flags().GetStringSlice("files")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
-
 			fileSubdomains, err := utils.GetEntriesFromFiles(subdomainlistFiles)
 			if err != nil {
 				a.OutputSignal.AddError(err)
@@ -157,7 +176,6 @@ func (a *OsintScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(errors.New("no subdomains provided"))
 				return
 			}
-
 			threads, err := cmd.Flags().GetInt("threads")
 			if err != nil {
 				a.OutputSignal.AddError(err)
@@ -173,7 +191,6 @@ func (a *OsintScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-
 			dnsResolver, err := cmd.Flags().GetString("dns-resolver")
 			if err != nil {
 				a.OutputSignal.AddError(err)
@@ -188,7 +205,11 @@ func (a *OsintScan) InitDiscoverCommand() {
 			a.OutputSignal.Content = report
 		},
 	}
+
+	// Target Flags
 	discoverDNSSubdomainBruteCmd.Flags().String("domain", "", "The domain name to bruteforce subdomains for")
+
+	// Config Flags
 	discoverDNSSubdomainBruteCmd.Flags().StringSlice("subdomains", []string{}, "A list of subdomain names to test during bruteforce discovery")
 	discoverDNSSubdomainBruteCmd.Flags().StringSlice("files", []string{}, "File paths containing lists of subdomains to use for bruteforce discovery")
 	discoverDNSSubdomainBruteCmd.Flags().Int("threads", 20, "Number of parallel threads to use for bruteforce discovery")
@@ -196,8 +217,10 @@ func (a *OsintScan) InitDiscoverCommand() {
 	discoverDNSSubdomainBruteCmd.Flags().Int("timeout", 0, "Maximum time (in minutes) to spend on subdomain discovery")
 	discoverDNSSubdomainBruteCmd.Flags().String("dns-resolver", "", "Custom DNS resolver/server to use for queries")
 
+	// Mark Required Flags
 	_ = discoverDNSSubdomainBruteCmd.MarkFlagRequired("domain")
 
+	// Add command to 'subdomain' command
 	discoverDNSSubdomainCmd.AddCommand(discoverDNSSubdomainBruteCmd)
 
 	discoverShodanCmd := &cobra.Command{
@@ -259,11 +282,16 @@ func (a *OsintScan) InitDiscoverCommand() {
 		},
 	}
 
+	// Target Flags
 	discoverShodanHostnameCmd.Flags().String("api-key", "", "Shodan API Key (defaults to SHODAN_API_KEY environment variable if not provided)")
 	discoverShodanHostnameCmd.Flags().String("query", "", "The search query string to use with Shodan (e.g., 'apache', 'nginx')")
 	discoverShodanHostnameCmd.Flags().String("hostname", "", "The hostname suffix to match in Shodan search results")
+
+	// Mark Required Flags
 	_ = discoverShodanHostnameCmd.MarkFlagRequired("query")
 	_ = discoverShodanHostnameCmd.MarkFlagRequired("hostname")
+
+	// Add command to 'shodan' command
 	discoverShodanCmd.AddCommand(discoverShodanHostnameCmd)
 
 	a.RootCmd.AddCommand(discoverCmd)

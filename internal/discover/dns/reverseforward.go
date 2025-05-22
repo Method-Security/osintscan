@@ -3,16 +3,18 @@ package dns
 import (
 	"net"
 
-	dnsFern "github.com/Method-Security/osintscan/generated/go/discover/dns"
+	dnsfern "github.com/Method-Security/osintscan/generated/go/discover/dns"
 )
 
-func GetReverseForwardDNSLookup(fqdn string) dnsFern.DiscoverDnsReverseForwardReport {
-	report := dnsFern.DiscoverDnsReverseForwardReport{
+// GetReverseForwardDNSLookup performs both forward (A/AAAA) and reverse (PTR) DNS lookups for a given FQDN.
+// Returns a report containing all resolved IPs and their associated hostnames, along with any errors encountered.
+func GetReverseForwardDNSLookup(fqdn string) dnsfern.DiscoverDnsReverseForwardReport {
+	report := dnsfern.DiscoverDnsReverseForwardReport{
 		Domain: fqdn,
 	}
 	errors := []string{}
 
-	// Resolve the IP addresses for the given FQDN
+	// Resolve the IP addresses for the given FQDN (forward lookup)
 	ips, err := net.LookupIP(fqdn)
 	if err != nil {
 		errors = append(errors, err.Error())
@@ -20,16 +22,16 @@ func GetReverseForwardDNSLookup(fqdn string) dnsFern.DiscoverDnsReverseForwardRe
 		return report
 	}
 
-	lookUps := []*dnsFern.LookUpDetails{}
+	lookUps := []*dnsfern.LookUpDetails{}
 	for _, ip := range ips {
-		// Perform a reverse lookup (PTR record)
+		// Perform a reverse lookup (PTR record) for each IP
 		names, err := net.LookupAddr(ip.String())
 		if err != nil {
 			errors = append(errors, err.Error())
 		}
 
 		// Store resolved hostnames per IP
-		lookUps = append(lookUps, &dnsFern.LookUpDetails{
+		lookUps = append(lookUps, &dnsfern.LookUpDetails{
 			Ip:      ip.String(),
 			DnsPtrs: names,
 		})
