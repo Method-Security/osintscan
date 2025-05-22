@@ -6,16 +6,16 @@ import (
 	"io"
 	"strings"
 
-	dnsFern "github.com/Method-Security/osintscan/generated/go/discover/dns"
+	dnsfern "github.com/Method-Security/osintscan/generated/go/discover/dns"
 	"github.com/projectdiscovery/subfinder/v2/pkg/runner"
 )
 
 // GetDomainSubdomainsPassive queries subfinder for all subdomains for a given domain. It returns a SubdomainsEnumReport struct containing
 // all subdomains and any errors that occurred.
-func GetDomainSubdomainsPassive(ctx context.Context, domain string) (dnsFern.DiscoverDnsSubdomainReport, error) {
-	report := dnsFern.DiscoverDnsSubdomainReport{
+func GetDomainSubdomainsPassive(ctx context.Context, domain string) (dnsfern.DiscoverDnsSubdomainReport, error) {
+	report := dnsfern.DiscoverDnsSubdomainReport{
 		Domain:        domain,
-		DiscoveryType: dnsFern.DiscoverDnsSubdomainTypePassive,
+		DiscoveryType: dnsfern.DiscoverDnsSubdomainTypePassive,
 	}
 	errors := []string{}
 

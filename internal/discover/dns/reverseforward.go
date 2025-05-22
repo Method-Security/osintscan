@@ -3,11 +3,11 @@ package dns
 import (
 	"net"
 
-	dnsFern "github.com/Method-Security/osintscan/generated/go/discover/dns"
+	dnsfern "github.com/Method-Security/osintscan/generated/go/discover/dns"
 )
 
-func GetReverseForwardDNSLookup(fqdn string) dnsFern.DiscoverDnsReverseForwardReport {
-	report := dnsFern.DiscoverDnsReverseForwardReport{
+func GetReverseForwardDNSLookup(fqdn string) dnsfern.DiscoverDnsReverseForwardReport {
+	report := dnsfern.DiscoverDnsReverseForwardReport{
 		Domain: fqdn,
 	}
 	errors := []string{}
@@ -20,7 +20,7 @@ func GetReverseForwardDNSLookup(fqdn string) dnsFern.DiscoverDnsReverseForwardRe
 		return report
 	}
 
-	lookUps := []*dnsFern.LookUpDetails{}
+	lookUps := []*dnsfern.LookUpDetails{}
 	for _, ip := range ips {
 		// Perform a reverse lookup (PTR record)
 		names, err := net.LookupAddr(ip.String())
@@ -29,7 +29,7 @@ func GetReverseForwardDNSLookup(fqdn string) dnsFern.DiscoverDnsReverseForwardRe
 		}
 
 		// Store resolved hostnames per IP
-		lookUps = append(lookUps, &dnsFern.LookUpDetails{
+		lookUps = append(lookUps, &dnsfern.LookUpDetails{
 			Ip:      ip.String(),
 			DnsPtrs: names,
 		})

@@ -5,15 +5,15 @@ import (
 	"fmt"
 	"net"
 
-	dnsFern "github.com/Method-Security/osintscan/generated/go/enumerate/dns"
+	dnsfern "github.com/Method-Security/osintscan/generated/go/enumerate/dns"
 )
 
 // TestZoneTransfer checks if a domain is vulnerable to a DNS zone transfer attack
-func TestZoneTransfer(ctx context.Context, domains []string, timeout int) (*dnsFern.EnumerateDnsZoneTransferReport, error) {
-	report := &dnsFern.EnumerateDnsZoneTransferReport{Domains: domains}
+func TestZoneTransfer(ctx context.Context, domains []string, timeout int) (*dnsfern.EnumerateDnsZoneTransferReport, error) {
+	report := &dnsfern.EnumerateDnsZoneTransferReport{Domains: domains}
 	errors := []string{}
 
-	zoneTransferDetails := []*dnsFern.DnsZoneTransferDetails{}
+	zoneTransferDetails := []*dnsfern.DnsZoneTransferDetails{}
 	for _, domain := range domains {
 		axfrSuccessful := false
 
@@ -25,11 +25,11 @@ func TestZoneTransfer(ctx context.Context, domains []string, timeout int) (*dnsF
 			continue
 		}
 
-		dnsRecords := []*dnsFern.DnsZoneTransferRecord{}
+		dnsRecords := []*dnsfern.DnsZoneTransferRecord{}
 		for _, ns := range nsRecords {
-			dnsRecords = append(dnsRecords, &dnsFern.DnsZoneTransferRecord{
+			dnsRecords = append(dnsRecords, &dnsfern.DnsZoneTransferRecord{
 				Name:  domain,
-				Type:  dnsFern.DnsRecordTypeNs,
+				Type:  dnsfern.DnsRecordTypeNs,
 				Value: ns.Host,
 			})
 			fmt.Printf("[Debug] Testing zone transfer on NS: %s\n", ns.Host)
@@ -44,7 +44,7 @@ func TestZoneTransfer(ctx context.Context, domains []string, timeout int) (*dnsF
 			}
 		}
 
-		zoneTransferDetails = append(zoneTransferDetails, &dnsFern.DnsZoneTransferDetails{
+		zoneTransferDetails = append(zoneTransferDetails, &dnsfern.DnsZoneTransferDetails{
 			Domain:     domain,
 			DnsRecords: dnsRecords,
 			Success:    &axfrSuccessful,

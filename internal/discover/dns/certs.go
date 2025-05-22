@@ -9,12 +9,12 @@ import (
 	"net/http"
 	"net/url"
 
-	dnsFern "github.com/Method-Security/osintscan/generated/go/discover/dns"
+	dnsfern "github.com/Method-Security/osintscan/generated/go/discover/dns"
 )
 
 // DiscoverDomainCerts queries crt.sh for all certificates for a given domain. It returns a CertsReport struct containing
 // all certificates and any errors that occurred.
-func DiscoverDomainCerts(ctx context.Context, domain string) (*dnsFern.DiscoverDnsCertsReport, error) {
+func DiscoverDomainCerts(ctx context.Context, domain string) (*dnsfern.DiscoverDnsCertsReport, error) {
 	errors := []string{}
 
 	baseURL := "https://crt.sh/?q=%s&output=json"
@@ -40,14 +40,14 @@ func DiscoverDomainCerts(ctx context.Context, domain string) (*dnsFern.DiscoverD
 	}
 
 	// 3. Decode the JSON response into the slice of CertificateRecord
-	var records []*dnsFern.CertificateRecord
+	var records []*dnsfern.CertificateRecord
 	err = json.Unmarshal(body, &records)
 	if err != nil {
 		errors = append(errors, err.Error())
 	}
 
 	// 4. Create the CertReport struct
-	report := &dnsFern.DiscoverDnsCertsReport{
+	report := &dnsfern.DiscoverDnsCertsReport{
 		Domain:       domain,
 		Certificates: records,
 		Errors:       errors,
