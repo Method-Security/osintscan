@@ -3,9 +3,7 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"net"
 	"os"
-	"strconv"
 
 	dns "github.com/Method-Security/osintscan/internal/discover/dns"
 	subdomain "github.com/Method-Security/osintscan/internal/discover/dns/subdomain"
@@ -199,7 +197,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 				return
 			}
 			if dnsResolver != "" {
-				err = validateDNSServerAddress(dnsResolver)
+				err = utils.ValidateDNSServerAddress(dnsResolver)
 				if err != nil {
 					a.OutputSignal.AddError(err)
 					return
@@ -224,7 +222,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 	discoverDNSSubdomainBruteCmd.Flags().Int("threads", 20, "Number of parallel threads to use for bruteforce discovery")
 	discoverDNSSubdomainBruteCmd.Flags().Int("max-depth", 3, "Maximum recursion depth for subdomain bruteforce")
 	discoverDNSSubdomainBruteCmd.Flags().Int("timeout", 0, "Maximum time (in minutes) to spend on subdomain discovery")
-	discoverDNSSubdomainBruteCmd.Flags().String("dns-resolver", "", "Custom DNS resolver/server to use for queries")
+	discoverDNSSubdomainBruteCmd.Flags().String("dns-resolver", "", "Custom DNS resolver/server to use for queries (e.g. 1.1.1.1:53)")
 
 	// Mark Required Flags
 	_ = discoverDNSSubdomainBruteCmd.MarkFlagRequired("domain")
@@ -304,24 +302,4 @@ func (a *OsintScan) InitDiscoverCommand() {
 	discoverShodanCmd.AddCommand(discoverShodanHostnameCmd)
 
 	a.RootCmd.AddCommand(discoverCmd)
-}
-
-// validateDNSServerAddress checks if the DNS server address is in the correct format (IP:PORT)
-func validateDNSServerAddress(address string) error {
-	host, port, err := net.SplitHostPort(address)
-	if err != nil {
-		return fmt.Errorf("invalid DNS server address format: %v", err)
-	}
-
-	// Validate IP address
-	if ip := net.ParseIP(host); ip == nil {
-		return fmt.Errorf("invalid IP address in DNS server address: %s", host)
-	}
-
-	// Validate port number
-	if portNum, err := strconv.Atoi(port); err != nil || portNum < 1 || portNum > 65535 {
-		return fmt.Errorf("invalid port number in DNS server address: %s", port)
-	}
-
-	return nil
 }

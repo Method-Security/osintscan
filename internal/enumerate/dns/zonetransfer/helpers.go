@@ -7,14 +7,15 @@ import (
 
 	dnsfern "github.com/Method-Security/osintscan/generated/go/enumerate/dns"
 	"github.com/miekg/dns"
+	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
 // sendAXFRRequest attempts a DNS zone transfer (AXFR) from the given nameserver for the specified domain.
 // Returns the records, whether the transfer was successful, and any errors encountered.
-func sendAXFRRequest(ns, domain string, timeout int) ([]*dnsfern.DnsZoneTransferRecord, bool, []string) {
+func sendAXFRRequest(ns, domain string, timeout int, log svc1log.Logger) ([]*dnsfern.DnsZoneTransferRecord, bool, []string) {
 	errors := []string{}
 	addr := fmt.Sprintf("%s:53", ns)
-	fmt.Printf("[Debug] Attempting AXFR transfer from %s\n", addr)
+	log.Info("[Debug] Attempting AXFR transfer from", svc1log.SafeParam("addr", addr))
 
 	fullDomain := domain
 	if !strings.HasSuffix(fullDomain, ".") {
@@ -53,7 +54,7 @@ func sendAXFRRequest(ns, domain string, timeout int) ([]*dnsfern.DnsZoneTransfer
 	}
 
 	if axfrSuccessful {
-		fmt.Printf("[Debug] Zone transfer successful from %s with %d records\n", ns, len(records))
+		log.Info("[Debug] Zone transfer successful from", svc1log.SafeParam("ns", ns), svc1log.SafeParam("records", len(records)))
 		return records, true, errors
 	}
 
