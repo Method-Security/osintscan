@@ -70,7 +70,7 @@ func DiscoverDomainDNSRecords(ctx context.Context, domain string) (*dnsfern.Disc
 	errors := []string{}
 
 	// Get all the DNS records
-	var questionTypes []uint16 = []uint16{dns.TypeA, dns.TypeAAAA, dns.TypeMX, dns.TypeTXT, dns.TypeNS, dns.TypeCNAME}
+	questionTypes := []uint16{dns.TypeA, dns.TypeAAAA, dns.TypeMX, dns.TypeTXT, dns.TypeNS, dns.TypeCNAME}
 	dnsRecords, err := getDNSRecords(domain, questionTypes)
 	if err != nil {
 		errors = append(errors, err.Error())
