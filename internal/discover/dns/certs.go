@@ -39,11 +39,28 @@ func DiscoverDomainCerts(ctx context.Context, domain string) (*dnsfern.DiscoverD
 		errors = append(errors, err.Error())
 	}
 
-	// Decode the JSON response into the slice of CertificateRecord
-	var records []*dnsfern.CertificateRecord
-	err = json.Unmarshal(body, &records)
-	if err != nil {
+	// Parse the JSON response manually
+	var rawRecords []map[string]interface{}
+	if err := json.Unmarshal(body, &rawRecords); err != nil {
 		errors = append(errors, err.Error())
+	}
+
+	// Convert raw records to CertificateRecord structs
+	records := make([]*dnsfern.CertificateRecord, 0, len(rawRecords))
+	for _, raw := range rawRecords {
+		record := &dnsfern.CertificateRecord{
+			IssuerCaid:     int(raw["issuer_ca_id"].(float64)),
+			IssuerName:     raw["issuer_name"].(string),
+			CommonName:     raw["common_name"].(string),
+			NameValue:      raw["name_value"].(string),
+			Id:             int(raw["id"].(float64)),
+			EntryTimestamp: raw["entry_timestamp"].(string),
+			NotBefore:      raw["not_before"].(string),
+			NotAfter:       raw["not_after"].(string),
+			SerialNumber:   raw["serial_number"].(string),
+			ResultCount:    int(raw["result_count"].(float64)),
+		}
+		records = append(records, record)
 	}
 
 	// Create the CertReport struct
