@@ -3,7 +3,9 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"net"
 	"os"
+	"strconv"
 
 	dns "github.com/Method-Security/osintscan/internal/discover/dns"
 	subdomain "github.com/Method-Security/osintscan/internal/discover/dns/subdomain"
@@ -196,6 +198,13 @@ func (a *OsintScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
+			if dnsResolver != "" {
+				err = validateDNSServerAddress(dnsResolver)
+				if err != nil {
+					a.OutputSignal.AddError(err)
+					return
+				}
+			}
 
 			report, err := subdomain.GetDomainSubdomainsBrute(cmd.Context(), domain, allSubdomains, threads, maxDepth, timeout, dnsResolver)
 			if err != nil {
@@ -295,4 +304,24 @@ func (a *OsintScan) InitDiscoverCommand() {
 	discoverShodanCmd.AddCommand(discoverShodanHostnameCmd)
 
 	a.RootCmd.AddCommand(discoverCmd)
+}
+
+// validateDNSServerAddress checks if the DNS server address is in the correct format (IP:PORT)
+func validateDNSServerAddress(address string) error {
+	host, port, err := net.SplitHostPort(address)
+	if err != nil {
+		return fmt.Errorf("invalid DNS server address format: %v", err)
+	}
+
+	// Validate IP address
+	if ip := net.ParseIP(host); ip == nil {
+		return fmt.Errorf("invalid IP address in DNS server address: %s", host)
+	}
+
+	// Validate port number
+	if portNum, err := strconv.Atoi(port); err != nil || portNum < 1 || portNum > 65535 {
+		return fmt.Errorf("invalid port number in DNS server address: %s", port)
+	}
+
+	return nil
 }
