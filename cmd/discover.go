@@ -196,6 +196,13 @@ func (a *OsintScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
+			if dnsResolver != "" {
+				err = utils.ValidateDNSServerAddress(dnsResolver)
+				if err != nil {
+					a.OutputSignal.AddError(err)
+					return
+				}
+			}
 
 			report, err := subdomain.GetDomainSubdomainsBrute(cmd.Context(), domain, allSubdomains, threads, maxDepth, timeout, dnsResolver)
 			if err != nil {
@@ -215,7 +222,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 	discoverDNSSubdomainBruteCmd.Flags().Int("threads", 20, "Number of parallel threads to use for bruteforce discovery")
 	discoverDNSSubdomainBruteCmd.Flags().Int("max-depth", 3, "Maximum recursion depth for subdomain bruteforce")
 	discoverDNSSubdomainBruteCmd.Flags().Int("timeout", 0, "Maximum time (in minutes) to spend on subdomain discovery")
-	discoverDNSSubdomainBruteCmd.Flags().String("dns-resolver", "", "Custom DNS resolver/server to use for queries")
+	discoverDNSSubdomainBruteCmd.Flags().String("dns-resolver", "", "Custom DNS resolver/server to use for queries (e.g. 1.1.1.1:53)")
 
 	// Mark Required Flags
 	_ = discoverDNSSubdomainBruteCmd.MarkFlagRequired("domain")

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	dnsfern "github.com/Method-Security/osintscan/generated/go/discover/dns"
+	"github.com/Method-Security/osintscan/utils"
 	"github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
@@ -70,22 +71,7 @@ func getSubdomainsBrute(ctx context.Context, domain string, subdomainList []stri
 		defer cancel()
 	}
 
-	var resolver *net.Resolver
-	if dnsServerAddress == "" {
-		log.Info("Using system default DNS resolver")
-		resolver = &net.Resolver{}
-	} else {
-		log.Info("Using custom DNS server address", svc1log.SafeParam("dnsServerAddress", dnsServerAddress))
-		resolver = &net.Resolver{
-			PreferGo: true,
-			Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
-				d := net.Dialer{
-					Timeout: time.Second * 10,
-				}
-				return d.DialContext(ctx, "udp", dnsServerAddress)
-			},
-		}
-	}
+	resolver := utils.GetResolver(dnsServerAddress, log)
 
 	// First iteration - test all base subdomains for wildcards
 	wildcardDNS, err := detectWildcardDNS(ctx, domain, resolver)
