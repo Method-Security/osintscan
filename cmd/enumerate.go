@@ -26,25 +26,8 @@ func (a *OsintScan) InitEnumerateCommand() {
 	enumerateDNSZoneTransferCmd := &cobra.Command{
 		Use:   "zonetransfer [domain...]",
 		Short: "Attempt DNS zone transfers (AXFR) for domains",
-		Long: `Attempt DNS zone transfers (AXFR) for the specified domains to enumerate all DNS records, if the server allows it. 
-This can reveal all subdomains and records managed by the DNS server.
-
-By default, the tool will discover authoritative nameservers via NS record lookups and attempt zone transfers on each.
-You can also specify a nameserver directly to test specific servers.
-
-Examples:
-  # Test domains by looking up their NS records
-  osintscan enumerate dns zonetransfer --domains example.com,example.org
-
-  # Test domains against a specific nameserver
-  osintscan enumerate dns zonetransfer --domains example.com --nameserver ns1.example.com
-
-  # Test using positional arguments
-  osintscan enumerate dns zonetransfer example.com example.org
-
-  # Test against a specific IP
-  osintscan enumerate dns zonetransfer --nameserver 192.168.1.10 internal.corp`,
-		Args: cobra.ArbitraryArgs,
+		Long:  "Attempt DNS zone transfers (AXFR) for the specified domains to enumerate all DNS records, if the server allows it. This can reveal all subdomains and records",
+		Args:  cobra.ArbitraryArgs,
 		Run: func(cmd *cobra.Command, args []string) {
 			// Get domains from both flags and positional arguments
 			domains, err := cmd.Flags().GetStringSlice("domains")

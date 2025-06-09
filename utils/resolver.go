@@ -54,6 +54,9 @@ func ValidateDNSServerAddress(address string) error {
 	return nil
 }
 
+// GetResolver returns a new resolver with the given DNS server address.
+// If the DNS server address is empty, the system default resolver is used.
+// If the DNS server address is provided, the resolver is configured to use the given DNS server address.
 func GetResolver(dnsServerAddress string, log svc1log.Logger) *net.Resolver {
 	var resolver *net.Resolver
 	if dnsServerAddress == "" {
