@@ -1,7 +1,9 @@
 package zonetransfer
 
 import (
+	"context"
 	"fmt"
+	"net"
 	"strings"
 	"time"
 
@@ -12,8 +14,24 @@ import (
 
 // sendAXFRRequest attempts a DNS zone transfer (AXFR) from the given nameserver for the specified domain.
 // Returns the records, whether the transfer was successful, and any errors encountered.
-func sendAXFRRequest(ns, domain string, timeout int, log svc1log.Logger) ([]*dnsfern.DnsZoneTransferRecord, bool, []string) {
+func sendAXFRRequest(ns, domain string, timeout int, resolver *net.Resolver, log svc1log.Logger) ([]*dnsfern.DnsZoneTransferRecord, bool, []string) {
 	errors := []string{}
+
+	// Check if ns is already an IP
+	if net.ParseIP(ns) == nil {
+		// It's a hostname, resolve it
+		addrs, err := resolver.LookupHost(context.Background(), ns)
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("failed to resolve nameserver %s: %v", ns, err))
+			return nil, false, errors
+		}
+		if len(addrs) == 0 {
+			errors = append(errors, fmt.Sprintf("no addresses found for nameserver %s", ns))
+			return nil, false, errors
+		}
+		ns = addrs[0] // Use first resolved IP
+	}
+
 	addr := fmt.Sprintf("%s:53", ns)
 	log.Info("[Debug] Attempting AXFR transfer from", svc1log.SafeParam("addr", addr))
 

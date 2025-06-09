@@ -20,7 +20,7 @@ func TestZoneTransfer(ctx context.Context, domains []string, timeout int, resolv
 	// Direct nameserver mode
 	if nameserver != "" {
 		log.Info("Using direct nameserver mode", svc1log.SafeParam("nameserver", nameserver))
-		return testDirectNameserver(ctx, nameserver, domains, timeout, log)
+		return testDirectNameserver(ctx, nameserver, domains, timeout, resolver, log)
 	}
 
 	// NS lookup mode
@@ -29,10 +29,13 @@ func TestZoneTransfer(ctx context.Context, domains []string, timeout int, resolv
 }
 
 // testDirectNameserver tests zone transfers directly against a specified nameserver
-func testDirectNameserver(ctx context.Context, nameserver string, domains []string, timeout int, log svc1log.Logger) (*dnsfern.EnumerateDnsZoneTransferReport, error) {
+func testDirectNameserver(ctx context.Context, nameserver string, domains []string, timeout int, resolver string, log svc1log.Logger) (*dnsfern.EnumerateDnsZoneTransferReport, error) {
 	report := &dnsfern.EnumerateDnsZoneTransferReport{Domains: domains}
 	errors := []string{}
 	zoneTransferDetails := []*dnsfern.DnsZoneTransferDetails{}
+
+	// Get custom resolver if specified
+	customResolver := utils.GetResolver(resolver, log)
 
 	// Normalize nameserver address
 	ns := normalizeNameserver(nameserver)
@@ -43,7 +46,7 @@ func testDirectNameserver(ctx context.Context, nameserver string, domains []stri
 			svc1log.SafeParam("nameserver", ns))
 
 		// Attempt zone transfer
-		records, success, errs := sendAXFRRequest(ns, domain, timeout, log)
+		records, success, errs := sendAXFRRequest(ns, domain, timeout, customResolver, log)
 
 		if len(errs) > 0 {
 			for _, err := range errs {
@@ -132,7 +135,7 @@ func testDomainViaLookup(ctx context.Context, domain string, timeout int, resolv
 			svc1log.SafeParam("domain", domain))
 
 		// Attempt zone transfer
-		records, success, errs := sendAXFRRequest(nsHost, domain, timeout, log)
+		records, success, errs := sendAXFRRequest(nsHost, domain, timeout, resolver, log)
 
 		if len(errs) > 0 {
 			for _, err := range errs {
