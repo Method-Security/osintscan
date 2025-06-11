@@ -6,10 +6,10 @@ import (
 	dnsfern "github.com/Method-Security/osintscan/generated/go/discover/dns"
 )
 
-// GetReverseForwardDNSLookup performs both forward (A/AAAA) and reverse (PTR) DNS lookups for a given FQDN.
+// GetForwardReverseDNSLookup performs both forward (A/AAAA) and reverse (PTR) DNS lookups for a given FQDN.
 // Returns a report containing all resolved IPs and their associated hostnames, along with any errors encountered.
-func GetReverseForwardDNSLookup(fqdn string) dnsfern.DiscoverDnsReverseForwardReport {
-	report := dnsfern.DiscoverDnsReverseForwardReport{
+func GetForwardReverseDNSLookup(fqdn string) dnsfern.DiscoverDnsForwardReverseReport {
+	report := dnsfern.DiscoverDnsForwardReverseReport{
 		Domain: fqdn,
 	}
 	errors := []string{}

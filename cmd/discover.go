@@ -84,10 +84,10 @@ func (a *OsintScan) InitDiscoverCommand() {
 	// Add command to 'dns' command
 	discoverDNSCmd.AddCommand(discoverDNSRecordsCmd)
 
-	discoverDNSReverseForwardCmd := &cobra.Command{
-		Use:   "reverseforward",
-		Short: "Perform reverse and forward DNS lookups",
-		Long:  `Perform both reverse and forward DNS lookups for the specified domain to identify associated IPs and hostnames.`,
+	discoverDNSForwardReverseCmd := &cobra.Command{
+		Use:   "forwardreverse",
+		Short: "Perform forward and reverse DNS lookups",
+		Long:  `Perform both forward and reverse DNS lookups for the specified domain to identify associated IPs and hostnames.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			domain, err := cmd.Flags().GetString("domain")
 			if err != nil {
@@ -95,19 +95,19 @@ func (a *OsintScan) InitDiscoverCommand() {
 				return
 			}
 
-			report := dns.GetReverseForwardDNSLookup(domain)
+			report := dns.GetForwardReverseDNSLookup(domain)
 			a.OutputSignal.Content = report
 		},
 	}
 
 	// Target Flags
-	discoverDNSReverseForwardCmd.Flags().String("domain", "", "The domain name to perform reverse and forward lookups on")
+	discoverDNSForwardReverseCmd.Flags().String("domain", "", "The domain name to perform forward and reverse lookups on")
 
 	// Mark Required Flags
-	_ = discoverDNSReverseForwardCmd.MarkFlagRequired("domain")
+	_ = discoverDNSForwardReverseCmd.MarkFlagRequired("domain")
 
 	// Add command to 'dns' command
-	discoverDNSCmd.AddCommand(discoverDNSReverseForwardCmd)
+	discoverDNSCmd.AddCommand(discoverDNSForwardReverseCmd)
 
 	discoverDNSSubdomainCmd := &cobra.Command{
 		Use:   "subdomain",
