@@ -8,9 +8,9 @@ types:
 
   DiscoverDnsRecordsResult:
     properties:
-      dnsRecords: list<dns.DnsRecord>
-      dmarcRecords: list<dns.DnsRecord>
-      dkimRecords: list<dns.DnsRecord>
+      dnsRecords: optional<list<dns.DnsRecord>>
+      dmarcRecords: optional<list<dns.DnsRecord>>
+      dkimRecords: optional<list<dns.DnsRecord>>
 
   DiscoverDnsRecordsReport:
     properties:

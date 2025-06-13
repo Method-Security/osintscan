@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 
 	dnsfern "github.com/Method-Security/osintscan/generated/go/discover/dns"
 	dns "github.com/Method-Security/osintscan/internal/discover/dns"
@@ -146,7 +147,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 
 			// Create config
 			config := dnsfern.DiscoverDnsSubdomainConfig{
-				DiscoveryType: "passive",
+				DiscoveryType: strings.ToLower(string(dnsfern.DiscoverDnsSubdomainTypePassive)),
 				Passive: &dnsfern.DiscoverDnsSubdomainPassiveConfig{
 					Domain: domain,
 				},
@@ -231,7 +232,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 			}
 
 			config := dnsfern.DiscoverDnsSubdomainConfig{
-				DiscoveryType: "active",
+				DiscoveryType: strings.ToLower(string(dnsfern.DiscoverDnsSubdomainTypeActive)),
 				Active: &dnsfern.DiscoverDnsSubdomainActiveConfig{
 					Domain:      domain,
 					Subdomains:  allSubdomains,
