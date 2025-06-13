@@ -1,25 +1,26 @@
+imports:
+  dns: ../../common/dns.yml
+
 types:
-  DnsRecordType:
-    enum:
-      - A
-      - AAAA
-      - CNAME
-      - MX
-      - NS
-      - SOA
-      - TXT
-  DnsZoneTransferRecord:
-    properties:
-      Name: string
-      Type: DnsRecordType
-      Value: string
   DnsZoneTransferDetails:
     properties:
-      Domain: string
-      DNSRecords: optional<list<DnsZoneTransferRecord>>
-      Success: optional<boolean>
+      domain: string
+      dnsRecords: optional<list<dns.DnsRecord>>
+      success: optional<boolean>
+
+  EnumerateDnsZoneTransferConfig:
+    properties:
+      domains: list<string>
+      nameserver: optional<string>
+      dnsResolver: optional<string>
+      timeout: optional<integer>
+
+  EnumerateDnsZoneTransferResult:
+    properties:
+      zoneTransfer: list<DnsZoneTransferDetails>
+
   EnumerateDnsZoneTransferReport:
     properties:
-      Domains: list<string>
-      ZoneTransfer: optional<list<DnsZoneTransferDetails>>
-      Errors: optional<list<string>>
+      config: EnumerateDnsZoneTransferConfig
+      result: EnumerateDnsZoneTransferResult
+      errors: optional<list<string>>

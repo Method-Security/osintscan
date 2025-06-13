@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 
+	dnsfern "github.com/Method-Security/osintscan/generated/go/enumerate/dns"
 	"github.com/Method-Security/osintscan/internal/enumerate/dns/zonetransfer"
 	"github.com/Method-Security/osintscan/utils"
 	"github.com/spf13/cobra"
@@ -66,7 +67,14 @@ func (a *OsintScan) InitEnumerateCommand() {
 				}
 			}
 
-			report, err := zonetransfer.TestZoneTransfer(cmd.Context(), domains, timeout, dnsResolver, nameserver)
+			config := dnsfern.EnumerateDnsZoneTransferConfig{
+				Domains:     domains,
+				Nameserver:  &nameserver,
+				DnsResolver: &dnsResolver,
+				Timeout:     &timeout,
+			}
+
+			report, err := zonetransfer.TestZoneTransfer(cmd.Context(), config)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return

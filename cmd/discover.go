@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	dnsfern "github.com/Method-Security/osintscan/generated/go/discover/dns"
 	dns "github.com/Method-Security/osintscan/internal/discover/dns"
 	subdomain "github.com/Method-Security/osintscan/internal/discover/dns/subdomain"
 	shodan "github.com/Method-Security/osintscan/internal/discover/shodan"
@@ -38,7 +39,12 @@ func (a *OsintScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			report, err := dns.DiscoverDomainCerts(cmd.Context(), domain)
+
+			config := dnsfern.DiscoverDnsCertsConfig{
+				Domain: domain,
+			}
+
+			report, err := dns.DiscoverDomainCerts(cmd.Context(), config)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -66,7 +72,12 @@ func (a *OsintScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			report, err := dns.DiscoverDomainDNSRecords(cmd.Context(), domain)
+
+			config := dnsfern.DiscoverDnsRecordsConfig{
+				Domain: domain,
+			}
+
+			report, err := dns.DiscoverDomainDNSRecords(cmd.Context(), config)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -95,7 +106,11 @@ func (a *OsintScan) InitDiscoverCommand() {
 				return
 			}
 
-			report := dns.GetForwardReverseDNSLookup(domain)
+			config := dnsfern.DiscoverDnsForwardReverseConfig{
+				Domain: domain,
+			}
+
+			report := dns.GetForwardReverseDNSLookup(config)
 			a.OutputSignal.Content = report
 		},
 	}
@@ -111,7 +126,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 
 	discoverDNSSubdomainCmd := &cobra.Command{
 		Use:   "subdomain",
-		Short: "Enumerate subdomains for a domain",
+		Short: "Discover subdomains for a domain",
 		Long:  `Discover subdomains for the specified domain using passive and active enumeration techniques.`,
 	}
 
@@ -119,15 +134,26 @@ func (a *OsintScan) InitDiscoverCommand() {
 
 	discoverDNSSubdomainPassiveCmd := &cobra.Command{
 		Use:   "passive",
-		Short: "Passively enumerate subdomains",
+		Short: "Passively discover subdomains",
 		Long:  `Identify subdomains for the specified domain using only passive data sources (no direct interaction with the target).`,
 		Run: func(cmd *cobra.Command, args []string) {
+			// Parse flags
 			domain, err := cmd.Flags().GetString("domain")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			report, err := subdomain.GetDomainSubdomainsPassive(cmd.Context(), domain)
+
+			// Create config
+			config := dnsfern.DiscoverDnsSubdomainConfig{
+				DiscoveryType: "passive",
+				Passive: &dnsfern.DiscoverDnsSubdomainPassiveConfig{
+					Domain: domain,
+				},
+			}
+
+			// Create report
+			report, err := subdomain.GetDomainSubdomainsPassive(cmd.Context(), config)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -145,10 +171,10 @@ func (a *OsintScan) InitDiscoverCommand() {
 	// Add command to 'subdomain' command
 	discoverDNSSubdomainCmd.AddCommand(discoverDNSSubdomainPassiveCmd)
 
-	discoverDNSSubdomainBruteCmd := &cobra.Command{
-		Use:   "brute",
-		Short: "Actively bruteforce subdomains",
-		Long:  `Actively enumerate subdomains for the specified domain by bruteforcing common subdomain names and patterns.`,
+	discoverDNSSubdomainActiveCmd := &cobra.Command{
+		Use:   "active",
+		Short: "Actively discover subdomains",
+		Long:  `Actively discover subdomains for the specified domain by bruteforcing common subdomain names and patterns.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			domain, err := cmd.Flags().GetString("domain")
 			if err != nil {
@@ -204,7 +230,19 @@ func (a *OsintScan) InitDiscoverCommand() {
 				}
 			}
 
-			report, err := subdomain.GetDomainSubdomainsBrute(cmd.Context(), domain, allSubdomains, threads, maxDepth, timeout, dnsResolver)
+			config := dnsfern.DiscoverDnsSubdomainConfig{
+				DiscoveryType: "active",
+				Active: &dnsfern.DiscoverDnsSubdomainActiveConfig{
+					Domain:      domain,
+					Subdomains:  allSubdomains,
+					Threads:     &threads,
+					MaxDepth:    &maxDepth,
+					Timeout:     &timeout,
+					DnsResolver: &dnsResolver,
+				},
+			}
+
+			report, err := subdomain.GetDomainSubdomainsActive(cmd.Context(), config)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -214,21 +252,21 @@ func (a *OsintScan) InitDiscoverCommand() {
 	}
 
 	// Target Flags
-	discoverDNSSubdomainBruteCmd.Flags().String("domain", "", "The domain name to bruteforce subdomains for")
+	discoverDNSSubdomainActiveCmd.Flags().String("domain", "", "The domain name to discover subdomains for")
 
 	// Config Flags
-	discoverDNSSubdomainBruteCmd.Flags().StringSlice("subdomains", []string{}, "A list of subdomain names to test during bruteforce discovery")
-	discoverDNSSubdomainBruteCmd.Flags().StringSlice("files", []string{}, "File paths containing lists of subdomains to use for bruteforce discovery")
-	discoverDNSSubdomainBruteCmd.Flags().Int("threads", 20, "Number of parallel threads to use for bruteforce discovery")
-	discoverDNSSubdomainBruteCmd.Flags().Int("max-depth", 3, "Maximum recursion depth for subdomain bruteforce")
-	discoverDNSSubdomainBruteCmd.Flags().Int("timeout", 0, "Maximum time (in minutes) to spend on subdomain discovery")
-	discoverDNSSubdomainBruteCmd.Flags().String("dns-resolver", "", "Custom DNS resolver/server to use for queries (e.g. 1.1.1.1:53)")
+	discoverDNSSubdomainActiveCmd.Flags().StringSlice("subdomains", []string{}, "A list of subdomain names to test during discovery")
+	discoverDNSSubdomainActiveCmd.Flags().StringSlice("files", []string{}, "File paths containing lists of subdomains to use for discovery")
+	discoverDNSSubdomainActiveCmd.Flags().Int("threads", 20, "Number of parallel threads to use for discovery")
+	discoverDNSSubdomainActiveCmd.Flags().Int("max-depth", 3, "Maximum recursion depth for subdomain discovery")
+	discoverDNSSubdomainActiveCmd.Flags().Int("timeout", 0, "Maximum time (in minutes) to spend on subdomain discovery")
+	discoverDNSSubdomainActiveCmd.Flags().String("dns-resolver", "", "Custom DNS resolver/server to use for queries (e.g. 1.1.1.1:53)")
 
 	// Mark Required Flags
-	_ = discoverDNSSubdomainBruteCmd.MarkFlagRequired("domain")
+	_ = discoverDNSSubdomainActiveCmd.MarkFlagRequired("domain")
 
 	// Add command to 'subdomain' command
-	discoverDNSSubdomainCmd.AddCommand(discoverDNSSubdomainBruteCmd)
+	discoverDNSSubdomainCmd.AddCommand(discoverDNSSubdomainActiveCmd)
 
 	discoverShodanCmd := &cobra.Command{
 		Use:   "shodan",

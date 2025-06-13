@@ -14,23 +14,28 @@ import (
 	"github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
-// GetDomainSubdomainsBrute performs active (bruteforce) subdomain enumeration for a given domain.
+// GetDomainSubdomainsActive performs active (bruteforce) subdomain discovery for a given domain.
 // Returns a report containing all discovered subdomains and any errors encountered.
-func GetDomainSubdomainsBrute(ctx context.Context, domain string, subdomainList []string, parallelThreads int, recursiveDepth int, timeout int, dnsServerAddress string) (dnsfern.DiscoverDnsSubdomainReport, error) {
-	report := dnsfern.DiscoverDnsSubdomainReport{
-		Domain:        domain,
-		DiscoveryType: dnsfern.DiscoverDnsSubdomainTypeBrute,
-	}
+func GetDomainSubdomainsActive(ctx context.Context, config dnsfern.DiscoverDnsSubdomainConfig) (dnsfern.DiscoverDnsSubdomainReport, error) {
+	activeConfig := config.GetActive()
 	errors := []string{}
 
-	// Run the bruteforce subdomain enumeration
-	subdomains, err := getSubdomainsBrute(ctx, domain, subdomainList, parallelThreads, recursiveDepth, timeout, dnsServerAddress)
+	// Run the active subdomain discovery
+	subdomains, err := getSubdomainsActive(ctx, activeConfig.Domain, activeConfig.Subdomains, *activeConfig.Threads, *activeConfig.MaxDepth, *activeConfig.Timeout, *activeConfig.DnsResolver)
 	if err != nil {
 		errors = append(errors, err.Error())
 	}
 
-	report.Subdomains = subdomains
-	report.Errors = errors
+	result := dnsfern.DiscoverDnsSubdomainResult{
+		Subdomains: subdomains,
+	}
+
+	report := dnsfern.DiscoverDnsSubdomainReport{
+		Config: &config,
+		Result: &result,
+		Errors: errors,
+	}
+
 	return report, nil
 }
 
@@ -56,8 +61,8 @@ func detectWildcardDNS(ctx context.Context, domain string, resolver *net.Resolve
 	return nil, nil
 }
 
-// getSubdomainsBrute performs recursive bruteforce subdomain enumeration with concurrency and wildcard detection.
-func getSubdomainsBrute(ctx context.Context, domain string, subdomainList []string, parallelThreads int, recursiveDepth int, timeout int, dnsServerAddress string) ([]string, error) {
+// getSubdomainsActive performs recursive bruteforce subdomain enumeration with concurrency and wildcard detection.
+func getSubdomainsActive(ctx context.Context, domain string, subdomainList []string, parallelThreads int, recursiveDepth int, timeout int, dnsServerAddress string) ([]string, error) {
 	log := svc1log.FromContext(ctx)
 	subdomains := []string{}
 	subdomainsSet := make(map[string]struct{}) // To track unique valid subdomains

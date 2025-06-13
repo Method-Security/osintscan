@@ -1,24 +1,19 @@
+imports:
+  dns: ../../common/dns.yml
+
 types:
-  DnsRecord:
-    properties:
-      name: string
-      ttl: integer
-      type: string
-      value: string
-  DnsRecords:
-    properties:
-      a: optional<list<DnsRecord>>
-      aaaa: optional<list<DnsRecord>>
-      mx: optional<list<DnsRecord>>
-      txt: optional<list<DnsRecord>>
-      ns: optional<list<DnsRecord>>
-      cname: optional<list<DnsRecord>>
-  DiscoverDnsRecordsReport:
+  DiscoverDnsRecordsConfig:
     properties:
       domain: string
-      dnsRecords: DnsRecords
-      dmarcDomain: optional<string>
-      dmarcDnsRecords: DnsRecords
-      dkimDomain: optional<string>
-      dkimDnsRecords: DnsRecords
+
+  DiscoverDnsRecordsResult:
+    properties:
+      dnsRecords: list<dns.DnsRecord>
+      dmarcRecords: list<dns.DnsRecord>
+      dkimRecords: list<dns.DnsRecord>
+
+  DiscoverDnsRecordsReport:
+    properties:
+      config: DiscoverDnsRecordsConfig
+      result: DiscoverDnsRecordsResult
       errors: optional<list<string>>

@@ -6,6 +6,7 @@ import (
 	"net"
 	"strings"
 
+	common "github.com/Method-Security/osintscan/generated/go/common"
 	dnsfern "github.com/Method-Security/osintscan/generated/go/enumerate/dns"
 	"github.com/Method-Security/osintscan/utils"
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
@@ -14,39 +15,39 @@ import (
 // TestZoneTransfer performs DNS zone transfer tests on the specified domains.
 // If nameserver is provided, it tests directly against that server.
 // Otherwise, it discovers nameservers via NS record lookups.
-func TestZoneTransfer(ctx context.Context, domains []string, timeout int, resolver string, nameserver string) (*dnsfern.EnumerateDnsZoneTransferReport, error) {
+func TestZoneTransfer(ctx context.Context, config dnsfern.EnumerateDnsZoneTransferConfig) (*dnsfern.EnumerateDnsZoneTransferReport, error) {
 	log := svc1log.FromContext(ctx)
 
 	// Direct nameserver mode
-	if nameserver != "" {
-		log.Info("Using direct nameserver mode", svc1log.SafeParam("nameserver", nameserver))
-		return testDirectNameserver(ctx, nameserver, domains, timeout, resolver, log)
+	if config.Nameserver != nil && *config.Nameserver != "" {
+		log.Info("Using direct nameserver mode", svc1log.SafeParam("nameserver", *config.Nameserver))
+		return testDirectNameserver(ctx, config)
 	}
 
 	// NS lookup mode
 	log.Info("Using NS lookup mode")
-	return testViaNSLookup(ctx, domains, timeout, resolver, log)
+	return testViaNSLookup(ctx, config)
 }
 
 // testDirectNameserver tests zone transfers directly against a specified nameserver
-func testDirectNameserver(ctx context.Context, nameserver string, domains []string, timeout int, resolver string, log svc1log.Logger) (*dnsfern.EnumerateDnsZoneTransferReport, error) {
-	report := &dnsfern.EnumerateDnsZoneTransferReport{Domains: domains}
+func testDirectNameserver(ctx context.Context, config dnsfern.EnumerateDnsZoneTransferConfig) (*dnsfern.EnumerateDnsZoneTransferReport, error) {
+	log := svc1log.FromContext(ctx)
 	errors := []string{}
 	zoneTransferDetails := []*dnsfern.DnsZoneTransferDetails{}
 
 	// Get custom resolver if specified
-	customResolver := utils.GetResolver(resolver, log)
+	customResolver := utils.GetResolver(*config.DnsResolver, log)
 
 	// Normalize nameserver address
-	ns := normalizeNameserver(nameserver)
+	ns := normalizeNameserver(*config.Nameserver)
 
-	for _, domain := range domains {
+	for _, domain := range config.Domains {
 		log.Info("Testing zone transfer",
 			svc1log.SafeParam("domain", domain),
 			svc1log.SafeParam("nameserver", ns))
 
 		// Attempt zone transfer
-		records, success, errs := sendAXFRRequest(ns, domain, timeout, customResolver, log)
+		records, success, errs := sendAXFRRequest(ns, domain, *config.Timeout, customResolver, log)
 
 		if len(errs) > 0 {
 			for _, err := range errs {
@@ -66,35 +67,44 @@ func testDirectNameserver(ctx context.Context, nameserver string, domains []stri
 				svc1log.SafeParam("records", len(records)))
 		}
 	}
-
-	report.ZoneTransfer = zoneTransferDetails
-	report.Errors = errors
+	report := &dnsfern.EnumerateDnsZoneTransferReport{
+		Config: &config,
+		Result: &dnsfern.EnumerateDnsZoneTransferResult{
+			ZoneTransfer: zoneTransferDetails,
+		},
+		Errors: errors,
+	}
 	return report, nil
 }
 
 // testViaNSLookup discovers nameservers and tests zone transfers on each
-func testViaNSLookup(ctx context.Context, domains []string, timeout int, resolver string, log svc1log.Logger) (*dnsfern.EnumerateDnsZoneTransferReport, error) {
-	report := &dnsfern.EnumerateDnsZoneTransferReport{Domains: domains}
+func testViaNSLookup(ctx context.Context, config dnsfern.EnumerateDnsZoneTransferConfig) (*dnsfern.EnumerateDnsZoneTransferReport, error) {
+	log := svc1log.FromContext(ctx)
 	errors := []string{}
 	zoneTransferDetails := []*dnsfern.DnsZoneTransferDetails{}
 
 	// Get custom resolver if specified
-	customResolver := utils.GetResolver(resolver, log)
+	customResolver := utils.GetResolver(*config.DnsResolver, log)
 
-	for _, domain := range domains {
-		details := testDomainViaLookup(ctx, domain, timeout, customResolver, log, &errors)
+	for _, domain := range config.Domains {
+		details := testDomainViaLookup(ctx, domain, *config.Timeout, customResolver, log, &errors)
 		zoneTransferDetails = append(zoneTransferDetails, details)
 	}
 
-	report.ZoneTransfer = zoneTransferDetails
-	report.Errors = errors
+	report := &dnsfern.EnumerateDnsZoneTransferReport{
+		Config: &config,
+		Result: &dnsfern.EnumerateDnsZoneTransferResult{
+			ZoneTransfer: zoneTransferDetails,
+		},
+		Errors: errors,
+	}
 	return report, nil
 }
 
 // testDomainViaLookup tests a single domain by looking up its NS records
 func testDomainViaLookup(ctx context.Context, domain string, timeout int, resolver *net.Resolver, log svc1log.Logger, errors *[]string) *dnsfern.DnsZoneTransferDetails {
 	axfrSuccessful := false
-	dnsRecords := []*dnsfern.DnsZoneTransferRecord{}
+	dnsRecords := []*common.DnsRecord{}
 
 	log.Info("Looking up NS records", svc1log.SafeParam("domain", domain))
 

@@ -1,0 +1,20 @@
+types:
+  DnsRecordType:
+    enum:
+      - A
+      - AAAA
+      - CNAME
+      - MX
+      - NS
+      - SOA
+      - TXT
+      - PTR
+      - SRV
+      - UNKNOWN
+
+  DnsRecord:
+    properties:
+      name: string
+      ttl: integer
+      type: DnsRecordType
+      value: string

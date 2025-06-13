@@ -1,11 +1,35 @@
 types:
   DiscoverDnsSubdomainType:
     enum:
-      - BRUTE
+      - ACTIVE
       - PASSIVE
-  DiscoverDnsSubdomainReport:
+
+  DiscoverDnsSubdomainActiveConfig:
     properties:
       domain: string
-      discoveryType: DiscoverDnsSubdomainType
       subdomains: optional<list<string>>
+      subdomainLists: optional<list<string>>
+      threads: optional<integer>
+      maxDepth: optional<integer>
+      timeout: optional<integer>
+      dnsResolver: optional<string>
+
+  DiscoverDnsSubdomainPassiveConfig:
+    properties:
+      domain: string
+
+  DiscoverDnsSubdomainConfig:
+    discriminant: discoveryType
+    union:
+      active: DiscoverDnsSubdomainActiveConfig
+      passive: DiscoverDnsSubdomainPassiveConfig
+
+  DiscoverDnsSubdomainResult:
+    properties:
+      subdomains: optional<list<string>>
+
+  DiscoverDnsSubdomainReport:
+    properties:
+      config: DiscoverDnsSubdomainConfig
+      result: DiscoverDnsSubdomainResult
       errors: optional<list<string>>

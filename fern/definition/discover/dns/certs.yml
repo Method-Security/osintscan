@@ -1,19 +1,27 @@
 types:
   CertificateRecord:
     properties:
-      IssuerCAID: integer
-      IssuerName: string
-      CommonName: string
-      NameValue: string
-      ID: integer
-      EntryTimestamp: string
-      NotBefore: string
-      NotAfter: string
-      SerialNumber: string
-      ResultCount: integer
+      issuerCAID: integer
+      issuerName: string
+      commonName: string
+      nameValue: string
+      id: integer
+      entryTimestamp: string
+      notBefore: string
+      notAfter: string
+      serialNumber: string
+      resultCount: integer
+
+  DiscoverDnsCertsConfig:
+    properties:
+      domain: string
+
+  DiscoverDnsCertsResult:
+    properties:
+      certificates: list<CertificateRecord>
 
   DiscoverDnsCertsReport:
     properties:
-      Domain: string
-      Certificates: list<CertificateRecord>
-      Errors: list<string>
+      config: DiscoverDnsCertsConfig
+      result: DiscoverDnsCertsResult
+      errors: optional<list<string>>
