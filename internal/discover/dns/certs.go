@@ -14,11 +14,11 @@ import (
 
 // DiscoverDomainCerts queries crt.sh for all certificates for a given domain.
 // Returns a report containing all certificates and any errors encountered.
-func DiscoverDomainCerts(ctx context.Context, domain string) (*dnsfern.DiscoverDnsCertsReport, error) {
+func DiscoverDomainCerts(ctx context.Context, config dnsfern.DiscoverDnsCertsConfig) (*dnsfern.DiscoverDnsCertsReport, error) {
 	errors := []string{}
 
 	baseURL := "https://crt.sh/?q=%s&output=json"
-	escapedDomain := url.QueryEscape(domain) // Properly escape the domain in the URL
+	escapedDomain := url.QueryEscape(config.Domain) // Properly escape the domain in the URL
 	apiURL := fmt.Sprintf(baseURL, escapedDomain)
 
 	// Make the HTTP request to crt.sh API
@@ -65,9 +65,11 @@ func DiscoverDomainCerts(ctx context.Context, domain string) (*dnsfern.DiscoverD
 
 	// Create the CertReport struct
 	report := &dnsfern.DiscoverDnsCertsReport{
-		Domain:       domain,
-		Certificates: records,
-		Errors:       errors,
+		Config: &config,
+		Result: &dnsfern.DiscoverDnsCertsResult{
+			Certificates: records,
+		},
+		Errors: errors,
 	}
 
 	return report, nil

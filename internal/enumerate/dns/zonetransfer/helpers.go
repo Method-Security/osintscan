@@ -7,14 +7,14 @@ import (
 	"strings"
 	"time"
 
-	dnsfern "github.com/Method-Security/osintscan/generated/go/enumerate/dns"
+	common "github.com/Method-Security/osintscan/generated/go/common"
 	"github.com/miekg/dns"
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
 // sendAXFRRequest attempts a DNS zone transfer (AXFR) from the given nameserver for the specified domain.
 // Returns the records, whether the transfer was successful, and any errors encountered.
-func sendAXFRRequest(ns, domain string, timeout int, resolver *net.Resolver, log svc1log.Logger) ([]*dnsfern.DnsZoneTransferRecord, bool, []string) {
+func sendAXFRRequest(ns, domain string, timeout int, resolver *net.Resolver, log svc1log.Logger) ([]*common.DnsRecord, bool, []string) {
 	errors := []string{}
 
 	// Check if ns is already an IP
@@ -53,7 +53,7 @@ func sendAXFRRequest(ns, domain string, timeout int, resolver *net.Resolver, log
 		return nil, false, errors
 	}
 
-	var records []*dnsfern.DnsZoneTransferRecord
+	var records []*common.DnsRecord
 	axfrSuccessful := false
 
 	// Read all responses from the transfer
@@ -81,22 +81,22 @@ func sendAXFRRequest(ns, domain string, timeout int, resolver *net.Resolver, log
 }
 
 // convertRecord converts a DNS resource record to a DnsZoneTransferRecord, if supported.
-func convertRecord(rr dns.RR) *dnsfern.DnsZoneTransferRecord {
+func convertRecord(rr dns.RR) *common.DnsRecord {
 	switch r := rr.(type) {
 	case *dns.A:
-		return &dnsfern.DnsZoneTransferRecord{Name: r.Hdr.Name, Type: dnsfern.DnsRecordTypeA, Value: r.A.String()}
+		return &common.DnsRecord{Name: r.Hdr.Name, Ttl: int(r.Hdr.Ttl), Type: common.DnsRecordTypeA, Value: r.A.String()}
 	case *dns.AAAA:
-		return &dnsfern.DnsZoneTransferRecord{Name: r.Hdr.Name, Type: dnsfern.DnsRecordTypeAaaa, Value: r.AAAA.String()}
+		return &common.DnsRecord{Name: r.Hdr.Name, Ttl: int(r.Hdr.Ttl), Type: common.DnsRecordTypeAaaa, Value: r.AAAA.String()}
 	case *dns.CNAME:
-		return &dnsfern.DnsZoneTransferRecord{Name: r.Hdr.Name, Type: dnsfern.DnsRecordTypeCname, Value: r.Target}
+		return &common.DnsRecord{Name: r.Hdr.Name, Ttl: int(r.Hdr.Ttl), Type: common.DnsRecordTypeCname, Value: r.Target}
 	case *dns.MX:
-		return &dnsfern.DnsZoneTransferRecord{Name: r.Hdr.Name, Type: dnsfern.DnsRecordTypeMx, Value: fmt.Sprintf("%d %s", r.Preference, r.Mx)}
+		return &common.DnsRecord{Name: r.Hdr.Name, Ttl: int(r.Hdr.Ttl), Type: common.DnsRecordTypeMx, Value: fmt.Sprintf("%d %s", r.Preference, r.Mx)}
 	case *dns.NS:
-		return &dnsfern.DnsZoneTransferRecord{Name: r.Hdr.Name, Type: dnsfern.DnsRecordTypeNs, Value: r.Ns}
+		return &common.DnsRecord{Name: r.Hdr.Name, Ttl: int(r.Hdr.Ttl), Type: common.DnsRecordTypeNs, Value: r.Ns}
 	case *dns.SOA:
-		return &dnsfern.DnsZoneTransferRecord{Name: r.Hdr.Name, Type: dnsfern.DnsRecordTypeSoa, Value: fmt.Sprintf("%s %s %d", r.Ns, r.Mbox, r.Serial)}
+		return &common.DnsRecord{Name: r.Hdr.Name, Ttl: int(r.Hdr.Ttl), Type: common.DnsRecordTypeSoa, Value: fmt.Sprintf("%s %s %d", r.Ns, r.Mbox, r.Serial)}
 	case *dns.TXT:
-		return &dnsfern.DnsZoneTransferRecord{Name: r.Hdr.Name, Type: dnsfern.DnsRecordTypeTxt, Value: fmt.Sprintf("%s", r.Txt)}
+		return &common.DnsRecord{Name: r.Hdr.Name, Ttl: int(r.Hdr.Ttl), Type: common.DnsRecordTypeTxt, Value: fmt.Sprintf("%s", r.Txt)}
 	default:
 		return nil
 	}

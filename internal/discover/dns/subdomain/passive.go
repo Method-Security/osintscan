@@ -12,21 +12,25 @@ import (
 
 // GetDomainSubdomainsPassive queries subfinder for all subdomains for a given domain using passive sources.
 // Returns a report containing all discovered subdomains and any errors encountered.
-func GetDomainSubdomainsPassive(ctx context.Context, domain string) (dnsfern.DiscoverDnsSubdomainReport, error) {
-	report := dnsfern.DiscoverDnsSubdomainReport{
-		Domain:        domain,
-		DiscoveryType: dnsfern.DiscoverDnsSubdomainTypePassive,
-	}
+func GetDomainSubdomainsPassive(ctx context.Context, config dnsfern.DiscoverDnsSubdomainConfig) (dnsfern.DiscoverDnsSubdomainReport, error) {
 	errors := []string{}
 
 	// Get all valid subdomains using passive enumeration
-	subdomains, err := getSubdomainsPassive(ctx, domain)
+	subdomains, err := getSubdomainsPassive(ctx, config.GetPassive().Domain)
 	if err != nil {
 		errors = append(errors, err.Error())
 	}
 
-	report.Subdomains = subdomains
-	report.Errors = errors
+	result := dnsfern.DiscoverDnsSubdomainResult{
+		Subdomains: subdomains,
+	}
+
+	report := dnsfern.DiscoverDnsSubdomainReport{
+		Config: &config,
+		Result: &result,
+		Errors: errors,
+	}
+
 	return report, nil
 }
 
