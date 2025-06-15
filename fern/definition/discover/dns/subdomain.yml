@@ -3,7 +3,6 @@ types:
     enum:
       - ACTIVE
       - PASSIVE
-
   DiscoverDnsSubdomainActiveConfig:
     properties:
       domain: string
@@ -13,21 +12,17 @@ types:
       maxDepth: optional<integer>
       timeout: optional<integer>
       dnsResolver: optional<string>
-
   DiscoverDnsSubdomainPassiveConfig:
     properties:
       domain: string
-
   DiscoverDnsSubdomainConfig:
     discriminant: discoveryType
     union:
       active: DiscoverDnsSubdomainActiveConfig
       passive: DiscoverDnsSubdomainPassiveConfig
-
   DiscoverDnsSubdomainResult:
     properties:
       subdomains: optional<list<string>>
-
   DiscoverDnsSubdomainReport:
     properties:
       config: DiscoverDnsSubdomainConfig

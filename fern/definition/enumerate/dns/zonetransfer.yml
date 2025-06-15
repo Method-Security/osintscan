@@ -1,24 +1,20 @@
 imports:
   dns: ../../common/dns.yml
-
 types:
   DnsZoneTransferDetails:
     properties:
       domain: string
       dnsRecords: optional<list<dns.DnsRecord>>
       success: optional<boolean>
-
   EnumerateDnsZoneTransferConfig:
     properties:
       domains: list<string>
       nameserver: optional<string>
       dnsResolver: optional<string>
       timeout: optional<integer>
-
   EnumerateDnsZoneTransferResult:
     properties:
       zoneTransfer: list<DnsZoneTransferDetails>
-
   EnumerateDnsZoneTransferReport:
     properties:
       config: EnumerateDnsZoneTransferConfig
