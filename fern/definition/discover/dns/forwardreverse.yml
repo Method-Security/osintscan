@@ -3,15 +3,12 @@ types:
     properties:
       forwardIp: optional<string>
       reversePtrs: optional<list<string>>
-
   DiscoverDnsForwardReverseConfig:
     properties:
       domain: string
-
   DiscoverDnsForwardReverseResult:
     properties:
       lookups: optional<list<LookupDetails>>
-
   DiscoverDnsForwardReverseReport:
     properties:
       config: DiscoverDnsForwardReverseConfig
