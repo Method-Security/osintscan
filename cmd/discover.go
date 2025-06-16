@@ -188,7 +188,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			subdomainlistFiles, err := cmd.Flags().GetStringSlice("files")
+			subdomainlistFiles, err := cmd.Flags().GetStringSlice("subdomain-lists")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -234,12 +234,13 @@ func (a *OsintScan) InitDiscoverCommand() {
 			config := dnsfern.DiscoverDnsSubdomainConfig{
 				DiscoveryType: strings.ToLower(string(dnsfern.DiscoverDnsSubdomainTypeActive)),
 				Active: &dnsfern.DiscoverDnsSubdomainActiveConfig{
-					Domain:      domain,
-					Subdomains:  allSubdomains,
-					Threads:     &threads,
-					MaxDepth:    &maxDepth,
-					Timeout:     &timeout,
-					DnsResolver: &dnsResolver,
+					Domain:         domain,
+					Subdomains:     allSubdomains,
+					SubdomainLists: subdomainlistFiles,
+					Threads:        &threads,
+					MaxDepth:       &maxDepth,
+					Timeout:        &timeout,
+					DnsResolver:    &dnsResolver,
 				},
 			}
 
@@ -257,7 +258,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 
 	// Config Flags
 	discoverDNSSubdomainActiveCmd.Flags().StringSlice("subdomains", []string{}, "A list of subdomain names to test during discovery")
-	discoverDNSSubdomainActiveCmd.Flags().StringSlice("files", []string{}, "File paths containing lists of subdomains to use for discovery")
+	discoverDNSSubdomainActiveCmd.Flags().StringSlice("subdomain-lists", []string{}, "File paths containing lists of subdomains to use for discovery")
 	discoverDNSSubdomainActiveCmd.Flags().Int("threads", 20, "Number of parallel threads to use for discovery")
 	discoverDNSSubdomainActiveCmd.Flags().Int("max-depth", 3, "Maximum recursion depth for subdomain discovery")
 	discoverDNSSubdomainActiveCmd.Flags().Int("timeout", 0, "Maximum time (in minutes) to spend on subdomain discovery")
