@@ -291,7 +291,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 
 	// Config Flags
 	discoverDNSSubdomainActiveCmd.Flags().StringSlice("subdomains", []string{}, "A list of subdomain names to test during discovery")
-	discoverDNSSubdomainActiveCmd.Flags().String("wordlist-size", "", "The size of the wordlist to use for discovery")
+	discoverDNSSubdomainActiveCmd.Flags().String("wordlist-size", "", "The size of the in-built wordlist to use for discovery")
 	discoverDNSSubdomainActiveCmd.Flags().String("wordlist-file", "", "The file containing the wordlist to use for discovery")
 	discoverDNSSubdomainActiveCmd.Flags().Int("threads", 20, "Number of parallel threads to use for discovery")
 	discoverDNSSubdomainActiveCmd.Flags().Int("max-depth", 2, "Maximum recursion depth for subdomain discovery")
