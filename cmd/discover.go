@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -188,20 +187,62 @@ func (a *OsintScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			subdomainlistFiles, err := cmd.Flags().GetStringSlice("subdomain-lists")
+
+			wordlistFile, err := cmd.Flags().GetString("wordlist-file")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			fileSubdomains, err := utils.GetEntriesFromFiles(subdomainlistFiles)
+
+			wordlistSize, err := cmd.Flags().GetString("wordlist-size")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			allSubdomains := append(subdomains, fileSubdomains...)
+
+			var wordlistSubdomains []string
+			var wordlistSizeEnum *dnsfern.WordlistSize
+
+			// Priority 1: Use custom wordlist file if specified
+			if wordlistFile != "" {
+				wordlistSubdomains, err = utils.GetEntriesFromFiles([]string{wordlistFile})
+				if err != nil {
+					a.OutputSignal.AddError(err)
+					return
+				}
+			} else if wordlistSize != "" {
+				// Priority 2: Use built-in wordlist if size specified
+				wordlistSizeEnumValue, err := dnsfern.NewWordlistSizeFromString(wordlistSize)
+				if err != nil {
+					a.OutputSignal.AddError(err)
+					return
+				}
+				wordlistSizeEnum = &wordlistSizeEnumValue
+
+				filePath := utils.GetDiscoverDNSSubdomainActiveWordlistPath(wordlistSize)
+				if filePath != "" {
+					wordlistSubdomains, err = utils.GetEntriesFromFiles([]string{filePath})
+					if err != nil {
+						a.OutputSignal.AddError(err)
+						return
+					}
+				}
+			}
+
+			allSubdomains := append(subdomains, wordlistSubdomains...)
+
+			// Priority 3: Fall back to TINY wordlist if no subdomains at all
 			if len(allSubdomains) == 0 {
-				a.OutputSignal.AddError(errors.New("no subdomains provided"))
-				return
+				wordlistSizeEnumValue := dnsfern.WordlistSizeTiny
+				wordlistSizeEnum = &wordlistSizeEnumValue
+
+				tinyWordlistPath := utils.GetDiscoverDNSSubdomainActiveWordlistPath("TINY")
+				tinyWordlistSubdomains, err := utils.GetEntriesFromFiles([]string{tinyWordlistPath})
+				if err != nil {
+					a.OutputSignal.AddError(err)
+					return
+				}
+				allSubdomains = tinyWordlistSubdomains
 			}
 			threads, err := cmd.Flags().GetInt("threads")
 			if err != nil {
@@ -230,17 +271,17 @@ func (a *OsintScan) InitDiscoverCommand() {
 					return
 				}
 			}
-
 			config := dnsfern.DiscoverDnsSubdomainConfig{
 				DiscoveryType: strings.ToLower(string(dnsfern.DiscoverDnsSubdomainTypeActive)),
 				Active: &dnsfern.DiscoverDnsSubdomainActiveConfig{
-					Domain:         domain,
-					Subdomains:     allSubdomains,
-					SubdomainLists: subdomainlistFiles,
-					Threads:        &threads,
-					MaxDepth:       &maxDepth,
-					Timeout:        &timeout,
-					DnsResolver:    &dnsResolver,
+					Domain:       domain,
+					Subdomains:   allSubdomains,
+					WordlistSize: *wordlistSizeEnum,
+					WordlistFile: &wordlistFile,
+					Threads:      threads,
+					MaxDepth:     maxDepth,
+					Timeout:      timeout,
+					DnsResolver:  &dnsResolver,
 				},
 			}
 
@@ -258,9 +299,10 @@ func (a *OsintScan) InitDiscoverCommand() {
 
 	// Config Flags
 	discoverDNSSubdomainActiveCmd.Flags().StringSlice("subdomains", []string{}, "A list of subdomain names to test during discovery")
-	discoverDNSSubdomainActiveCmd.Flags().StringSlice("subdomain-lists", []string{}, "File paths containing lists of subdomains to use for discovery")
+	discoverDNSSubdomainActiveCmd.Flags().String("wordlist-size", "", "The size of the wordlist to use for discovery")
+	discoverDNSSubdomainActiveCmd.Flags().String("wordlist-file", "", "The file containing the wordlist to use for discovery")
 	discoverDNSSubdomainActiveCmd.Flags().Int("threads", 20, "Number of parallel threads to use for discovery")
-	discoverDNSSubdomainActiveCmd.Flags().Int("max-depth", 3, "Maximum recursion depth for subdomain discovery")
+	discoverDNSSubdomainActiveCmd.Flags().Int("max-depth", 2, "Maximum recursion depth for subdomain discovery")
 	discoverDNSSubdomainActiveCmd.Flags().Int("timeout", 0, "Maximum time (in minutes) to spend on subdomain discovery")
 	discoverDNSSubdomainActiveCmd.Flags().String("dns-resolver", "", "Custom DNS resolver/server to use for queries (e.g. 1.1.1.1:53)")
 

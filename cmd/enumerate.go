@@ -71,7 +71,7 @@ func (a *OsintScan) InitEnumerateCommand() {
 				Domains:     domains,
 				Nameserver:  &nameserver,
 				DnsResolver: &dnsResolver,
-				Timeout:     &timeout,
+				Timeout:     timeout,
 			}
 
 			report, err := zonetransfer.TestZoneTransfer(cmd.Context(), config)

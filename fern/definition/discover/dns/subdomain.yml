@@ -3,14 +3,21 @@ types:
     enum:
       - ACTIVE
       - PASSIVE
+  WordlistSize:
+    enum:
+      - TINY
+      - SMALL
+      - MEDIUM
+      - LARGE
   DiscoverDnsSubdomainActiveConfig:
     properties:
       domain: string
       subdomains: optional<list<string>>
-      subdomainLists: optional<list<string>>
-      threads: optional<integer>
-      maxDepth: optional<integer>
-      timeout: optional<integer>
+      wordlistSize: WordlistSize
+      wordlistFile: optional<string>
+      threads: integer
+      maxDepth: integer
+      timeout: integer
       dnsResolver: optional<string>
   DiscoverDnsSubdomainPassiveConfig:
     properties:

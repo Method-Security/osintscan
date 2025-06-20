@@ -11,7 +11,7 @@ types:
       domains: list<string>
       nameserver: optional<string>
       dnsResolver: optional<string>
-      timeout: optional<integer>
+      timeout: integer
   EnumerateDnsZoneTransferResult:
     properties:
       zoneTransfer: list<DnsZoneTransferDetails>

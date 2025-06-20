@@ -21,7 +21,7 @@ func GetDomainSubdomainsActive(ctx context.Context, config dnsfern.DiscoverDnsSu
 	errors := []string{}
 
 	// Run the active subdomain discovery
-	subdomains, err := getSubdomainsActive(ctx, activeConfig.Domain, activeConfig.Subdomains, *activeConfig.Threads, *activeConfig.MaxDepth, *activeConfig.Timeout, *activeConfig.DnsResolver)
+	subdomains, err := getSubdomainsActive(ctx, activeConfig.Domain, activeConfig.Subdomains, activeConfig.Threads, activeConfig.MaxDepth, activeConfig.Timeout, *activeConfig.DnsResolver)
 	if err != nil {
 		errors = append(errors, err.Error())
 	}
