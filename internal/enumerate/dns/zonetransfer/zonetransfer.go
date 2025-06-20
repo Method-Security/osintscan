@@ -47,7 +47,7 @@ func testDirectNameserver(ctx context.Context, config dnsfern.EnumerateDnsZoneTr
 			svc1log.SafeParam("nameserver", ns))
 
 		// Attempt zone transfer
-		records, success, errs := sendAXFRRequest(ns, domain, *config.Timeout, customResolver, log)
+		records, success, errs := sendAXFRRequest(ns, domain, config.Timeout, customResolver, log)
 
 		if len(errs) > 0 {
 			for _, err := range errs {
@@ -87,7 +87,7 @@ func testViaNSLookup(ctx context.Context, config dnsfern.EnumerateDnsZoneTransfe
 	customResolver := utils.GetResolver(*config.DnsResolver, log)
 
 	for _, domain := range config.Domains {
-		details := testDomainViaLookup(ctx, domain, *config.Timeout, customResolver, log, &errors)
+		details := testDomainViaLookup(ctx, domain, config.Timeout, customResolver, log, &errors)
 		zoneTransferDetails = append(zoneTransferDetails, details)
 	}
 
