@@ -13,7 +13,7 @@ types:
     properties:
       domain: string
       subdomains: optional<list<string>>
-      wordlistSize: WordlistSize
+      wordlistSize: optional<WordlistSize>
       wordlistFile: optional<string>
       threads: integer
       maxDepth: integer

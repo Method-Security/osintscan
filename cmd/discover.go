@@ -231,18 +231,10 @@ func (a *OsintScan) InitDiscoverCommand() {
 
 			allSubdomains := append(subdomains, wordlistSubdomains...)
 
-			// Priority 3: Fall back to TINY wordlist if no subdomains at all
+			// Fail if no subdomains are provided
 			if len(allSubdomains) == 0 {
-				wordlistSizeEnumValue := dnsfern.WordlistSizeTiny
-				wordlistSizeEnum = &wordlistSizeEnumValue
-
-				tinyWordlistPath := utils.GetDiscoverDNSSubdomainActiveWordlistPath("TINY")
-				tinyWordlistSubdomains, err := utils.GetEntriesFromFiles([]string{tinyWordlistPath})
-				if err != nil {
-					a.OutputSignal.AddError(err)
-					return
-				}
-				allSubdomains = tinyWordlistSubdomains
+				a.OutputSignal.AddError(fmt.Errorf("no subdomains provided: specify either --subdomains, --wordlist-size, or --wordlist-file"))
+				return
 			}
 			threads, err := cmd.Flags().GetInt("threads")
 			if err != nil {
@@ -276,7 +268,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 				Active: &dnsfern.DiscoverDnsSubdomainActiveConfig{
 					Domain:       domain,
 					Subdomains:   allSubdomains,
-					WordlistSize: *wordlistSizeEnum,
+					WordlistSize: wordlistSizeEnum,
 					WordlistFile: &wordlistFile,
 					Threads:      threads,
 					MaxDepth:     maxDepth,
