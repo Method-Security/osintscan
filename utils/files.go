@@ -34,10 +34,10 @@ func GetEntriesFromFiles(paths []string) ([]string, error) {
 // GetDiscoverDNSSubdomainActiveWordlistPath returns the file path for a given wordlist size
 func GetDiscoverDNSSubdomainActiveWordlistPath(wordlistSize string) string {
 	wordlistPaths := map[string]string{
-		"TINY":   "conf/discover/dns/subdomain/wordlist-100.txt",
-		"SMALL":  "conf/discover/dns/subdomain/wordlist-5000.txt",
-		"MEDIUM": "conf/discover/dns/subdomain/wordlist-20000.txt",
-		"LARGE":  "conf/discover/dns/subdomain/wordlist-110000.txt",
+		"TINY":   "/opt/method/osintscan/var/conf/discover/dns/subdomain/wordlist-100.txt",
+		"SMALL":  "/opt/method/osintscan/var/conf/discover/dns/subdomain/wordlist-5000.txt",
+		"MEDIUM": "/opt/method/osintscan/var/conf/discover/dns/subdomain/wordlist-20000.txt",
+		"LARGE":  "/opt/method/osintscan/var/conf/discover/dns/subdomain/wordlist-110000.txt",
 	}
 
 	return wordlistPaths[wordlistSize]
