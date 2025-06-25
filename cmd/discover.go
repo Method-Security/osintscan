@@ -219,7 +219,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 				}
 				wordlistSizeEnum = &wordlistSizeEnumValue
 
-				filePath := utils.GetDiscoverDNSSubdomainActiveWordlistPath(wordlistSize)
+				filePath := subdomain.GetDiscoverDNSSubdomainActiveWordlistPath(wordlistSize)
 				if filePath != "" {
 					wordlistSubdomains, err = utils.GetEntriesFromFiles([]string{filePath})
 					if err != nil {

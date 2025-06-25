@@ -185,3 +185,15 @@ func generateRandomSubdomain(domain string) (string, error) {
 
 	return fmt.Sprintf("%s.%s", string(randomString), domain), nil
 }
+
+// GetDiscoverDNSSubdomainActiveWordlistPath returns the file path for a given wordlist size
+func GetDiscoverDNSSubdomainActiveWordlistPath(wordlistSize string) string {
+	wordlistPaths := map[string]string{
+		"TINY":   "/opt/method/osintscan/var/conf/discover/dns/subdomain/wordlist-100.txt",
+		"SMALL":  "/opt/method/osintscan/var/conf/discover/dns/subdomain/wordlist-5000.txt",
+		"MEDIUM": "/opt/method/osintscan/var/conf/discover/dns/subdomain/wordlist-20000.txt",
+		"LARGE":  "/opt/method/osintscan/var/conf/discover/dns/subdomain/wordlist-110000.txt",
+	}
+
+	return wordlistPaths[wordlistSize]
+}
