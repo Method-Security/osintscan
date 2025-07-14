@@ -10,10 +10,6 @@ types:
       - SMALL
       - MEDIUM
       - LARGE
-  PassiveSource:
-    enum:
-      - CRTSH
-      - WAYBACKARCHIVE
 # Configs
   DiscoverDnsSubdomainActiveConfig:
     properties:
@@ -30,7 +26,6 @@ types:
       domain: string
       threads: integer
       timeout: integer
-      dnsResolvers: list<string>
       requestsPerSecond: integer
       maxEnumerationTime: integer
 # Reports

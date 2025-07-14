@@ -180,7 +180,6 @@ func (a *OsintScan) InitDiscoverCommand() {
 
 	// Target Flags
 	discoverDNSSubdomainPassiveCmd.Flags().String("domain", "", "The domain name to passively enumerate subdomains for")
-	discoverDNSSubdomainPassiveCmd.Flags().StringSlice("dns-resolvers", []string{"8.8.8.8:53"}, "DNS resolvers to use for queries")
 	discoverDNSSubdomainPassiveCmd.Flags().Int("requests-per-second", 0, "Maximum number of requests per second to send to the DNS resolvers")
 	discoverDNSSubdomainPassiveCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
 	discoverDNSSubdomainPassiveCmd.Flags().Int("threads", 10, "Number of concurrent threads for scanning")
@@ -416,7 +415,6 @@ func getDiscoverDNSPassiveSubdomainConfig(domain string, threads, timeout int, d
 			Domain:             domain,
 			Threads:            threads,
 			Timeout:            timeout,
-			DnsResolvers:       dnsResolvers,
 			RequestsPerSecond:  requestsPerSecond,
 			MaxEnumerationTime: maxEnumerationTime,
 		},

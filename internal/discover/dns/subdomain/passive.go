@@ -43,7 +43,6 @@ func getSubdomainsPassive(ctx context.Context, config dnsfern.DiscoverDnsSubdoma
 		Threads:            config.Threads,
 		Timeout:            config.Timeout,
 		MaxEnumerationTime: config.MaxEnumerationTime,
-		Resolvers:          config.DnsResolvers,
 		RateLimit:          config.RequestsPerSecond,
 	}
 
