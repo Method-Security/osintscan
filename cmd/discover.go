@@ -40,9 +40,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 				return
 			}
 
-			config := dnsfern.DiscoverDnsCertsConfig{
-				Domain: domain,
-			}
+			config := getDiscoverDNSCertsConfig(domain)
 
 			report, err := dns.DiscoverDomainCerts(cmd.Context(), config)
 			if err != nil {
@@ -73,9 +71,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 				return
 			}
 
-			config := dnsfern.DiscoverDnsRecordsConfig{
-				Domain: domain,
-			}
+			config := getDiscoverDNSRecordsConfig(domain)
 
 			report, err := dns.DiscoverDomainDNSRecords(cmd.Context(), config)
 			if err != nil {
@@ -106,9 +102,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 				return
 			}
 
-			config := dnsfern.DiscoverDnsForwardReverseConfig{
-				Domain: domain,
-			}
+			config := getDiscoverDNSForwardReverseConfig(domain)
 
 			report := dns.GetForwardReverseDNSLookup(config)
 			a.OutputSignal.Content = report
@@ -144,13 +138,30 @@ func (a *OsintScan) InitDiscoverCommand() {
 				return
 			}
 
-			// Create config
-			config := dnsfern.DiscoverDnsSubdomainConfig{
-				DiscoveryType: strings.ToLower(string(dnsfern.DiscoverDnsSubdomainTypePassive)),
-				Passive: &dnsfern.DiscoverDnsSubdomainPassiveConfig{
-					Domain: domain,
-				},
+			// Config Flags
+			requestsPerSecond, err := cmd.Flags().GetInt("requests-per-second")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
 			}
+			maxEnumerationTime, err := cmd.Flags().GetInt("max-enumeration-time")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			timeout, err := cmd.Flags().GetInt("timeout")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			threads, err := cmd.Flags().GetInt("threads")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			// Create config
+			config := getDiscoverDNSPassiveSubdomainConfig(domain, threads, timeout, requestsPerSecond, maxEnumerationTime)
 
 			// Create report
 			report, err := subdomain.GetDomainSubdomainsPassive(cmd.Context(), config)
@@ -164,6 +175,10 @@ func (a *OsintScan) InitDiscoverCommand() {
 
 	// Target Flags
 	discoverDNSSubdomainPassiveCmd.Flags().String("domain", "", "The domain name to passively enumerate subdomains for")
+	discoverDNSSubdomainPassiveCmd.Flags().Int("requests-per-second", 0, "Maximum number of requests per second to send to the DNS resolvers")
+	discoverDNSSubdomainPassiveCmd.Flags().Int("max-enumeration-time", 3, "Maximum time (in minutes) to run discovery")
+	discoverDNSSubdomainPassiveCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
+	discoverDNSSubdomainPassiveCmd.Flags().Int("threads", 10, "Number of concurrent threads for scanning")
 
 	// Mark Required Flags
 	_ = discoverDNSSubdomainPassiveCmd.MarkFlagRequired("domain")
@@ -263,19 +278,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 					return
 				}
 			}
-			config := dnsfern.DiscoverDnsSubdomainConfig{
-				DiscoveryType: strings.ToLower(string(dnsfern.DiscoverDnsSubdomainTypeActive)),
-				Active: &dnsfern.DiscoverDnsSubdomainActiveConfig{
-					Domain:       domain,
-					Subdomains:   allSubdomains,
-					WordlistSize: wordlistSizeEnum,
-					WordlistFile: &wordlistFile,
-					Threads:      threads,
-					MaxDepth:     maxDepth,
-					Timeout:      timeout,
-					DnsResolver:  &dnsResolver,
-				},
-			}
+			config := getDiscoverDNSActiveSubdomainConfig(domain, allSubdomains, wordlistSizeEnum, &wordlistFile, threads, maxDepth, timeout, &dnsResolver)
 
 			report, err := subdomain.GetDomainSubdomainsActive(cmd.Context(), config)
 			if err != nil {
@@ -293,7 +296,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 	discoverDNSSubdomainActiveCmd.Flags().StringSlice("subdomains", []string{}, "A list of subdomain names to test during discovery")
 	discoverDNSSubdomainActiveCmd.Flags().String("wordlist-size", "", "The size of the in-built wordlist to use for discovery")
 	discoverDNSSubdomainActiveCmd.Flags().String("wordlist-file", "", "The file containing the wordlist to use for discovery")
-	discoverDNSSubdomainActiveCmd.Flags().Int("threads", 20, "Number of parallel threads to use for discovery")
+	discoverDNSSubdomainActiveCmd.Flags().Int("threads", 10, "Number of parallel threads to use for discovery")
 	discoverDNSSubdomainActiveCmd.Flags().Int("max-depth", 2, "Maximum recursion depth for subdomain discovery")
 	discoverDNSSubdomainActiveCmd.Flags().Int("timeout", 0, "Maximum time (in minutes) to spend on subdomain discovery")
 	discoverDNSSubdomainActiveCmd.Flags().String("dns-resolver", "", "Custom DNS resolver/server to use for queries (e.g. 1.1.1.1:53)")
@@ -376,4 +379,56 @@ func (a *OsintScan) InitDiscoverCommand() {
 	discoverShodanCmd.AddCommand(discoverShodanHostnameCmd)
 
 	a.RootCmd.AddCommand(discoverCmd)
+}
+
+// getDiscoverDNSCertsConfig creates and returns a configuration for DNS certificate discovery
+func getDiscoverDNSCertsConfig(domain string) dnsfern.DiscoverDnsCertsConfig {
+	return dnsfern.DiscoverDnsCertsConfig{
+		Domain: domain,
+	}
+}
+
+// getDiscoverDNSRecordsConfig creates and returns a configuration for DNS records discovery
+func getDiscoverDNSRecordsConfig(domain string) dnsfern.DiscoverDnsRecordsConfig {
+	return dnsfern.DiscoverDnsRecordsConfig{
+		Domain: domain,
+	}
+}
+
+// getDiscoverDNSForwardReverseConfig creates and returns a configuration for forward/reverse DNS lookup
+func getDiscoverDNSForwardReverseConfig(domain string) dnsfern.DiscoverDnsForwardReverseConfig {
+	return dnsfern.DiscoverDnsForwardReverseConfig{
+		Domain: domain,
+	}
+}
+
+// getDiscoverDNSPassiveSubdomainConfig creates and returns a configuration for passive subdomain discovery
+func getDiscoverDNSPassiveSubdomainConfig(domain string, threads, timeout int, requestsPerSecond int, maxEnumerationTime int) dnsfern.DiscoverDnsSubdomainConfig {
+	return dnsfern.DiscoverDnsSubdomainConfig{
+		DiscoveryType: strings.ToLower(string(dnsfern.DiscoverDnsSubdomainTypePassive)),
+		Passive: &dnsfern.DiscoverDnsSubdomainPassiveConfig{
+			Domain:             domain,
+			Threads:            threads,
+			Timeout:            timeout,
+			RequestsPerSecond:  requestsPerSecond,
+			MaxEnumerationTime: maxEnumerationTime,
+		},
+	}
+}
+
+// getDiscoverDNSActiveSubdomainConfig creates and returns a configuration for active subdomain discovery
+func getDiscoverDNSActiveSubdomainConfig(domain string, subdomains []string, wordlistSize *dnsfern.WordlistSize, wordlistFile *string, threads, maxDepth, timeout int, dnsResolver *string) dnsfern.DiscoverDnsSubdomainConfig {
+	return dnsfern.DiscoverDnsSubdomainConfig{
+		DiscoveryType: strings.ToLower(string(dnsfern.DiscoverDnsSubdomainTypeActive)),
+		Active: &dnsfern.DiscoverDnsSubdomainActiveConfig{
+			Domain:       domain,
+			Subdomains:   subdomains,
+			WordlistSize: wordlistSize,
+			WordlistFile: wordlistFile,
+			Threads:      threads,
+			MaxDepth:     maxDepth,
+			Timeout:      timeout,
+			DnsResolver:  dnsResolver,
+		},
+	}
 }

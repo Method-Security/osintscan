@@ -1,4 +1,5 @@
 types:
+# Enums
   DiscoverDnsSubdomainType:
     enum:
       - ACTIVE
@@ -9,6 +10,7 @@ types:
       - SMALL
       - MEDIUM
       - LARGE
+# Configs
   DiscoverDnsSubdomainActiveConfig:
     properties:
       domain: string
@@ -22,6 +24,11 @@ types:
   DiscoverDnsSubdomainPassiveConfig:
     properties:
       domain: string
+      threads: integer
+      timeout: integer
+      requestsPerSecond: integer
+      maxEnumerationTime: integer
+# Reports
   DiscoverDnsSubdomainConfig:
     discriminant: discoveryType
     union:

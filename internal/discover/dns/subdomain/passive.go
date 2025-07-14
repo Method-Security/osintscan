@@ -16,7 +16,7 @@ func GetDomainSubdomainsPassive(ctx context.Context, config dnsfern.DiscoverDnsS
 	errors := []string{}
 
 	// Get all valid subdomains using passive enumeration
-	subdomains, err := getSubdomainsPassive(ctx, config.GetPassive().Domain)
+	subdomains, err := getSubdomainsPassive(ctx, *config.Passive)
 	if err != nil {
 		errors = append(errors, err.Error())
 	}
@@ -37,11 +37,13 @@ func GetDomainSubdomainsPassive(ctx context.Context, config dnsfern.DiscoverDnsS
 // SubdomainsEnumReport represents the report of all subdomains for a given domain including all non-fatal errors that occurred.
 
 // getSubdomainsPassive runs subfinder in passive mode for a single domain and returns the discovered subdomains.
-func getSubdomainsPassive(ctx context.Context, domain string) ([]string, error) {
+func getSubdomainsPassive(ctx context.Context, config dnsfern.DiscoverDnsSubdomainPassiveConfig) ([]string, error) {
+	// Set subfinder config
 	subfinderOpts := &runner.Options{
-		Threads:            10, // Number of threads for enumeration
-		Timeout:            30, // Timeout in seconds for sources
-		MaxEnumerationTime: 10, // Max time in minutes for enumeration
+		Threads:            config.Threads,
+		Timeout:            config.Timeout,
+		MaxEnumerationTime: config.MaxEnumerationTime,
+		RateLimit:          config.RequestsPerSecond,
 	}
 
 	// Initialize subfinder runner
@@ -52,7 +54,7 @@ func getSubdomainsPassive(ctx context.Context, domain string) ([]string, error) 
 
 	output := &bytes.Buffer{}
 	// Run subdomain enumeration for the given domain
-	if err = subfinder.EnumerateSingleDomainWithCtx(ctx, domain, []io.Writer{output}); err != nil {
+	if err = subfinder.EnumerateSingleDomainWithCtx(ctx, config.Domain, []io.Writer{output}); err != nil {
 		return []string{}, err
 	}
 

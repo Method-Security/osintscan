@@ -67,12 +67,7 @@ func (a *OsintScan) InitEnumerateCommand() {
 				}
 			}
 
-			config := dnsfern.EnumerateDnsZoneTransferConfig{
-				Domains:     domains,
-				Nameserver:  &nameserver,
-				DnsResolver: &dnsResolver,
-				Timeout:     timeout,
-			}
+			config := getEnumerateDNSZoneTransferConfig(domains, nameserver, dnsResolver, timeout)
 
 			report, err := zonetransfer.TestZoneTransfer(cmd.Context(), config)
 			if err != nil {
@@ -94,4 +89,14 @@ func (a *OsintScan) InitEnumerateCommand() {
 	enumerateDNSCmd.AddCommand(enumerateDNSZoneTransferCmd)
 
 	a.RootCmd.AddCommand(enumerateCmd)
+}
+
+// getEnumerateDNSZoneTransferConfig creates and returns a configuration for DNS zone transfer enumeration
+func getEnumerateDNSZoneTransferConfig(domains []string, nameserver, dnsResolver string, timeout int) dnsfern.EnumerateDnsZoneTransferConfig {
+	return dnsfern.EnumerateDnsZoneTransferConfig{
+		Domains:     domains,
+		Nameserver:  &nameserver,
+		DnsResolver: &dnsResolver,
+		Timeout:     timeout,
+	}
 }
