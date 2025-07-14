@@ -41,8 +41,8 @@ func getSubdomainsPassive(ctx context.Context, config dnsfern.DiscoverDnsSubdoma
 	// Set subfinder config
 	subfinderOpts := &runner.Options{
 		Threads:            config.Threads,
-		Timeout:            config.Timeout,
-		MaxEnumerationTime: config.MaxEnumerationTime,
+		Timeout:            30,
+		MaxEnumerationTime: 10,
 		RateLimit:          config.RequestsPerSecond,
 	}
 

@@ -144,16 +144,6 @@ func (a *OsintScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			maxEnumerationTime, err := cmd.Flags().GetInt("max-enumeration-time")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-			timeout, err := cmd.Flags().GetInt("timeout")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
 			threads, err := cmd.Flags().GetInt("threads")
 			if err != nil {
 				a.OutputSignal.AddError(err)
@@ -161,7 +151,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 			}
 
 			// Create config
-			config := getDiscoverDNSPassiveSubdomainConfig(domain, threads, timeout, requestsPerSecond, maxEnumerationTime)
+			config := getDiscoverDNSPassiveSubdomainConfig(domain, requestsPerSecond, threads)
 
 			// Create report
 			report, err := subdomain.GetDomainSubdomainsPassive(cmd.Context(), config)
@@ -176,8 +166,6 @@ func (a *OsintScan) InitDiscoverCommand() {
 	// Target Flags
 	discoverDNSSubdomainPassiveCmd.Flags().String("domain", "", "The domain name to passively enumerate subdomains for")
 	discoverDNSSubdomainPassiveCmd.Flags().Int("requests-per-second", 0, "Maximum number of requests per second to send to the DNS resolvers")
-	discoverDNSSubdomainPassiveCmd.Flags().Int("max-enumeration-time", 3, "Maximum time (in minutes) to run discovery")
-	discoverDNSSubdomainPassiveCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
 	discoverDNSSubdomainPassiveCmd.Flags().Int("threads", 10, "Number of concurrent threads for scanning")
 
 	// Mark Required Flags
@@ -403,15 +391,13 @@ func getDiscoverDNSForwardReverseConfig(domain string) dnsfern.DiscoverDnsForwar
 }
 
 // getDiscoverDNSPassiveSubdomainConfig creates and returns a configuration for passive subdomain discovery
-func getDiscoverDNSPassiveSubdomainConfig(domain string, threads, timeout int, requestsPerSecond int, maxEnumerationTime int) dnsfern.DiscoverDnsSubdomainConfig {
+func getDiscoverDNSPassiveSubdomainConfig(domain string, requestsPerSecond int, threads int) dnsfern.DiscoverDnsSubdomainConfig {
 	return dnsfern.DiscoverDnsSubdomainConfig{
 		DiscoveryType: strings.ToLower(string(dnsfern.DiscoverDnsSubdomainTypePassive)),
 		Passive: &dnsfern.DiscoverDnsSubdomainPassiveConfig{
-			Domain:             domain,
-			Threads:            threads,
-			Timeout:            timeout,
-			RequestsPerSecond:  requestsPerSecond,
-			MaxEnumerationTime: maxEnumerationTime,
+			Domain:            domain,
+			RequestsPerSecond: requestsPerSecond,
+			Threads:           threads,
 		},
 	}
 }
