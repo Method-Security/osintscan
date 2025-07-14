@@ -24,10 +24,8 @@ types:
   DiscoverDnsSubdomainPassiveConfig:
     properties:
       domain: string
-      threads: integer
-      timeout: integer
       requestsPerSecond: integer
-      maxEnumerationTime: integer
+      threads: integer
 # Reports
   DiscoverDnsSubdomainConfig:
     discriminant: discoveryType
