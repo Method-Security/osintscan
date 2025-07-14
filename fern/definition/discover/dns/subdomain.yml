@@ -1,4 +1,5 @@
 types:
+# Enums
   DiscoverDnsSubdomainType:
     enum:
       - ACTIVE
@@ -9,6 +10,11 @@ types:
       - SMALL
       - MEDIUM
       - LARGE
+  PassiveSource:
+    enum:
+      - CRTSH
+      - WAYBACKARCHIVE
+# Configs
   DiscoverDnsSubdomainActiveConfig:
     properties:
       domain: string
@@ -22,6 +28,12 @@ types:
   DiscoverDnsSubdomainPassiveConfig:
     properties:
       domain: string
+      threads: integer
+      timeout: integer
+      dnsResolvers: list<string>
+      requestsPerSecond: integer
+      maxEnumerationTime: integer
+# Reports
   DiscoverDnsSubdomainConfig:
     discriminant: discoveryType
     union:
