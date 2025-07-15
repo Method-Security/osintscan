@@ -7,10 +7,16 @@ import (
 	"math/big"
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 
+	// Generated
 	dnsfern "github.com/Method-Security/osintscan/generated/go/discover/dns"
+
+	// Utils
 	"github.com/Method-Security/osintscan/utils"
+
+	// External
 	"github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
@@ -79,6 +85,7 @@ func getSubdomainsActive(ctx context.Context, domain string, subdomainList []str
 	resolver := utils.GetResolver(dnsServerAddress, log)
 
 	// First iteration - test all base subdomains for wildcards
+	log.Info("Detecting wildcards", svc1log.SafeParam("domain", domain))
 	wildcardDNS, err := detectWildcardDNS(ctx, domain, resolver)
 	if err != nil {
 		return []string{}, err
@@ -89,15 +96,24 @@ func getSubdomainsActive(ctx context.Context, domain string, subdomainList []str
 		return subdomains, nil
 	}
 
+	log.Info("Generating base permutations", svc1log.SafeParam("domain", domain))
 	basePermutations := generatePermutations([]string{domain}, subdomainList)
-	validBaseSubdomains := testPermutations(ctx, basePermutations, resolver, semaphore, &wg, subdomainsMutex, subdomainsSet, &subdomains)
+	validBaseSubdomains := testPermutations(ctx, basePermutations, resolver, semaphore, &wg, subdomainsMutex, subdomainsSet, &subdomains, 1, recursiveDepth)
 
 	// For each subsequent depth, only build on valid subdomains from previous iteration
+	log.Info("Starting subdomain discovery", svc1log.SafeParam("base_subdomain count", len(validBaseSubdomains)))
 	currentDepthSubdomains := validBaseSubdomains
 	for depth := 2; depth <= recursiveDepth; depth++ {
 		if len(currentDepthSubdomains) == 0 {
 			break // No valid subdomains to build on
 		}
+
+		depthPercentage := float64(depth-1) / float64(recursiveDepth-1) * 100
+		log.Info("Processing subdomain depth",
+			svc1log.SafeParam("depth", depth),
+			svc1log.SafeParam("max_depth", recursiveDepth),
+			svc1log.SafeParam("depth_progress_pct", fmt.Sprintf("%.1f", depthPercentage)),
+			svc1log.SafeParam("subdomain_count", len(currentDepthSubdomains)))
 
 		validSubdomains := []string{}
 		for _, subdomain := range currentDepthSubdomains {
@@ -114,7 +130,7 @@ func getSubdomainsActive(ctx context.Context, domain string, subdomainList []str
 		}
 
 		newPermutations := generatePermutations(validSubdomains, subdomainList)
-		currentDepthSubdomains = testPermutations(ctx, newPermutations, resolver, semaphore, &wg, subdomainsMutex, subdomainsSet, &subdomains)
+		currentDepthSubdomains = testPermutations(ctx, newPermutations, resolver, semaphore, &wg, subdomainsMutex, subdomainsSet, &subdomains, depth, recursiveDepth)
 	}
 
 	return subdomains, nil
@@ -122,9 +138,13 @@ func getSubdomainsActive(ctx context.Context, domain string, subdomainList []str
 
 // testPermutations concurrently tests a list of subdomain permutations for DNS resolution.
 // Uses a semaphore to limit concurrency and mutexes to protect shared state.
-func testPermutations(ctx context.Context, permutations []string, resolver *net.Resolver, semaphore chan struct{}, wg *sync.WaitGroup, subdomainsMutex *sync.Mutex, subdomainsSet map[string]struct{}, subdomains *[]string) []string {
+func testPermutations(ctx context.Context, permutations []string, resolver *net.Resolver, semaphore chan struct{}, wg *sync.WaitGroup, subdomainsMutex *sync.Mutex, subdomainsSet map[string]struct{}, subdomains *[]string, depth int, maxDepth int) []string {
+	log := svc1log.FromContext(ctx)
 	var validSubdomains []string
 	validSubdomainsMutex := &sync.Mutex{}
+
+	totalPermutations := len(permutations)
+	var completedCount int64
 
 	for _, testSubdomain := range permutations {
 		wg.Add(1)
@@ -139,7 +159,27 @@ func testPermutations(ctx context.Context, permutations []string, resolver *net.
 				return
 			}
 
+			// Capture the duration of the lookup
+			start := time.Now()
 			_, err := resolver.LookupHost(ctx, testSubdomain)
+			duration := time.Since(start)
+			completed := atomic.AddInt64(&completedCount, 1)
+
+			if duration.Milliseconds() < 1000 {
+				log.Info("Subdomain check",
+					svc1log.SafeParam("duration_ms", duration.Milliseconds()),
+					svc1log.SafeParam("depth", depth),
+					svc1log.SafeParam("completed", completed),
+					svc1log.SafeParam("total", totalPermutations))
+			} else {
+				log.Warn("Subdomain check (Longer than 1 second)",
+					svc1log.SafeParam("duration_ms", duration.Milliseconds()),
+					svc1log.SafeParam("depth", depth),
+					svc1log.SafeParam("completed", completed),
+					svc1log.SafeParam("total", totalPermutations))
+			}
+
+			// If the subdomain is found, add it to the list
 			if err == nil {
 				subdomainsMutex.Lock()
 				if _, exists := subdomainsSet[testSubdomain]; !exists {
