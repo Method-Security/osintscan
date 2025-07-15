@@ -9,8 +9,13 @@ import (
 	"sync"
 	"time"
 
+	// Generated
 	dnsfern "github.com/Method-Security/osintscan/generated/go/discover/dns"
+
+	// Utils
 	"github.com/Method-Security/osintscan/utils"
+
+	// External
 	"github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
@@ -79,6 +84,7 @@ func getSubdomainsActive(ctx context.Context, domain string, subdomainList []str
 	resolver := utils.GetResolver(dnsServerAddress, log)
 
 	// First iteration - test all base subdomains for wildcards
+	log.Info("Detecting wildcards", svc1log.SafeParam("domain", domain))
 	wildcardDNS, err := detectWildcardDNS(ctx, domain, resolver)
 	if err != nil {
 		return []string{}, err
@@ -89,16 +95,19 @@ func getSubdomainsActive(ctx context.Context, domain string, subdomainList []str
 		return subdomains, nil
 	}
 
+	log.Info("Generating base permutations", svc1log.SafeParam("domain", domain))
 	basePermutations := generatePermutations([]string{domain}, subdomainList)
 	validBaseSubdomains := testPermutations(ctx, basePermutations, resolver, semaphore, &wg, subdomainsMutex, subdomainsSet, &subdomains)
 
 	// For each subsequent depth, only build on valid subdomains from previous iteration
+	log.Info("Starting subdomain discovery", svc1log.SafeParam("base_subdomain count", len(validBaseSubdomains)))
 	currentDepthSubdomains := validBaseSubdomains
 	for depth := 2; depth <= recursiveDepth; depth++ {
 		if len(currentDepthSubdomains) == 0 {
 			break // No valid subdomains to build on
 		}
 
+		log.Info("Processing subdomain depth", svc1log.SafeParam("depth", depth), svc1log.SafeParam("subdomain_count", len(currentDepthSubdomains)))
 		validSubdomains := []string{}
 		for _, subdomain := range currentDepthSubdomains {
 			wildcardDNS, err := detectWildcardDNS(ctx, subdomain, resolver)
