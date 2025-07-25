@@ -63,7 +63,6 @@ func GetResolver(dnsServerAddress string, log svc1log.Logger) *net.Resolver {
 		log.Info("Using system default DNS resolver")
 		resolver = &net.Resolver{}
 	} else {
-		log.Info("Using custom DNS server address", svc1log.SafeParam("dnsServerAddress", dnsServerAddress))
 		resolver = &net.Resolver{
 			PreferGo: true,
 			Dial: func(ctx context.Context, network, address string) (net.Conn, error) {

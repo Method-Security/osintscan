@@ -19,6 +19,7 @@ blog
 dev
 www2
 ns3
+artifactory
 pop3
 forum
 admin

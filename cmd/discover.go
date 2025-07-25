@@ -8,6 +8,7 @@ import (
 	dnsfern "github.com/Method-Security/osintscan/generated/go/discover/dns"
 	dns "github.com/Method-Security/osintscan/internal/discover/dns"
 	subdomain "github.com/Method-Security/osintscan/internal/discover/dns/subdomain"
+	subdomainIntelligent "github.com/Method-Security/osintscan/internal/discover/dns/subdomain/intelligent"
 	shodan "github.com/Method-Security/osintscan/internal/discover/shodan"
 	"github.com/Method-Security/osintscan/utils"
 	"github.com/spf13/cobra"
@@ -118,6 +119,10 @@ func (a *OsintScan) InitDiscoverCommand() {
 	// Add command to 'dns' command
 	discoverDNSCmd.AddCommand(discoverDNSForwardReverseCmd)
 
+	// subdomain Commands
+	// subdomain active
+	// subdomain passive
+	// subdomain intelligent
 	discoverDNSSubdomainCmd := &cobra.Command{
 		Use:   "subdomain",
 		Short: "Discover subdomains for a domain",
@@ -295,6 +300,64 @@ func (a *OsintScan) InitDiscoverCommand() {
 	// Add command to 'subdomain' command
 	discoverDNSSubdomainCmd.AddCommand(discoverDNSSubdomainActiveCmd)
 
+	discoverDNSSubdomainIntelligentCmd := &cobra.Command{
+		Use:   "intelligent",
+		Short: "Intelligently discover subdomains",
+		Long:  `Intelligently discover subdomains for the specified domain by using various techniques to find subdomains.`,
+		Run: func(cmd *cobra.Command, args []string) {
+			domains, err := cmd.Flags().GetStringSlice("domains")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			threads, err := cmd.Flags().GetInt("threads")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			timeout, err := cmd.Flags().GetInt("timeout")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			dnsResolver, err := cmd.Flags().GetString("dns-resolver")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			if dnsResolver != "" {
+				err = utils.ValidateDNSServerAddress(dnsResolver)
+				if err != nil {
+					a.OutputSignal.AddError(err)
+					return
+				}
+			}
+			config := getDiscoverDNSIntelligentSubdomainConfig(domains, threads, timeout, &dnsResolver)
+
+			report, err := subdomainIntelligent.GetSubDomainsIntelligent(cmd.Context(), config)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			a.OutputSignal.Content = report
+		},
+	}
+
+	// Target Flags
+	discoverDNSSubdomainIntelligentCmd.Flags().StringSlice("domains", []string{}, "A list of domain names to discover subdomains for")
+
+	// Config Flags
+	discoverDNSSubdomainIntelligentCmd.Flags().Int("threads", 10, "Number of parallel threads to use for discovery")
+	discoverDNSSubdomainIntelligentCmd.Flags().Int("timeout", 0, "Maximum time (in minutes) to spend on subdomain discovery")
+	discoverDNSSubdomainIntelligentCmd.Flags().String("dns-resolver", "8.8.8.8:53", "Custom DNS resolver/server to use for queries (e.g. 1.1.1.1:53)")
+
+	// Mark Required Flags
+	_ = discoverDNSSubdomainIntelligentCmd.MarkFlagRequired("domains")
+
+	// Add command to 'subdomain' command
+	discoverDNSSubdomainCmd.AddCommand(discoverDNSSubdomainIntelligentCmd)
+
 	discoverShodanCmd := &cobra.Command{
 		Use:   "shodan",
 		Short: "Query Shodan for host and service information",
@@ -415,6 +478,19 @@ func getDiscoverDNSActiveSubdomainConfig(domain string, subdomains []string, wor
 			MaxDepth:     maxDepth,
 			Timeout:      timeout,
 			DnsResolver:  dnsResolver,
+		},
+	}
+}
+
+// getDiscoverDNSIntelligentSubdomainConfig creates and returns a configuration for intelligent subdomain discovery
+func getDiscoverDNSIntelligentSubdomainConfig(domains []string, threads int, timeout int, dnsResolver *string) dnsfern.DiscoverDnsSubdomainConfig {
+	return dnsfern.DiscoverDnsSubdomainConfig{
+		DiscoveryType: strings.ToLower(string(dnsfern.DiscoverDnsSubdomainTypeIntelligent)),
+		Intelligent: &dnsfern.DiscoverDnsSubdomainIntelligentConfig{
+			Domains:     domains,
+			Threads:     threads,
+			Timeout:     timeout,
+			DnsResolver: dnsResolver,
 		},
 	}
 }

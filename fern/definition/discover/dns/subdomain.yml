@@ -4,6 +4,7 @@ types:
     enum:
       - ACTIVE
       - PASSIVE
+      - INTELLIGENT
   WordlistSize:
     enum:
       - TINY
@@ -26,12 +27,19 @@ types:
       domain: string
       requestsPerSecond: integer
       threads: integer
+  DiscoverDnsSubdomainIntelligentConfig:
+    properties:
+      domains: list<string>
+      threads: integer
+      timeout: integer
+      dnsResolver: optional<string>
 # Reports
   DiscoverDnsSubdomainConfig:
     discriminant: discoveryType
     union:
       active: DiscoverDnsSubdomainActiveConfig
       passive: DiscoverDnsSubdomainPassiveConfig
+      intelligent: DiscoverDnsSubdomainIntelligentConfig
   DiscoverDnsSubdomainResult:
     properties:
       subdomains: optional<list<string>>
