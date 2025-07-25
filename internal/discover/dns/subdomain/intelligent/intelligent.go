@@ -16,14 +16,8 @@ func GetSubDomainsIntelligent(ctx context.Context, config dnsfern.DiscoverDnsSub
 	intelligentConfig := config.GetIntelligent()
 	errors := []string{}
 
-	// Handle DNS resolver safely
-	dnsResolver := "8.8.8.8:53" // Default value
-	if intelligentConfig.DnsResolver != nil {
-		dnsResolver = *intelligentConfig.DnsResolver
-	}
-
 	// Run the intelligent domain discovery
-	domains, err := getDomainsIntelligentWithRecursion(ctx, intelligentConfig.Domains, intelligentConfig.Threads, intelligentConfig.Timeout, intelligentConfig.MaxRecursion, dnsResolver)
+	domains, err := getDomainsIntelligentWithRecursion(ctx, intelligentConfig.Domains, intelligentConfig.Threads, intelligentConfig.Timeout, intelligentConfig.MaxRecursion, *intelligentConfig.DnsResolver)
 	if err != nil {
 		errors = append(errors, err.Error())
 	}

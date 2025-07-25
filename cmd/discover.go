@@ -356,7 +356,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 	discoverDNSSubdomainIntelligentCmd.Flags().Int("threads", 10, "Number of parallel threads to use for discovery")
 	discoverDNSSubdomainIntelligentCmd.Flags().Int("timeout", 0, "Maximum time (in minutes) to spend on subdomain discovery")
 	discoverDNSSubdomainIntelligentCmd.Flags().Int("max-recursion", 2, "Maximum recursion for intelligent subdomain discovery")
-	discoverDNSSubdomainIntelligentCmd.Flags().String("dns-resolver", "8.8.8.8:53", "Custom DNS resolver/server to use for queries (e.g. 1.1.1.1:53)")
+	discoverDNSSubdomainIntelligentCmd.Flags().String("dns-resolver", "1.1.1.1:53", "Custom DNS resolver/server to use for queries (e.g. 1.1.1.1:53)")
 
 	// Mark Required Flags
 	_ = discoverDNSSubdomainIntelligentCmd.MarkFlagRequired("domains")
