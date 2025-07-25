@@ -12,10 +12,8 @@ import (
 
 	// Generated
 	dnsfern "github.com/Method-Security/osintscan/generated/go/discover/dns"
-
 	// Utils
 	"github.com/Method-Security/osintscan/utils"
-
 	// External
 	"github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
@@ -229,7 +227,7 @@ func generateRandomSubdomain(domain string) (string, error) {
 // GetDiscoverDNSSubdomainActiveWordlistPath returns the file path for a given wordlist size
 func GetDiscoverDNSSubdomainActiveWordlistPath(wordlistSize string) string {
 	wordlistPaths := map[string]string{
-		"TINY":   "/opt/method/osintscan/var/conf/discover/dns/subdomain/wordlist-100.txt",
+		"TINY":   "/opt/method/osintscan/var/conf/discover/dns/subdomain/wordlist-500.txt",
 		"SMALL":  "/opt/method/osintscan/var/conf/discover/dns/subdomain/wordlist-5000.txt",
 		"MEDIUM": "/opt/method/osintscan/var/conf/discover/dns/subdomain/wordlist-20000.txt",
 		"LARGE":  "/opt/method/osintscan/var/conf/discover/dns/subdomain/wordlist-110000.txt",
