@@ -24,7 +24,7 @@ var commonLocationCodes = []string{
 	"mia", "miami", "lon", "london", "par", "paris", "tok", "tokyo", "syd", "sydney",
 	"tor", "toronto", "van", "vancouver", "sea", "seattle", "sf", "sanfrancisco",
 	"bos", "boston", "atl", "atlanta", "den", "denver", "dal", "dallas", "hou", "houston",
-	"phx", "phoenix", "det", "detroit", "min", "minneapolis",
+	"phx", "phoenix", "det", "detroit", "min", "minneapolis", "atl", "atlanta",
 
 	// Country codes (ISO 3166-1 alpha-2) and common variations
 	"us", "usa", "uk", "gb", "ca", "canada", "de", "germany", "fr", "france",
