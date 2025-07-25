@@ -12,10 +12,8 @@ import (
 
 	// Generated
 	dnsfern "github.com/Method-Security/osintscan/generated/go/discover/dns"
-
 	// Utils
 	"github.com/Method-Security/osintscan/utils"
-
 	// External
 	"github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )

@@ -132,7 +132,7 @@ var commonInternalTerms = []string{
 // CORE INTELLIGENT DISCOVERY FUNCTIONS
 // =============================================================================
 
-// Simple wrapper functions that add cache support
+// TestWordlistSubstitutionWithCache tests wordlist substitution for a given domain
 func TestWordlistSubstitutionWithCache(ctx context.Context, fqdn string, dnsServerAddress string, existingDomains []string, maxWorkers int, dnsCache *sync.Map) ([]string, error) {
 	log := svc1log.FromContext(ctx)
 	log.Info("Starting wordlist substitution analysis", svc1log.SafeParam("fqdn", fqdn))
@@ -579,11 +579,6 @@ func reconstructDomain(parts []string, separators []string) string {
 	}
 
 	return result
-}
-
-// testDomainsConcurrently tests potential domains concurrently
-func testDomainsConcurrently(ctx context.Context, candidates []string, dnsServerAddress string, maxWorkers int) ([]string, error) {
-	return testDomainsWithCache(ctx, candidates, dnsServerAddress, maxWorkers, nil)
 }
 
 func testDomainsWithCache(ctx context.Context, candidates []string, dnsServerAddress string, maxWorkers int, dnsCache *sync.Map) ([]string, error) {

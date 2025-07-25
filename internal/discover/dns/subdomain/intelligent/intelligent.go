@@ -8,7 +8,6 @@ import (
 
 	// Generated
 	dnsfern "github.com/Method-Security/osintscan/generated/go/discover/dns"
-
 	// External
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
