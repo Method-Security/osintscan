@@ -77,7 +77,7 @@ func getDomainsIntelligentWithRecursion(ctx context.Context, domains []string, t
 	var completedIterations int
 
 	// Perform recursive analysis
-	for iteration := 0; iteration < maxRecursion; iteration++ {
+	for iteration := 0; iteration <= maxRecursion; iteration++ {
 		completedIterations = iteration + 1
 		log.Info("Starting iteration",
 			svc1log.SafeParam("iteration", completedIterations),
