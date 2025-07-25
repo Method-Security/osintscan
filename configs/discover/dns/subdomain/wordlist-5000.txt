@@ -404,10 +404,12 @@ award
 awards
 aws
 awstats
+awmag
 axis
 az
 azmoon
 azure
+azureapps
 b
 b.ns
 b.ns.e
@@ -4674,6 +4676,7 @@ www.articles
 www.ask
 www.au
 www.auto
+www.basis
 www.b2b
 www.bb
 www.bbs

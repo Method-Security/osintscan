@@ -33,7 +33,9 @@ auth
 autoconfig
 autodiscover
 aws
+awmag
 azure
+azureapps
 backend
 backup
 backups
@@ -473,6 +475,7 @@ west
 whm
 wiki
 www
+www.basis
 www.blog
 www.dev
 www.forum
