@@ -24,7 +24,7 @@ func GetSubDomainsIntelligent(ctx context.Context, config dnsfern.DiscoverDnsSub
 	}
 
 	// Run the intelligent domain discovery
-	domains, err := getDomainsIntelligent(ctx, intelligentConfig.Domains, intelligentConfig.Threads, intelligentConfig.Timeout, dnsResolver)
+	domains, err := getDomainsIntelligentWithRecursion(ctx, intelligentConfig.Domains, intelligentConfig.Threads, intelligentConfig.Timeout, intelligentConfig.MaxRecursion, dnsResolver)
 	if err != nil {
 		errors = append(errors, err.Error())
 	}
@@ -42,7 +42,7 @@ func GetSubDomainsIntelligent(ctx context.Context, config dnsfern.DiscoverDnsSub
 	return report, nil
 }
 
-func getDomainsIntelligent(ctx context.Context, domains []string, threads int, timeout int, dnsResolver string) ([]string, error) {
+func getDomainsIntelligentWithRecursion(ctx context.Context, domains []string, threads int, timeout int, maxRecursion int, dnsResolver string) ([]string, error) {
 	// Create a context with timeout (if timeout > 0)
 	var timeoutCtx context.Context
 	var cancel context.CancelFunc
@@ -56,24 +56,87 @@ func getDomainsIntelligent(ctx context.Context, domains []string, threads int, t
 	}
 
 	log := svc1log.FromContext(timeoutCtx)
-	log.Info("Starting intelligent domain analysis",
-		svc1log.SafeParam("domains", domains),
-		svc1log.SafeParam("threads", threads))
+	log.Info("Starting recursive intelligent domain analysis",
+		svc1log.SafeParam("initial_domains", domains),
+		svc1log.SafeParam("threads", threads),
+		svc1log.SafeParam("max_recursion", maxRecursion))
 
-	// Run intelligent analysis
-	discoveredDomains, err := RunIntelligentAnalysisForDomains(timeoutCtx, domains, dnsResolver, threads)
-	if err != nil {
-		return nil, err
+	// Create shared DNS cache that persists across all iterations
+	dnsCache := &sync.Map{}
+
+	// Track all discovered domains across iterations
+	allDiscoveredDomains := make(map[string]bool)
+	currentDomains := make([]string, len(domains))
+	copy(currentDomains, domains)
+
+	// Add initial domains to the discovered set so we don't include them in results
+	for _, domain := range domains {
+		allDiscoveredDomains[domain] = true
 	}
 
-	return discoveredDomains, nil
+	var finalResults []string
+	var completedIterations int
+
+	// Perform recursive analysis
+	for iteration := 0; iteration < maxRecursion; iteration++ {
+		completedIterations = iteration + 1
+		log.Info("Starting iteration",
+			svc1log.SafeParam("iteration", completedIterations),
+			svc1log.SafeParam("domains_to_analyze", len(currentDomains)))
+
+		// Run intelligent analysis on current set of domains with persistent cache
+		iterationResults, err := RunIntelligentAnalysisForDomainsWithCache(timeoutCtx, currentDomains, dnsResolver, threads, dnsCache)
+		if err != nil {
+			log.Warn("Error in iteration, continuing with partial results",
+				svc1log.SafeParam("iteration", completedIterations),
+				svc1log.SafeParam("error", err.Error()))
+		}
+
+		// Find new domains discovered in this iteration
+		var newDomains []string
+		for _, domain := range iterationResults {
+			if !allDiscoveredDomains[domain] {
+				allDiscoveredDomains[domain] = true
+				newDomains = append(newDomains, domain)
+				finalResults = append(finalResults, domain)
+			}
+		}
+
+		log.Info("Iteration completed",
+			svc1log.SafeParam("iteration", completedIterations),
+			svc1log.SafeParam("new_domains_found", len(newDomains)))
+
+		// If no new domains found, break early
+		if len(newDomains) == 0 {
+			log.Info("No new domains discovered, stopping recursive analysis",
+				svc1log.SafeParam("iteration", completedIterations))
+			break
+		}
+
+		// Use the newly discovered domains as input for the next iteration
+		currentDomains = newDomains
+
+		// Check if context was cancelled
+		select {
+		case <-timeoutCtx.Done():
+			log.Info("Context cancelled, stopping recursive analysis")
+			return finalResults, timeoutCtx.Err()
+		default:
+			// Continue to next iteration
+		}
+	}
+
+	log.Info("Recursive intelligent analysis completed",
+		svc1log.SafeParam("total_discovered", len(finalResults)),
+		svc1log.SafeParam("iterations_completed", completedIterations))
+
+	return finalResults, nil
 }
 
-// RunIntelligentAnalysisForDomains runs comprehensive intelligent analysis on all domains
-// with improved parallelization: processes domains in parallel and runs analysis types concurrently
-func RunIntelligentAnalysisForDomains(ctx context.Context, domains []string, dnsServerAddress string, maxThreads int) ([]string, error) {
+// RunIntelligentAnalysisForDomainsWithCache runs comprehensive intelligent analysis with a provided cache
+func RunIntelligentAnalysisForDomainsWithCache(ctx context.Context, domains []string, dnsServerAddress string, maxThreads int, dnsCache *sync.Map) ([]string, error) {
 	log := svc1log.FromContext(ctx)
-	log.Info("Starting comprehensive intelligent analysis with enhanced parallelization",
+	log.Info("Starting comprehensive intelligent analysis with persistent cache",
 		svc1log.SafeParam("input_domains_count", len(domains)),
 		svc1log.SafeParam("max_threads", maxThreads),
 		svc1log.SafeParam("tests", "wordlist_substitution, high_entropy, numeric_sequence, advanced_patterns"))
@@ -103,7 +166,7 @@ func RunIntelligentAnalysisForDomains(ctx context.Context, domains []string, dns
 		go func() {
 			defer wg.Done()
 			for domain := range domainChan {
-				processDomainConcurrently(ctx, domain, domains, dnsServerAddress, dnsWorkers, allResults)
+				processDomainConcurrentlyWithCache(ctx, domain, domains, dnsServerAddress, dnsWorkers, allResults, dnsCache)
 			}
 		}()
 	}
@@ -150,8 +213,8 @@ func RunIntelligentAnalysisForDomains(ctx context.Context, domains []string, dns
 	return uniqueDomains, nil
 }
 
-// processDomainConcurrently runs all analysis types for a domain concurrently
-func processDomainConcurrently(ctx context.Context, domain string, allDomains []string, dnsServerAddress string, dnsWorkers int, allResults chan<- []string) {
+// processDomainConcurrentlyWithCache runs all analysis types for a domain concurrently with provided cache
+func processDomainConcurrentlyWithCache(ctx context.Context, domain string, allDomains []string, dnsServerAddress string, dnsWorkers int, allResults chan<- []string, dnsCache *sync.Map) {
 	log := svc1log.FromContext(ctx)
 	log.Info("Processing domain with concurrent analysis", svc1log.SafeParam("domain", domain))
 
@@ -162,7 +225,7 @@ func processDomainConcurrently(ctx context.Context, domain string, allDomains []
 	analysisWg.Add(1)
 	go func() {
 		defer analysisWg.Done()
-		if results, err := TestWordlistSubstitution(ctx, domain, dnsServerAddress, allDomains, dnsWorkers); err == nil {
+		if results, err := TestWordlistSubstitutionWithCache(ctx, domain, dnsServerAddress, allDomains, dnsWorkers, dnsCache); err == nil {
 			select {
 			case allResults <- results:
 			case <-ctx.Done():
@@ -174,7 +237,7 @@ func processDomainConcurrently(ctx context.Context, domain string, allDomains []
 	analysisWg.Add(1)
 	go func() {
 		defer analysisWg.Done()
-		if results, err := TestHighEntropyDomains(ctx, domain, dnsServerAddress, allDomains); err == nil {
+		if results, err := TestHighEntropyDomainsWithCache(ctx, domain, dnsServerAddress, allDomains, dnsCache); err == nil {
 			select {
 			case allResults <- results:
 			case <-ctx.Done():
@@ -186,7 +249,7 @@ func processDomainConcurrently(ctx context.Context, domain string, allDomains []
 	analysisWg.Add(1)
 	go func() {
 		defer analysisWg.Done()
-		if results, err := TestNumericSequenceDomains(ctx, domain, dnsServerAddress, allDomains); err == nil {
+		if results, err := TestNumericSequenceDomainsWithCache(ctx, domain, dnsServerAddress, allDomains, dnsCache); err == nil {
 			select {
 			case allResults <- results:
 			case <-ctx.Done():
@@ -198,7 +261,7 @@ func processDomainConcurrently(ctx context.Context, domain string, allDomains []
 	analysisWg.Add(1)
 	go func() {
 		defer analysisWg.Done()
-		if results, err := TestAdvancedPatternAnalysis(ctx, domain, dnsServerAddress, allDomains); err == nil {
+		if results, err := TestAdvancedPatternAnalysisWithCache(ctx, domain, dnsServerAddress, allDomains, dnsCache); err == nil {
 			select {
 			case allResults <- results:
 			case <-ctx.Done():

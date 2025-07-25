@@ -32,6 +32,7 @@ types:
       domains: list<string>
       threads: integer
       timeout: integer
+      maxRecursion: integer
       dnsResolver: optional<string>
 # Reports
   DiscoverDnsSubdomainConfig:

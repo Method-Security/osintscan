@@ -26,14 +26,8 @@ func GetDomainSubdomainsActive(ctx context.Context, config dnsfern.DiscoverDnsSu
 	activeConfig := config.GetActive()
 	errors := []string{}
 
-	// Handle DNS resolver safely
-	dnsResolver := "8.8.8.8:53" // Default value
-	if activeConfig.DnsResolver != nil {
-		dnsResolver = *activeConfig.DnsResolver
-	}
-
 	// Run the active subdomain discovery
-	subdomains, err := getSubdomainsActive(ctx, activeConfig.Domain, activeConfig.Subdomains, activeConfig.Threads, activeConfig.MaxDepth, activeConfig.Timeout, dnsResolver)
+	subdomains, err := getSubdomainsActive(ctx, activeConfig.Domain, activeConfig.Subdomains, activeConfig.Threads, activeConfig.MaxDepth, activeConfig.Timeout, *activeConfig.DnsResolver)
 	if err != nil {
 		errors = append(errors, err.Error())
 	}

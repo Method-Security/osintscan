@@ -132,9 +132,8 @@ var commonInternalTerms = []string{
 // CORE INTELLIGENT DISCOVERY FUNCTIONS
 // =============================================================================
 
-// TestWordlistSubstitution finds wordlist matches in domains and generates variations
-// This is the main intelligent discovery function
-func TestWordlistSubstitution(ctx context.Context, fqdn string, dnsServerAddress string, existingDomains []string, maxWorkers int) ([]string, error) {
+// Simple wrapper functions that add cache support
+func TestWordlistSubstitutionWithCache(ctx context.Context, fqdn string, dnsServerAddress string, existingDomains []string, maxWorkers int, dnsCache *sync.Map) ([]string, error) {
 	log := svc1log.FromContext(ctx)
 	log.Info("Starting wordlist substitution analysis", svc1log.SafeParam("fqdn", fqdn))
 
@@ -179,7 +178,7 @@ func TestWordlistSubstitution(ctx context.Context, fqdn string, dnsServerAddress
 					}
 				}
 
-				// Check for patterns where wordlist term is followed by numbers (e.g., "na8", "us2")
+				// Check for prefix matches with digits
 				for _, word := range wordlist {
 					if len(word) >= 2 && strings.HasPrefix(part, word) {
 						// Check if the part after the word contains only digits
@@ -217,7 +216,7 @@ func TestWordlistSubstitution(ctx context.Context, fqdn string, dnsServerAddress
 	// Add existing domains to candidates for testing
 	candidates = append(candidates, existingDomains...)
 
-	// Remove duplicates and test
+	// Remove duplicates and test with cache
 	uniqueCandidates := removeDuplicateStrings(candidates)
 	log.Info("Generated substitution candidates", svc1log.SafeParam("count", len(uniqueCandidates)))
 
@@ -225,11 +224,10 @@ func TestWordlistSubstitution(ctx context.Context, fqdn string, dnsServerAddress
 		return []string{}, nil
 	}
 
-	return testDomainsConcurrently(ctx, uniqueCandidates, dnsServerAddress, maxWorkers)
+	return testDomainsWithCache(ctx, uniqueCandidates, dnsServerAddress, maxWorkers, dnsCache)
 }
 
-// TestHighEntropyDomains detects high entropy patterns and generates variations
-func TestHighEntropyDomains(ctx context.Context, fqdn string, dnsServerAddress string, existingDomains []string) ([]string, error) {
+func TestHighEntropyDomainsWithCache(ctx context.Context, fqdn string, dnsServerAddress string, existingDomains []string, dnsCache *sync.Map) ([]string, error) {
 	log := svc1log.FromContext(ctx)
 	highEntropyPatterns := extractHighEntropyPatterns(ctx, existingDomains)
 
@@ -268,45 +266,10 @@ func TestHighEntropyDomains(ctx context.Context, fqdn string, dnsServerAddress s
 
 	log.Info("Generated high entropy candidates", svc1log.SafeParam("count", len(uniqueCandidates)-len(existingDomains)))
 
-	return testDomainsConcurrently(ctx, uniqueCandidates, dnsServerAddress, 50)
+	return testDomainsWithCache(ctx, uniqueCandidates, dnsServerAddress, 50, dnsCache)
 }
 
-// generateHighEntropyVariations generates variations for a single high entropy pattern
-func generateHighEntropyVariations(pattern string) []string {
-	var candidates []string
-
-	parts, separators := splitDomainPartsWithStructure(pattern)
-	leftmostPart := parts[0]
-
-	var remainingParts string
-	if len(parts) > 1 {
-		remainingParts = reconstructDomain(parts[1:], separators[1:])
-		if remainingParts != "" {
-			// Add the first separator back to connect leftmost part with remaining parts
-			if len(separators) > 0 {
-				remainingParts = separators[0] + remainingParts
-			} else {
-				remainingParts = "." + remainingParts
-			}
-		}
-	}
-
-	// Test with numbers 0-9 appended
-	for i := 0; i <= 9; i++ {
-		newDomain := fmt.Sprintf("%s%d%s", leftmostPart, i, remainingParts)
-		candidates = append(candidates, newDomain)
-	}
-	// Test with letters a-z appended
-	for i := 'a'; i <= 'z'; i++ {
-		newDomain := fmt.Sprintf("%s%c%s", leftmostPart, i, remainingParts)
-		candidates = append(candidates, newDomain)
-	}
-
-	return candidates
-}
-
-// TestNumericSequenceDomains finds numeric patterns and generates sequences
-func TestNumericSequenceDomains(ctx context.Context, fqdn string, dnsServerAddress string, existingDomains []string) ([]string, error) {
+func TestNumericSequenceDomainsWithCache(ctx context.Context, fqdn string, dnsServerAddress string, existingDomains []string, dnsCache *sync.Map) ([]string, error) {
 	log := svc1log.FromContext(ctx)
 	log.Info("Starting numeric sequence analysis", svc1log.SafeParam("fqdn", fqdn))
 
@@ -347,11 +310,10 @@ func TestNumericSequenceDomains(ctx context.Context, fqdn string, dnsServerAddre
 	candidates = append(candidates, existingDomains...)
 	uniqueCandidates := removeDuplicateStrings(candidates)
 
-	return testDomainsConcurrently(ctx, uniqueCandidates, dnsServerAddress, 50)
+	return testDomainsWithCache(ctx, uniqueCandidates, dnsServerAddress, 50, dnsCache)
 }
 
-// TestAdvancedPatternAnalysis performs cross-correlation of patterns and intelligent permutations
-func TestAdvancedPatternAnalysis(ctx context.Context, domain string, dnsServerAddress string, allDomains []string) ([]string, error) {
+func TestAdvancedPatternAnalysisWithCache(ctx context.Context, domain string, dnsServerAddress string, allDomains []string, dnsCache *sync.Map) ([]string, error) {
 	log := svc1log.FromContext(ctx)
 	log.Info("Starting advanced pattern analysis", svc1log.SafeParam("domain", domain))
 
@@ -415,7 +377,41 @@ func TestAdvancedPatternAnalysis(ctx context.Context, domain string, dnsServerAd
 		}
 	}
 
-	return testDomainsConcurrently(ctx, finalCandidates, dnsServerAddress, 50)
+	return testDomainsWithCache(ctx, finalCandidates, dnsServerAddress, 50, dnsCache)
+}
+
+// generateHighEntropyVariations generates variations for a single high entropy pattern
+func generateHighEntropyVariations(pattern string) []string {
+	var candidates []string
+
+	parts, separators := splitDomainPartsWithStructure(pattern)
+	leftmostPart := parts[0]
+
+	var remainingParts string
+	if len(parts) > 1 {
+		remainingParts = reconstructDomain(parts[1:], separators[1:])
+		if remainingParts != "" {
+			// Add the first separator back to connect leftmost part with remaining parts
+			if len(separators) > 0 {
+				remainingParts = separators[0] + remainingParts
+			} else {
+				remainingParts = "." + remainingParts
+			}
+		}
+	}
+
+	// Test with numbers 0-9 appended
+	for i := 0; i <= 9; i++ {
+		newDomain := fmt.Sprintf("%s%d%s", leftmostPart, i, remainingParts)
+		candidates = append(candidates, newDomain)
+	}
+	// Test with letters a-z appended
+	for i := 'a'; i <= 'z'; i++ {
+		newDomain := fmt.Sprintf("%s%c%s", leftmostPart, i, remainingParts)
+		candidates = append(candidates, newDomain)
+	}
+
+	return candidates
 }
 
 // extractCrossPatterns generates cross-combinations of common prefixes and suffixes
@@ -537,6 +533,7 @@ func splitDomainParts(domain string) []string {
 // splitDomainPartsWithStructure splits a domain and returns both parts and structure info
 func splitDomainPartsWithStructure(domain string) ([]string, []string) {
 	var parts []string
+
 	var separators []string
 
 	currentPart := ""
@@ -586,6 +583,10 @@ func reconstructDomain(parts []string, separators []string) string {
 
 // testDomainsConcurrently tests potential domains concurrently
 func testDomainsConcurrently(ctx context.Context, candidates []string, dnsServerAddress string, maxWorkers int) ([]string, error) {
+	return testDomainsWithCache(ctx, candidates, dnsServerAddress, maxWorkers, nil)
+}
+
+func testDomainsWithCache(ctx context.Context, candidates []string, dnsServerAddress string, maxWorkers int, dnsCache *sync.Map) ([]string, error) {
 	log := svc1log.FromContext(ctx)
 	resolver := utils.GetResolver(dnsServerAddress, log)
 
@@ -612,7 +613,7 @@ func testDomainsConcurrently(ctx context.Context, candidates []string, dnsServer
 				case <-ctx.Done():
 					return
 				default:
-					if testDomainExists(ctx, candidate, resolver) {
+					if testDomainExistsWithCache(ctx, candidate, resolver, dnsCache) {
 						select {
 						case results <- candidate:
 						case <-ctx.Done():
@@ -718,6 +719,25 @@ func testDomainExists(ctx context.Context, domain string, resolver *net.Resolver
 	}
 
 	return false
+}
+
+// testDomainExistsWithCache checks cache first, then does DNS lookup if needed
+func testDomainExistsWithCache(ctx context.Context, domain string, resolver *net.Resolver, dnsCache *sync.Map) bool {
+	// Check cache first if available
+	if dnsCache != nil {
+		if cached, found := dnsCache.Load(domain); found {
+			return cached.(bool)
+		}
+	}
+
+	// Not in cache, do DNS lookup and cache result
+	exists := testDomainExists(ctx, domain, resolver)
+
+	if dnsCache != nil {
+		dnsCache.Store(domain, exists)
+	}
+
+	return exists
 }
 
 // extractHighEntropyPatterns identifies high entropy (random-looking) domains

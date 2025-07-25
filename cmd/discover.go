@@ -321,6 +321,11 @@ func (a *OsintScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
+			maxRecursion, err := cmd.Flags().GetInt("max-recursion")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
 			dnsResolver, err := cmd.Flags().GetString("dns-resolver")
 			if err != nil {
 				a.OutputSignal.AddError(err)
@@ -333,7 +338,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 					return
 				}
 			}
-			config := getDiscoverDNSIntelligentSubdomainConfig(domains, threads, timeout, &dnsResolver)
+			config := getDiscoverDNSIntelligentSubdomainConfig(domains, threads, timeout, maxRecursion, &dnsResolver)
 
 			report, err := subdomainIntelligent.GetSubDomainsIntelligent(cmd.Context(), config)
 			if err != nil {
@@ -350,6 +355,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 	// Config Flags
 	discoverDNSSubdomainIntelligentCmd.Flags().Int("threads", 10, "Number of parallel threads to use for discovery")
 	discoverDNSSubdomainIntelligentCmd.Flags().Int("timeout", 0, "Maximum time (in minutes) to spend on subdomain discovery")
+	discoverDNSSubdomainIntelligentCmd.Flags().Int("max-recursion", 2, "Maximum recursion for intelligent subdomain discovery")
 	discoverDNSSubdomainIntelligentCmd.Flags().String("dns-resolver", "8.8.8.8:53", "Custom DNS resolver/server to use for queries (e.g. 1.1.1.1:53)")
 
 	// Mark Required Flags
@@ -483,14 +489,15 @@ func getDiscoverDNSActiveSubdomainConfig(domain string, subdomains []string, wor
 }
 
 // getDiscoverDNSIntelligentSubdomainConfig creates and returns a configuration for intelligent subdomain discovery
-func getDiscoverDNSIntelligentSubdomainConfig(domains []string, threads int, timeout int, dnsResolver *string) dnsfern.DiscoverDnsSubdomainConfig {
+func getDiscoverDNSIntelligentSubdomainConfig(domains []string, threads int, timeout int, maxRecursion int, dnsResolver *string) dnsfern.DiscoverDnsSubdomainConfig {
 	return dnsfern.DiscoverDnsSubdomainConfig{
 		DiscoveryType: strings.ToLower(string(dnsfern.DiscoverDnsSubdomainTypeIntelligent)),
 		Intelligent: &dnsfern.DiscoverDnsSubdomainIntelligentConfig{
-			Domains:     domains,
-			Threads:     threads,
-			Timeout:     timeout,
-			DnsResolver: dnsResolver,
+			Domains:      domains,
+			Threads:      threads,
+			Timeout:      timeout,
+			MaxRecursion: maxRecursion,
+			DnsResolver:  dnsResolver,
 		},
 	}
 }
