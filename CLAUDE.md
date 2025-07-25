@@ -184,6 +184,16 @@ a.OutputSignal.Content = report
 - **Data Privacy**: Handle collected data responsibly and in compliance with privacy laws
 - **Passive vs Active**: Clearly distinguish between passive and active reconnaissance options
 
+## Development Commands
+
+```bash
+# MANDATORY: Run after completing TODOs to ensure code can be merged
+./godelw verify
+
+# Build the binary
+./godelw build
+```
+
 ## Development Workflow
 
 1. Follow CLI Development Conventions for new commands
@@ -191,6 +201,7 @@ a.OutputSignal.Content = report
 3. Implement proper rate limiting and error handling
 4. Test with various target types and scenarios
 5. Follow existing patterns for consistency
+6. **CRITICAL**: Always run `./godelw verify` after TODO completion before merging
 
 ## File Structure Conventions
 
