@@ -1,11 +1,15 @@
 types:
+# Lookup Struct
   LookupDetails:
     properties:
       forwardIp: optional<string>
       reversePtrs: optional<list<string>>
+# Config Struct
   DiscoverDnsForwardReverseConfig:
     properties:
       domain: string
+      dnsResolvers: optional<list<string>>
+# Report Structs
   DiscoverDnsForwardReverseResult:
     properties:
       lookups: optional<list<LookupDetails>>

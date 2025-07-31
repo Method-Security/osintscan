@@ -113,7 +113,13 @@ func (a *OsintScan) InitDiscoverCommand() {
 				return
 			}
 
-			config := getDiscoverDNSForwardReverseConfig(domain)
+			dnsResolvers, err := cmd.Flags().GetStringSlice("dns-resolvers")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			config := getDiscoverDNSForwardReverseConfig(domain, dnsResolvers)
 
 			report := dns.GetForwardReverseDNSLookup(config)
 			a.OutputSignal.Content = report
@@ -122,6 +128,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 
 	// Target Flags
 	discoverDNSForwardReverseCmd.Flags().String("domain", "", "The domain name to perform forward and reverse lookups on")
+	discoverDNSForwardReverseCmd.Flags().StringSlice("dns-resolvers", []string{}, "Custom DNS resolver/servers to use for queries (e.g. 1.1.1.1:53)")
 
 	// Mark Required Flags
 	_ = discoverDNSForwardReverseCmd.MarkFlagRequired("domain")
@@ -269,19 +276,19 @@ func (a *OsintScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			dnsResolver, err := cmd.Flags().GetString("dns-resolver")
+			dnsResolvers, err := cmd.Flags().GetStringSlice("dns-resolvers")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			if dnsResolver != "" {
+			for _, dnsResolver := range dnsResolvers {
 				err = utils.ValidateDNSServerAddress(dnsResolver)
 				if err != nil {
-					a.OutputSignal.AddError(err)
+					a.OutputSignal.AddError(fmt.Errorf("invalid DNS resolver: %w", err))
 					return
 				}
 			}
-			config := getDiscoverDNSActiveSubdomainConfig(domain, allSubdomains, wordlistSizeEnum, &wordlistFile, threads, maxDepth, timeout, &dnsResolver)
+			config := getDiscoverDNSActiveSubdomainConfig(domain, allSubdomains, wordlistSizeEnum, &wordlistFile, threads, maxDepth, timeout, dnsResolvers)
 
 			report, err := subdomain.GetDomainSubdomainsActive(cmd.Context(), config)
 			if err != nil {
@@ -302,7 +309,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 	discoverDNSSubdomainActiveCmd.Flags().Int("threads", 10, "Number of parallel threads to use for discovery")
 	discoverDNSSubdomainActiveCmd.Flags().Int("max-depth", 2, "Maximum recursion depth for subdomain discovery")
 	discoverDNSSubdomainActiveCmd.Flags().Int("timeout", 0, "Maximum time (in minutes) to spend on subdomain discovery")
-	discoverDNSSubdomainActiveCmd.Flags().String("dns-resolver", "", "Custom DNS resolver/server to use for queries (e.g. 1.1.1.1:53)")
+	discoverDNSSubdomainActiveCmd.Flags().StringSlice("dns-resolvers", []string{}, "Custom DNS resolver/servers to use for queries (e.g. 1.1.1.1:53)")
 
 	// Mark Required Flags
 	_ = discoverDNSSubdomainActiveCmd.MarkFlagRequired("domain")
@@ -500,9 +507,10 @@ func getDiscoverDNSRecordsConfig(domain string) dnsfern.DiscoverDnsRecordsConfig
 }
 
 // getDiscoverDNSForwardReverseConfig creates and returns a configuration for forward/reverse DNS lookup
-func getDiscoverDNSForwardReverseConfig(domain string) dnsfern.DiscoverDnsForwardReverseConfig {
+func getDiscoverDNSForwardReverseConfig(domain string, dnsResolvers []string) dnsfern.DiscoverDnsForwardReverseConfig {
 	return dnsfern.DiscoverDnsForwardReverseConfig{
-		Domain: domain,
+		Domain:       domain,
+		DnsResolvers: dnsResolvers,
 	}
 }
 
@@ -519,7 +527,7 @@ func getDiscoverDNSPassiveSubdomainConfig(domain string, requestsPerSecond int, 
 }
 
 // getDiscoverDNSActiveSubdomainConfig creates and returns a configuration for active subdomain discovery
-func getDiscoverDNSActiveSubdomainConfig(domain string, subdomains []string, wordlistSize *dnsfern.WordlistSize, wordlistFile *string, threads, maxDepth, timeout int, dnsResolver *string) dnsfern.DiscoverDnsSubdomainConfig {
+func getDiscoverDNSActiveSubdomainConfig(domain string, subdomains []string, wordlistSize *dnsfern.WordlistSize, wordlistFile *string, threads, maxDepth, timeout int, dnsResolvers []string) dnsfern.DiscoverDnsSubdomainConfig {
 	return dnsfern.DiscoverDnsSubdomainConfig{
 		DiscoveryType: strings.ToLower(string(dnsfern.DiscoverDnsSubdomainTypeActive)),
 		Active: &dnsfern.DiscoverDnsSubdomainActiveConfig{
@@ -530,7 +538,7 @@ func getDiscoverDNSActiveSubdomainConfig(domain string, subdomains []string, wor
 			Threads:      threads,
 			MaxDepth:     maxDepth,
 			Timeout:      timeout,
-			DnsResolver:  dnsResolver,
+			DnsResolvers: dnsResolvers,
 		},
 	}
 }
