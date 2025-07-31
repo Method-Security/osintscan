@@ -21,7 +21,7 @@ types:
       threads: integer
       maxDepth: integer
       timeout: integer
-      dnsResolver: optional<string>
+      dnsResolvers: optional<list<string>>
   DiscoverDnsSubdomainPassiveConfig:
     properties:
       domain: string

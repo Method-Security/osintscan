@@ -25,7 +25,7 @@ func GetDomainSubdomainsActive(ctx context.Context, config dnsfern.DiscoverDnsSu
 	errors := []string{}
 
 	// Run the active subdomain discovery
-	subdomains, err := getSubdomainsActive(ctx, activeConfig.Domain, activeConfig.Subdomains, activeConfig.Threads, activeConfig.MaxDepth, activeConfig.Timeout, *activeConfig.DnsResolver)
+	subdomains, err := getSubdomainsActive(ctx, activeConfig.Domain, activeConfig.Subdomains, activeConfig.Threads, activeConfig.MaxDepth, activeConfig.Timeout, activeConfig.DnsResolvers)
 	if err != nil {
 		errors = append(errors, err.Error())
 	}
@@ -66,7 +66,7 @@ func detectWildcardDNS(ctx context.Context, domain string, resolver *net.Resolve
 }
 
 // getSubdomainsActive performs recursive bruteforce subdomain enumeration with concurrency and wildcard detection.
-func getSubdomainsActive(ctx context.Context, domain string, subdomainList []string, parallelThreads int, recursiveDepth int, timeout int, dnsServerAddress string) ([]string, error) {
+func getSubdomainsActive(ctx context.Context, domain string, subdomainList []string, parallelThreads int, recursiveDepth int, timeout int, dnsServerAddresses []string) ([]string, error) {
 	log := svc1log.FromContext(ctx)
 	subdomains := []string{}
 	subdomainsSet := make(map[string]struct{}) // To track unique valid subdomains
@@ -79,12 +79,14 @@ func getSubdomainsActive(ctx context.Context, domain string, subdomainList []str
 		ctx, cancel = context.WithTimeout(ctx, time.Duration(timeout)*time.Minute)
 		defer cancel()
 	}
-
-	resolver := utils.GetResolver(dnsServerAddress, log)
+	resolvers := []*net.Resolver{}
+	for _, dnsServerAddress := range dnsServerAddresses {
+		resolvers = append(resolvers, utils.GetResolver(dnsServerAddress, log))
+	}
 
 	// First iteration - test all base subdomains for wildcards
 	log.Info("Detecting wildcards", svc1log.SafeParam("domain", domain))
-	wildcardDNS, err := detectWildcardDNS(ctx, domain, resolver)
+	wildcardDNS, err := detectWildcardDNS(ctx, domain, resolvers[0])
 	if err != nil {
 		return []string{}, err
 	}
@@ -96,7 +98,7 @@ func getSubdomainsActive(ctx context.Context, domain string, subdomainList []str
 
 	log.Info("Generating base permutations", svc1log.SafeParam("domain", domain))
 	basePermutations := generatePermutations([]string{domain}, subdomainList)
-	validBaseSubdomains := testPermutations(ctx, basePermutations, resolver, semaphore, &wg, subdomainsMutex, subdomainsSet, &subdomains, 1, recursiveDepth)
+	validBaseSubdomains := testPermutations(ctx, basePermutations, resolvers, semaphore, &wg, subdomainsMutex, subdomainsSet, &subdomains, 1, recursiveDepth)
 
 	// For each subsequent depth, only build on valid subdomains from previous iteration
 	log.Info("Starting subdomain discovery", svc1log.SafeParam("base_subdomain count", len(validBaseSubdomains)))
@@ -115,7 +117,7 @@ func getSubdomainsActive(ctx context.Context, domain string, subdomainList []str
 
 		validSubdomains := []string{}
 		for _, subdomain := range currentDepthSubdomains {
-			wildcardDNS, err := detectWildcardDNS(ctx, subdomain, resolver)
+			wildcardDNS, err := detectWildcardDNS(ctx, subdomain, resolvers[0]) // Use resolvers[0] for wildcard detection
 			if err != nil {
 				continue
 			}
@@ -128,7 +130,7 @@ func getSubdomainsActive(ctx context.Context, domain string, subdomainList []str
 		}
 
 		newPermutations := generatePermutations(validSubdomains, subdomainList)
-		currentDepthSubdomains = testPermutations(ctx, newPermutations, resolver, semaphore, &wg, subdomainsMutex, subdomainsSet, &subdomains, depth, recursiveDepth)
+		currentDepthSubdomains = testPermutations(ctx, newPermutations, resolvers, semaphore, &wg, subdomainsMutex, subdomainsSet, &subdomains, depth, recursiveDepth)
 	}
 
 	return subdomains, nil
@@ -136,13 +138,14 @@ func getSubdomainsActive(ctx context.Context, domain string, subdomainList []str
 
 // testPermutations concurrently tests a list of subdomain permutations for DNS resolution.
 // Uses a semaphore to limit concurrency and mutexes to protect shared state.
-func testPermutations(ctx context.Context, permutations []string, resolver *net.Resolver, semaphore chan struct{}, wg *sync.WaitGroup, subdomainsMutex *sync.Mutex, subdomainsSet map[string]struct{}, subdomains *[]string, depth int, maxDepth int) []string {
+func testPermutations(ctx context.Context, permutations []string, resolvers []*net.Resolver, semaphore chan struct{}, wg *sync.WaitGroup, subdomainsMutex *sync.Mutex, subdomainsSet map[string]struct{}, subdomains *[]string, depth int, maxDepth int) []string {
 	log := svc1log.FromContext(ctx)
 	var validSubdomains []string
 	validSubdomainsMutex := &sync.Mutex{}
 
 	totalPermutations := len(permutations)
 	var completedCount int64
+	var resolverIndex int64 // For round robin resolver selection
 
 	for _, testSubdomain := range permutations {
 		wg.Add(1)
@@ -156,6 +159,12 @@ func testPermutations(ctx context.Context, permutations []string, resolver *net.
 			case <-ctx.Done():
 				return
 			}
+
+			// Round robin resolver selection
+			currentIndex := atomic.AddInt64(&resolverIndex, 1) - 1
+			resolverIdx := currentIndex % int64(len(resolvers))
+			resolver := resolvers[resolverIdx]
+			log.Info("Using resolver", svc1log.SafeParam("resolver_index", resolverIdx))
 
 			// Capture the duration of the lookup
 			start := time.Now()

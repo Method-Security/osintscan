@@ -1,9 +1,13 @@
 package dns
 
 import (
+	"context"
+	"math/rand"
 	"net"
 
 	dnsfern "github.com/Method-Security/osintscan/generated/go/discover/dns"
+	"github.com/Method-Security/osintscan/utils"
+	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
 // GetForwardReverseDNSLookup performs both forward (A/AAAA) and reverse (PTR) DNS lookups for a given FQDN.
@@ -11,9 +15,9 @@ import (
 func GetForwardReverseDNSLookup(config dnsfern.DiscoverDnsForwardReverseConfig) dnsfern.DiscoverDnsForwardReverseReport {
 	errors := []string{}
 
-	lookUps, err := getLookups(config.Domain, errors)
-	if err != nil {
-		errors = append(errors, err.Error())
+	lookUps, errs := getLookups(config.Domain, config.DnsResolvers)
+	if len(errs) > 0 {
+		errors = append(errors, errs...)
 	}
 
 	results := dnsfern.DiscoverDnsForwardReverseResult{
@@ -28,28 +32,40 @@ func GetForwardReverseDNSLookup(config dnsfern.DiscoverDnsForwardReverseConfig) 
 	return report
 }
 
-func getLookups(domain string, errors []string) ([]*dnsfern.LookupDetails, error) {
+func getLookups(domain string, dnsResolvers []string) ([]*dnsfern.LookupDetails, []string) {
+	ctx := context.Background()
+	log := svc1log.FromContext(ctx)
+	errors := []string{}
+
+	// Pick a random resolver from the list
+	resolver := utils.GetResolver(dnsResolvers[rand.Intn(len(dnsResolvers))], log)
+
 	// Resolve the IP addresses for the given FQDN (forward lookup)
-	ips, err := net.LookupIP(domain)
+	ips, err := resolver.LookupHost(ctx, domain)
 	if err != nil {
 		errors = append(errors, err.Error())
+		return []*dnsfern.LookupDetails{}, errors
 	}
 
 	lookUps := []*dnsfern.LookupDetails{}
-	for _, ip := range ips {
+	for _, ipStr := range ips {
+		ip := net.ParseIP(ipStr)
+		if ip == nil {
+			continue
+		}
+
 		// Perform a reverse lookup (PTR record) for each IP
-		names, err := net.LookupAddr(ip.String())
+		names, err := resolver.LookupAddr(ctx, ip.String())
 		if err != nil {
 			errors = append(errors, err.Error())
 		}
 
 		// Store resolved hostnames per IP
-		ipStr := ip.String()
 		lookUps = append(lookUps, &dnsfern.LookupDetails{
 			ForwardIp:   &ipStr,
 			ReversePtrs: names,
 		})
 	}
 
-	return lookUps, nil
+	return lookUps, errors
 }
