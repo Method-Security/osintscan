@@ -1,0 +1,39 @@
+types:
+# CdnProvider Enum
+  CdnProvider:
+    enum: 
+    - AKAMAI
+    - CLOUDFLARE
+    - CLOUDFRONT
+    - INCAPSULA
+    - VERCEL
+# CDN File Structs
+  CdnProviderEntry:
+    properties:
+      ipv4Ranges: list<string>
+      ipv6Ranges: list<string>
+  CdnProviders:
+    properties:
+      cdnProviders: map<string, CdnProviderEntry>
+# Report Config
+  DiscoverCdnConfig:
+    properties:
+      ipAddresses: list<string>
+      fingerprintsFile: string
+# Report Structs
+  CdnMatch:
+    properties:
+      provider: CdnProvider
+      matchedRange: string
+  IpCdnResult:
+    properties:
+      ipAddress: string
+      match: optional<CdnMatch>
+  DiscoverCdnResult:
+    properties:
+      results: optional<list<IpCdnResult>>
+  DiscoverCdnReport:
+    properties:
+      config: DiscoverCdnConfig
+      result: DiscoverCdnResult
+      errors: optional<list<string>>
