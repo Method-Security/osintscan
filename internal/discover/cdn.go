@@ -9,14 +9,17 @@ import (
 	"net/netip"
 	"os"
 	"strings"
+	"sync/atomic"
 
 	// Generated
 	cdnfern "github.com/Method-Security/osintscan/generated/go/discover"
+	// Utils
+	"github.com/Method-Security/osintscan/utils"
 	// External
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
-// RunDiscoverCdns checks IP addresses against known CDN provider ranges
+// RunDiscoverCdns resolves domains to IP addresses and checks them against known CDN provider ranges
 // and returns a report with any matches found
 func RunDiscoverCdns(ctx context.Context, config cdnfern.DiscoverCdnConfig) *cdnfern.DiscoverCdnReport {
 	log := svc1log.FromContext(ctx)
@@ -39,32 +42,52 @@ func RunDiscoverCdns(ctx context.Context, config cdnfern.DiscoverCdnConfig) *cdn
 		return report
 	}
 
-	// Iterate through each IP address provided in the config
-	for _, ipAddress := range config.IpAddresses {
-		log.Info("Checking IP address", svc1log.SafeParam("ipAddress", ipAddress))
+	// Create resolvers for each provided DNS server
+	resolvers := []*net.Resolver{}
+	for _, dnsServerAddress := range config.DnsResolvers {
+		resolvers = append(resolvers, utils.GetResolver(dnsServerAddress, log))
+	}
 
-		// Initialize result structure for this specific IP
-		ipResult := &cdnfern.IpCdnResult{
-			IpAddress: ipAddress,
-			Match:     nil,
-		}
+	// Iterate through each domain provided in the config
+	for _, domain := range config.Domains {
+		log.Info("Resolving domain", svc1log.SafeParam("domain", domain))
 
-		// Parse and validate the IP address string
-		ip := net.ParseIP(strings.TrimSpace(ipAddress))
-		if ip == nil {
-			log.Error("Invalid IP address", svc1log.SafeParam("ipAddress", ipAddress))
-			continue
-		}
+		// Resolve domain to IP addresses using round-robin resolvers
+		ipAddresses, resolveErrors := resolvedomainToIPs(ctx, domain, resolvers, log)
 
-		// Check if this IP falls within any CDN provider ranges
-		match, errors := checkIPAgainstCdnRanges(ctx, ip, cdnFingerprints)
-		if match != nil {
-			ipResult.Match = match
+		// Add any resolution errors to the report
+		report.Errors = append(report.Errors, resolveErrors...)
+
+		// Check each resolved IP address against CDN ranges
+		for _, ipAddress := range ipAddresses {
+			log.Info("Checking resolved IP address", svc1log.SafeParam("domain", domain), svc1log.SafeParam("ipAddress", ipAddress))
+
+			// Initialize result structure for this specific IP
+			ipResult := &cdnfern.IpCdnResult{
+				Domain:    domain,
+				IpAddress: ipAddress,
+				Match:     nil,
+			}
+
+			// Parse and validate the IP address string
+			ip := net.ParseIP(strings.TrimSpace(ipAddress))
+			if ip == nil {
+				log.Error("Invalid IP address from resolution", svc1log.SafeParam("domain", domain), svc1log.SafeParam("ipAddress", ipAddress))
+				continue
+			}
+
+			// Check if this IP falls within any CDN provider ranges
+			match, errors := checkIPAgainstCdnRanges(ctx, ip, cdnFingerprints)
+			if match != nil {
+				ipResult.Match = match
+			}
+
+			// Always add the result, whether match found or not
 			result.Results = append(result.Results, ipResult)
-		}
 
-		// Accumulate any errors encountered during checking
-		report.Errors = append(report.Errors, errors...)
+			// Accumulate any errors encountered during checking
+			report.Errors = append(report.Errors, errors...)
+		}
 	}
 
 	// Set final result and return complete report
@@ -120,7 +143,6 @@ func checkIPAgainstCdnRanges(ctx context.Context, ip net.IP, cdnFingerprints *cd
 
 		// Check each IP range for this provider
 		for _, raw := range ranges {
-			log.Info("Checking range", svc1log.SafeParam("providerKey", providerKey), svc1log.SafeParam("raw", raw))
 			s := strings.TrimSpace(raw)
 
 			// Parse the IP range/subnet notation
@@ -151,4 +173,33 @@ func checkIPAgainstCdnRanges(ctx context.Context, ip net.IP, cdnFingerprints *cd
 	}
 
 	return nil, errors
+}
+
+// resolvedomainToIPs resolves an domain to IP addresses using round-robin resolvers
+// Returns a slice of IP address strings and any errors encountered
+func resolvedomainToIPs(ctx context.Context, domain string, resolvers []*net.Resolver, log svc1log.Logger) ([]string, []string) {
+	var resolverIndex int64
+	var ipAddresses []string
+	var errors []string
+
+	// Use round-robin resolver selection
+	currentIndex := atomic.AddInt64(&resolverIndex, 1) - 1
+	resolverIdx := currentIndex % int64(len(resolvers))
+	resolver := resolvers[resolverIdx]
+
+	log.Info("Using resolver for domain resolution", svc1log.SafeParam("resolver_index", resolverIdx), svc1log.SafeParam("domain", domain))
+
+	// Resolve the domain to IP addresses
+	ips, err := resolver.LookupHost(ctx, domain)
+	if err != nil {
+		errors = append(errors, fmt.Sprintf("failed to resolve domain %s: %v", domain, err))
+		return ipAddresses, errors
+	}
+
+	// Add all resolved IPs to the result
+	ipAddresses = append(ipAddresses, ips...)
+
+	log.Info("Resolved domain", svc1log.SafeParam("domain", domain), svc1log.SafeParam("ip_count", len(ips)))
+
+	return ipAddresses, errors
 }
