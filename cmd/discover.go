@@ -457,14 +457,14 @@ func (a *OsintScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			filePath, err := cmd.Flags().GetString("file-path")
+			fingerprintsFile, err := cmd.Flags().GetString("fingerprints-file")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
 
 			// Create config
-			config := getDiscoverCdnConfig(ipAddresses, filePath)
+			config := getDiscoverCdnConfig(ipAddresses, fingerprintsFile)
 
 			// Create report
 			report := cdn.RunDiscoverCdns(cmd.Context(), config)
@@ -550,9 +550,9 @@ func getDiscoverDNSIntelligentSubdomainConfig(domains []string, threads int, tim
 }
 
 // getDiscoverCdnConfig creates and returns a configuration for CDN discovery
-func getDiscoverCdnConfig(ipAddresses []string, filePath string) cdnfern.DiscoverCdnConfig {
+func getDiscoverCdnConfig(ipAddresses []string, fingerprintsFile string) cdnfern.DiscoverCdnConfig {
 	return cdnfern.DiscoverCdnConfig{
-		IpAddresses: ipAddresses,
-		FilePath:    filePath,
+		IpAddresses:      ipAddresses,
+		FingerprintsFile: fingerprintsFile,
 	}
 }

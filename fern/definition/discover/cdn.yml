@@ -19,7 +19,7 @@ types:
   DiscoverCdnConfig:
     properties:
       ipAddresses: list<string>
-      filePath: string
+      fingerprintsFile: string
 # Report Structs
   CdnMatch:
     properties:
