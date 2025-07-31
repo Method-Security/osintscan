@@ -474,7 +474,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 
 	// Target Flags
 	discoverCdnCmd.Flags().StringSlice("ip-addresses", []string{}, "The IP address to check against CDN provider ranges")
-	discoverCdnCmd.Flags().String("file-path", "configs/discover/cdn/providers.json", "The path to the CDN configuration file")
+	discoverCdnCmd.Flags().String("fingerprints-file", "/opt/method/osintscan/var/conf/discover/cdn/providers.json", "The path to the CDN fingerprints file")
 
 	// Mark Required Flags
 	_ = discoverCdnCmd.MarkFlagRequired("ip-addresses")
