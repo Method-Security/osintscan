@@ -162,7 +162,9 @@ func testPermutations(ctx context.Context, permutations []string, resolvers []*n
 
 			// Round robin resolver selection
 			currentIndex := atomic.AddInt64(&resolverIndex, 1) - 1
-			resolver := resolvers[currentIndex%int64(len(resolvers))]
+			resolverIdx := currentIndex % int64(len(resolvers))
+			resolver := resolvers[resolverIdx]
+			log.Info("Using resolver", svc1log.SafeParam("resolver_index", resolverIdx))
 
 			// Capture the duration of the lookup
 			start := time.Now()
