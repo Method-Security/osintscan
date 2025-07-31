@@ -30,7 +30,7 @@ types:
     properties:
       domain: string
       ipAddress: string
-      match: optional<CdnMatch>
+      match: CdnMatch
   DiscoverCdnResult:
     properties:
       results: optional<list<IpCdnResult>>

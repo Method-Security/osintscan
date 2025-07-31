@@ -63,11 +63,6 @@ func RunDiscoverCdns(ctx context.Context, config cdnfern.DiscoverCdnConfig) *cdn
 			log.Info("Checking resolved IP address", svc1log.SafeParam("domain", domain), svc1log.SafeParam("ipAddress", ipAddress))
 
 			// Initialize result structure for this specific IP
-			ipResult := &cdnfern.IpCdnResult{
-				Domain:    domain,
-				IpAddress: ipAddress,
-				Match:     nil,
-			}
 
 			// Parse and validate the IP address string
 			ip := net.ParseIP(strings.TrimSpace(ipAddress))
@@ -79,11 +74,13 @@ func RunDiscoverCdns(ctx context.Context, config cdnfern.DiscoverCdnConfig) *cdn
 			// Check if this IP falls within any CDN provider ranges
 			match, errors := checkIPAgainstCdnRanges(ctx, ip, cdnFingerprints)
 			if match != nil {
-				ipResult.Match = match
+				ipResult := &cdnfern.IpCdnResult{
+					Domain:    domain,
+					IpAddress: ipAddress,
+					Match:     match,
+				}
+				result.Results = append(result.Results, ipResult)
 			}
-
-			// Always add the result, whether match found or not
-			result.Results = append(result.Results, ipResult)
 
 			// Accumulate any errors encountered during checking
 			report.Errors = append(report.Errors, errors...)
