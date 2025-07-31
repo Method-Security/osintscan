@@ -103,7 +103,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 	discoverDNSCmd.AddCommand(discoverDNSRecordsCmd)
 
 	discoverDNSForwardReverseCmd := &cobra.Command{
-		Use:   "forwardreverse",
+		Use:   "forward-reverse",
 		Short: "Perform forward and reverse DNS lookups",
 		Long:  `Perform both forward and reverse DNS lookups for the specified domain to identify associated IPs and hostnames.`,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -459,7 +459,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 		Long:  `Check if an IP address belongs to a known CDN provider by comparing against known CDN IP ranges.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			// Parse flags
-			ipAddresses, err := cmd.Flags().GetStringSlice("ip-addresses")
+			domains, err := cmd.Flags().GetStringSlice("domains")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -469,9 +469,25 @@ func (a *OsintScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
+			dnsResolvers, err := cmd.Flags().GetStringSlice("dns-resolvers")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			if len(dnsResolvers) == 0 {
+				a.OutputSignal.AddError(fmt.Errorf("no DNS resolvers provided"))
+				return
+			}
+			for _, dnsResolver := range dnsResolvers {
+				err = utils.ValidateDNSServerAddress(dnsResolver)
+				if err != nil {
+					a.OutputSignal.AddError(fmt.Errorf("invalid DNS resolver: %w", err))
+					return
+				}
+			}
 
 			// Create config
-			config := getDiscoverCdnConfig(ipAddresses, fingerprintsFile)
+			config := getDiscoverCdnConfig(domains, dnsResolvers, fingerprintsFile)
 
 			// Create report
 			report := cdn.RunDiscoverCdns(cmd.Context(), config)
@@ -480,11 +496,12 @@ func (a *OsintScan) InitDiscoverCommand() {
 	}
 
 	// Target Flags
-	discoverCdnCmd.Flags().StringSlice("ip-addresses", []string{}, "The IP address to check against CDN provider ranges")
+	discoverCdnCmd.Flags().StringSlice("domains", []string{}, "The domain names to check against CDN provider ranges")
+	discoverCdnCmd.Flags().StringSlice("dns-resolvers", []string{"1.1.1.1:53"}, "Custom DNS resolver/servers to use for queries (e.g. 1.1.1.1:53)")
 	discoverCdnCmd.Flags().String("fingerprints-file", "/opt/method/osintscan/var/conf/discover/cdn/providers.json", "The path to the CDN fingerprints file")
 
 	// Mark Required Flags
-	_ = discoverCdnCmd.MarkFlagRequired("ip-addresses")
+	_ = discoverCdnCmd.MarkFlagRequired("domains")
 
 	// Add command to the 'discover' command
 	discoverCmd.AddCommand(discoverCdnCmd)
@@ -558,9 +575,11 @@ func getDiscoverDNSIntelligentSubdomainConfig(domains []string, threads int, tim
 }
 
 // getDiscoverCdnConfig creates and returns a configuration for CDN discovery
-func getDiscoverCdnConfig(ipAddresses []string, fingerprintsFile string) cdnfern.DiscoverCdnConfig {
+func getDiscoverCdnConfig(domains []string, dnsResolvers []string, fingerprintsFile string) cdnfern.DiscoverCdnConfig {
 	return cdnfern.DiscoverCdnConfig{
-		IpAddresses:      ipAddresses,
+		Domains:          domains,
+		DnsResolvers:     dnsResolvers,
 		FingerprintsFile: fingerprintsFile,
 	}
+
 }
