@@ -1,17 +1,27 @@
 package cmd
 
 import (
+	// Standard
 	"fmt"
 	"os"
 	"strings"
 
+	// Generated
+	cdnfern "github.com/Method-Security/osintscan/generated/go/discover"
 	dnsfern "github.com/Method-Security/osintscan/generated/go/discover/dns"
+
+	// Internal
+	cdn "github.com/Method-Security/osintscan/internal/discover"
 	dns "github.com/Method-Security/osintscan/internal/discover/dns"
 	subdomain "github.com/Method-Security/osintscan/internal/discover/dns/subdomain"
 	subdomainIntelligent "github.com/Method-Security/osintscan/internal/discover/dns/subdomain/intelligent"
+
+	// External
 	shodan "github.com/Method-Security/osintscan/internal/discover/shodan"
-	"github.com/Method-Security/osintscan/utils"
 	"github.com/spf13/cobra"
+
+	// Utils
+	"github.com/Method-Security/osintscan/utils"
 )
 
 func (a *OsintScan) InitDiscoverCommand() {
@@ -435,6 +445,43 @@ func (a *OsintScan) InitDiscoverCommand() {
 	// Add command to 'shodan' command
 	discoverShodanCmd.AddCommand(discoverShodanHostnameCmd)
 
+	// CDN Commands
+	discoverCdnCmd := &cobra.Command{
+		Use:   "cdn",
+		Short: "Discover CDN providers for IP addresses",
+		Long:  `Check if an IP address belongs to a known CDN provider by comparing against known CDN IP ranges.`,
+		Run: func(cmd *cobra.Command, args []string) {
+			// Parse flags
+			ipAddresses, err := cmd.Flags().GetStringSlice("ip-addresses")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			filePath, err := cmd.Flags().GetString("file-path")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			// Create config
+			config := getDiscoverCdnConfig(ipAddresses, filePath)
+
+			// Create report
+			report := cdn.RunDiscoverCdns(cmd.Context(), config)
+			a.OutputSignal.Content = report
+		},
+	}
+
+	// Target Flags
+	discoverCdnCmd.Flags().StringSlice("ip-addresses", []string{}, "The IP address to check against CDN provider ranges")
+	discoverCdnCmd.Flags().String("file-path", "configs/discover/cdn/providers.json", "The path to the CDN configuration file")
+
+	// Mark Required Flags
+	_ = discoverCdnCmd.MarkFlagRequired("ip-addresses")
+
+	// Add command to the 'discover' command
+	discoverCmd.AddCommand(discoverCdnCmd)
+
 	a.RootCmd.AddCommand(discoverCmd)
 }
 
@@ -499,5 +546,13 @@ func getDiscoverDNSIntelligentSubdomainConfig(domains []string, threads int, tim
 			MaxRecursion: maxRecursion,
 			DnsResolver:  dnsResolver,
 		},
+	}
+}
+
+// getDiscoverCdnConfig creates and returns a configuration for CDN discovery
+func getDiscoverCdnConfig(ipAddresses []string, filePath string) cdnfern.DiscoverCdnConfig {
+	return cdnfern.DiscoverCdnConfig{
+		IpAddresses: ipAddresses,
+		FilePath:    filePath,
 	}
 }
