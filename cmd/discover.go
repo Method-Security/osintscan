@@ -459,7 +459,12 @@ func (a *OsintScan) InitDiscoverCommand() {
 		Long:  `Check if an IP address belongs to a known CDN provider by comparing against known CDN IP ranges.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			// Parse flags
-			domains, err := cmd.Flags().GetStringSlice("domains")
+			domain, err := cmd.Flags().GetString("domain")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			ipAddresses, err := cmd.Flags().GetStringSlice("ip-addresses")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -487,7 +492,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 			}
 
 			// Create config
-			config := getDiscoverCdnConfig(domains, dnsResolvers, fingerprintsFile)
+			config := getDiscoverCdnConfig(domain, ipAddresses, dnsResolvers, fingerprintsFile)
 
 			// Create report
 			report := cdn.RunDiscoverCdns(cmd.Context(), config)
@@ -496,12 +501,13 @@ func (a *OsintScan) InitDiscoverCommand() {
 	}
 
 	// Target Flags
-	discoverCdnCmd.Flags().StringSlice("domains", []string{}, "The domain names to check against CDN provider ranges")
+	discoverCdnCmd.Flags().String("domain", "", "The domain name to check against CDN provider ranges")
+	discoverCdnCmd.Flags().StringSlice("ip-addresses", []string{}, "The IP addresses to check against CDN provider ranges")
 	discoverCdnCmd.Flags().StringSlice("dns-resolvers", []string{"1.1.1.1:53"}, "Custom DNS resolver/servers to use for queries (e.g. 1.1.1.1:53)")
 	discoverCdnCmd.Flags().String("fingerprints-file", "/opt/method/osintscan/var/conf/discover/cdn/providers.json", "The path to the CDN fingerprints file")
 
 	// Mark Required Flags
-	_ = discoverCdnCmd.MarkFlagRequired("domains")
+	_ = discoverCdnCmd.MarkFlagRequired("domain")
 
 	// Add command to the 'discover' command
 	discoverCmd.AddCommand(discoverCdnCmd)
@@ -575,11 +581,14 @@ func getDiscoverDNSIntelligentSubdomainConfig(domains []string, threads int, tim
 }
 
 // getDiscoverCdnConfig creates and returns a configuration for CDN discovery
-func getDiscoverCdnConfig(domains []string, dnsResolvers []string, fingerprintsFile string) cdnfern.DiscoverCdnConfig {
-	return cdnfern.DiscoverCdnConfig{
-		Domains:          domains,
+func getDiscoverCdnConfig(domain string, ipAddresses []string, dnsResolvers []string, fingerprintsFile string) cdnfern.DiscoverCdnConfig {
+	config := cdnfern.DiscoverCdnConfig{
+		Domain:           domain,
 		DnsResolvers:     dnsResolvers,
 		FingerprintsFile: fingerprintsFile,
 	}
-
+	if len(ipAddresses) > 0 {
+		config.IpAddresses = ipAddresses
+	}
+	return config
 }

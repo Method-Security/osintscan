@@ -18,7 +18,8 @@ types:
 # Report Config
   DiscoverCdnConfig:
     properties:
-      domains: list<string>
+      domain: string
+      ipAddresses: optional<list<string>>
       dnsResolvers: optional<list<string>>
       fingerprintsFile: string
 # Report Structs
@@ -33,7 +34,7 @@ types:
       match: CdnMatch
   DiscoverCdnResult:
     properties:
-      results: optional<list<IpCdnResult>>
+      matches: optional<list<IpCdnResult>>
   DiscoverCdnReport:
     properties:
       config: DiscoverCdnConfig

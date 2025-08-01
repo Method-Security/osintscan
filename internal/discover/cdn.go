@@ -26,7 +26,7 @@ func RunDiscoverCdns(ctx context.Context, config cdnfern.DiscoverCdnConfig) *cdn
 
 	// Initialize empty result structure to hold all IP check results
 	result := &cdnfern.DiscoverCdnResult{
-		Results: []*cdnfern.IpCdnResult{},
+		Matches: []*cdnfern.IpCdnResult{},
 	}
 
 	// Initialize report structure with config and result
@@ -42,49 +42,29 @@ func RunDiscoverCdns(ctx context.Context, config cdnfern.DiscoverCdnConfig) *cdn
 		return report
 	}
 
-	// Create resolvers for each provided DNS server
-	resolvers := []*net.Resolver{}
-	for _, dnsServerAddress := range config.DnsResolvers {
-		resolvers = append(resolvers, utils.GetResolver(dnsServerAddress, log))
-	}
+	// If no IP addresses are provided, resolve the domain to IP addresses else check the provided IP addresses
+	if config.IpAddresses == nil {
+		// Create resolvers for each provided DNS server
+		resolvers := []*net.Resolver{}
+		for _, dnsServerAddress := range config.DnsResolvers {
+			resolvers = append(resolvers, utils.GetResolver(dnsServerAddress, log))
+		}
 
-	// Iterate through each domain provided in the config
-	for _, domain := range config.Domains {
-		log.Info("Resolving domain", svc1log.SafeParam("domain", domain))
+		// Iterate through each domain provided in the config
+		log.Info("Resolving domain", svc1log.SafeParam("domain", config.Domain))
 
 		// Resolve domain to IP addresses using round-robin resolvers
-		ipAddresses, resolveErrors := resolvedomainToIPs(ctx, domain, resolvers, log)
-
-		// Add any resolution errors to the report
+		ipAddresses, resolveErrors := resolvedomainToIPs(ctx, config.Domain, resolvers, log)
 		report.Errors = append(report.Errors, resolveErrors...)
 
 		// Check each resolved IP address against CDN ranges
-		for _, ipAddress := range ipAddresses {
-			log.Info("Checking resolved IP address", svc1log.SafeParam("domain", domain), svc1log.SafeParam("ipAddress", ipAddress))
-
-			// Initialize result structure for this specific IP
-
-			// Parse and validate the IP address string
-			ip := net.ParseIP(strings.TrimSpace(ipAddress))
-			if ip == nil {
-				log.Error("Invalid IP address from resolution", svc1log.SafeParam("domain", domain), svc1log.SafeParam("ipAddress", ipAddress))
-				continue
-			}
-
-			// Check if this IP falls within any CDN provider ranges
-			match, errors := checkIPAgainstCdnRanges(ctx, ip, cdnFingerprints)
-			if match != nil {
-				ipResult := &cdnfern.IpCdnResult{
-					Domain:    domain,
-					IpAddress: ipAddress,
-					Match:     match,
-				}
-				result.Results = append(result.Results, ipResult)
-			}
-
-			// Accumulate any errors encountered during checking
-			report.Errors = append(report.Errors, errors...)
-		}
+		matches, errors := checkIPAgainstCdnRanges(ctx, ipAddresses, config, cdnFingerprints)
+		report.Errors = append(report.Errors, errors...)
+		result.Matches = append(result.Matches, matches...)
+	} else {
+		matches, errors := checkIPAgainstCdnRanges(ctx, config.IpAddresses, config, cdnFingerprints)
+		report.Errors = append(report.Errors, errors...)
+		result.Matches = append(result.Matches, matches...)
 	}
 
 	// Set final result and return complete report
@@ -110,9 +90,44 @@ func loadCdnDictFromPath(fingerprintsFile string) (*cdnfern.CdnProviders, error)
 	return &cfg, nil
 }
 
+func checkIPAgainstCdnRanges(ctx context.Context, ipAddresses []string, config cdnfern.DiscoverCdnConfig, cdnFingerprints *cdnfern.CdnProviders) (matches []*cdnfern.IpCdnResult, errors []string) {
+	log := svc1log.FromContext(ctx)
+
+	matches = []*cdnfern.IpCdnResult{}
+	errors = []string{}
+
+	for _, ipAddress := range ipAddresses {
+		log.Info("Checking IP address", svc1log.SafeParam("ipAddress", ipAddress))
+
+		// Initialize result structure for this specific IP
+
+		// Parse and validate the IP address string
+		ip := net.ParseIP(strings.TrimSpace(ipAddress))
+		if ip == nil {
+			log.Error("Invalid IP address from resolution", svc1log.SafeParam("domain", config.Domain), svc1log.SafeParam("ipAddress", ipAddress))
+			continue
+		}
+
+		// Check if this IP falls within any CDN provider ranges
+		match, errs := checkCdnRanges(ctx, ip, cdnFingerprints)
+		if match != nil {
+			ipResult := &cdnfern.IpCdnResult{
+				Domain:    config.Domain,
+				IpAddress: ipAddress,
+				Match:     match,
+			}
+			matches = append(matches, ipResult)
+		}
+
+		// Accumulate any errors encountered during checking
+		errors = append(errors, errs...)
+	}
+	return matches, errors
+}
+
 // checkIPAgainstCdnRanges compares an IP address against all CDN provider IP ranges
 // Returns the first matching CDN provider and any errors encountered
-func checkIPAgainstCdnRanges(ctx context.Context, ip net.IP, cdnFingerprints *cdnfern.CdnProviders) (*cdnfern.CdnMatch, []string) {
+func checkCdnRanges(ctx context.Context, ip net.IP, cdnFingerprints *cdnfern.CdnProviders) (*cdnfern.CdnMatch, []string) {
 	log := svc1log.FromContext(ctx)
 	errors := []string{}
 
