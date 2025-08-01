@@ -18,37 +18,39 @@ import (
 func TestZoneTransfer(ctx context.Context, config dnsfern.EnumerateDnsZoneTransferConfig) (*dnsfern.EnumerateDnsZoneTransferReport, error) {
 	log := svc1log.FromContext(ctx)
 
+	customResolvers := []*net.Resolver{}
+	for _, dnsResolver := range config.DnsResolvers {
+		customResolvers = append(customResolvers, utils.GetResolver(dnsResolver, log))
+	}
+
 	// Direct nameserver mode
 	if config.Nameserver != nil && *config.Nameserver != "" {
 		log.Info("Using direct nameserver mode", svc1log.SafeParam("nameserver", *config.Nameserver))
-		return testDirectNameserver(ctx, config)
+		return testDirectNameserver(ctx, config, customResolvers)
 	}
 
 	// NS lookup mode
 	log.Info("Using NS lookup mode")
-	return testViaNSLookup(ctx, config)
+	return testViaNSLookup(ctx, config, customResolvers)
 }
 
 // testDirectNameserver tests zone transfers directly against a specified nameserver
-func testDirectNameserver(ctx context.Context, config dnsfern.EnumerateDnsZoneTransferConfig) (*dnsfern.EnumerateDnsZoneTransferReport, error) {
+func testDirectNameserver(ctx context.Context, config dnsfern.EnumerateDnsZoneTransferConfig, customResolvers []*net.Resolver) (*dnsfern.EnumerateDnsZoneTransferReport, error) {
 	log := svc1log.FromContext(ctx)
 	errors := []string{}
 	zoneTransferDetails := []*dnsfern.DnsZoneTransferDetails{}
 
-	// Get custom resolver if specified
-	customResolver := utils.GetResolver(*config.DnsResolver, log)
-
 	// Normalize nameserver address
 	ns := normalizeNameserver(*config.Nameserver)
 
+	roundRobinResolver := 0
 	for _, domain := range config.Domains {
 		log.Info("Testing zone transfer",
 			svc1log.SafeParam("domain", domain),
 			svc1log.SafeParam("nameserver", ns))
 
 		// Attempt zone transfer
-		records, success, errs := sendAXFRRequest(ns, domain, config.Timeout, customResolver, log)
-
+		records, success, errs := sendAXFRRequest(ns, domain, config.Timeout, customResolvers[roundRobinResolver%len(customResolvers)], log)
 		if len(errs) > 0 {
 			for _, err := range errs {
 				errors = append(errors, fmt.Sprintf("%s@%s: %s", domain, ns, err))
@@ -66,6 +68,7 @@ func testDirectNameserver(ctx context.Context, config dnsfern.EnumerateDnsZoneTr
 				svc1log.SafeParam("domain", domain),
 				svc1log.SafeParam("records", len(records)))
 		}
+		roundRobinResolver++
 	}
 	report := &dnsfern.EnumerateDnsZoneTransferReport{
 		Config: &config,
@@ -78,17 +81,16 @@ func testDirectNameserver(ctx context.Context, config dnsfern.EnumerateDnsZoneTr
 }
 
 // testViaNSLookup discovers nameservers and tests zone transfers on each
-func testViaNSLookup(ctx context.Context, config dnsfern.EnumerateDnsZoneTransferConfig) (*dnsfern.EnumerateDnsZoneTransferReport, error) {
+func testViaNSLookup(ctx context.Context, config dnsfern.EnumerateDnsZoneTransferConfig, customResolvers []*net.Resolver) (*dnsfern.EnumerateDnsZoneTransferReport, error) {
 	log := svc1log.FromContext(ctx)
 	errors := []string{}
 	zoneTransferDetails := []*dnsfern.DnsZoneTransferDetails{}
 
-	// Get custom resolver if specified
-	customResolver := utils.GetResolver(*config.DnsResolver, log)
-
+	roundRobinResolver := 0
 	for _, domain := range config.Domains {
-		details := testDomainViaLookup(ctx, domain, config.Timeout, customResolver, log, &errors)
+		details := testDomainViaLookup(ctx, domain, config.Timeout, customResolvers[roundRobinResolver%len(customResolvers)], log, &errors)
 		zoneTransferDetails = append(zoneTransferDetails, details)
+		roundRobinResolver++
 	}
 
 	report := &dnsfern.EnumerateDnsZoneTransferReport{

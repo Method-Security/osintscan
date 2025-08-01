@@ -54,20 +54,24 @@ func (a *OsintScan) InitEnumerateCommand() {
 				return
 			}
 
-			dnsResolver, err := cmd.Flags().GetString("dns-resolver")
+			dnsResolvers, err := cmd.Flags().GetStringSlice("dns-resolvers")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			if dnsResolver != "" {
+			if len(dnsResolvers) == 0 {
+				a.OutputSignal.AddError(fmt.Errorf("no DNS resolvers provided"))
+				return
+			}
+			for _, dnsResolver := range dnsResolvers {
 				err = utils.ValidateDNSServerAddress(dnsResolver)
 				if err != nil {
-					a.OutputSignal.AddError(err)
+					a.OutputSignal.AddError(fmt.Errorf("invalid DNS resolver: %w", err))
 					return
 				}
 			}
 
-			config := getEnumerateDNSZoneTransferConfig(domains, nameserver, dnsResolver, timeout)
+			config := getEnumerateDNSZoneTransferConfig(domains, nameserver, dnsResolvers, timeout)
 
 			report, err := zonetransfer.TestZoneTransfer(cmd.Context(), config)
 			if err != nil {
@@ -84,7 +88,7 @@ func (a *OsintScan) InitEnumerateCommand() {
 
 	// Config Flags
 	enumerateDNSZoneTransferCmd.Flags().Int("timeout", 30, "Timeout in seconds for each zone transfer request")
-	enumerateDNSZoneTransferCmd.Flags().String("dns-resolver", "", "Custom DNS resolver for NS lookups (e.g. 1.1.1.1:53). Only used when --nameserver is not specified")
+	enumerateDNSZoneTransferCmd.Flags().StringSlice("dns-resolvers", []string{"1.1.1.1:53"}, "Custom DNS resolver/servers to use for queries (e.g. 1.1.1.1:53)")
 
 	enumerateDNSCmd.AddCommand(enumerateDNSZoneTransferCmd)
 
@@ -92,11 +96,11 @@ func (a *OsintScan) InitEnumerateCommand() {
 }
 
 // getEnumerateDNSZoneTransferConfig creates and returns a configuration for DNS zone transfer enumeration
-func getEnumerateDNSZoneTransferConfig(domains []string, nameserver, dnsResolver string, timeout int) dnsfern.EnumerateDnsZoneTransferConfig {
+func getEnumerateDNSZoneTransferConfig(domains []string, nameserver string, dnsResolvers []string, timeout int) dnsfern.EnumerateDnsZoneTransferConfig {
 	return dnsfern.EnumerateDnsZoneTransferConfig{
-		Domains:     domains,
-		Nameserver:  &nameserver,
-		DnsResolver: &dnsResolver,
-		Timeout:     timeout,
+		Domains:      domains,
+		Nameserver:   &nameserver,
+		DnsResolvers: dnsResolvers,
+		Timeout:      timeout,
 	}
 }
