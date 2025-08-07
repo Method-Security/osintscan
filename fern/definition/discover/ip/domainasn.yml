@@ -1,0 +1,23 @@
+types:
+# Lookup Struct
+  LookupDetails:
+    properties:
+      ip: string
+      domain: optional<string>
+      asn: optional<string>
+      geolocation: optional<string>
+# Config Struct
+  DiscoverIPDomainASNConfig:
+    properties:
+      ips: optional<list<string>>
+      cidr: optional<string>
+      dnsResolvers: optional<list<string>>
+# Report Structs
+  DiscoverIPDomainASNResult:
+    properties:
+      lookups: optional<list<LookupDetails>>
+  DiscoverIPDomainASNReport:
+    properties:
+      config: DiscoverIPDomainASNConfig
+      result: DiscoverIPDomainASNResult
+      errors: optional<list<string>>

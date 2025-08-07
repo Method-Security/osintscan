@@ -3,18 +3,22 @@ package cmd
 import (
 	// Standard
 	"fmt"
+	"net"
 	"os"
 	"strings"
 
 	// Generated
 	cdnfern "github.com/Method-Security/osintscan/generated/go/discover"
+	asnfern "github.com/Method-Security/osintscan/generated/go/discover/asn"
 	dnsfern "github.com/Method-Security/osintscan/generated/go/discover/dns"
+	ipfern "github.com/Method-Security/osintscan/generated/go/discover/ip"
 
 	// Internal
-	cdn "github.com/Method-Security/osintscan/internal/discover"
+	discover "github.com/Method-Security/osintscan/internal/discover"
 	dns "github.com/Method-Security/osintscan/internal/discover/dns"
 	subdomain "github.com/Method-Security/osintscan/internal/discover/dns/subdomain"
 	subdomainIntelligent "github.com/Method-Security/osintscan/internal/discover/dns/subdomain/intelligent"
+	ip "github.com/Method-Security/osintscan/internal/discover/ip"
 
 	// External
 	shodan "github.com/Method-Security/osintscan/internal/discover/shodan"
@@ -495,7 +499,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 			config := getDiscoverCdnConfig(domain, ipAddresses, dnsResolvers, fingerprintsFile)
 
 			// Create report
-			report := cdn.RunDiscoverCdns(cmd.Context(), config)
+			report := discover.RunDiscoverCdns(cmd.Context(), config)
 			a.OutputSignal.Content = report
 		},
 	}
@@ -512,6 +516,138 @@ func (a *OsintScan) InitDiscoverCommand() {
 	// Add command to the 'discover' command
 	discoverCmd.AddCommand(discoverCdnCmd)
 
+	// ------------------------------------------------------------------------------------------------
+	// Start - IP Address Discover Commands
+	// ------------------------------------------------------------------------------------------------
+
+	// IP Address Discover Commands
+	discoverIPCmd := &cobra.Command{
+		Use:   "ip",
+		Short: "Discover IP address and CIDR information",
+		Long:  `Discover information about IP addresses or CIDR Ranges including linked domains, ASN, geolocation.`,
+	}
+
+	// Add discoverIPCmd to the 'discover' command
+	discoverCmd.AddCommand(discoverIPCmd)
+
+	discoverIPDomainASNCmd := &cobra.Command{
+		Use:   "domainasn",
+		Short: "Perform a reverse DNS lookup and ASN lookup on a single IP, list of IPs, or a CIDR range",
+		Long:  `Perform a reverse DNS lookup and ASN lookup on a single IP, list of IPs, or a CIDR range. Warning: /16 and larger can take upwards of 30 minutes.`,
+		Run: func(cmd *cobra.Command, args []string) {
+			// Parse flags
+			ips, err := cmd.Flags().GetStringSlice("ips")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			cidr, err := cmd.Flags().GetString("cidr")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			dnsResolvers, err := cmd.Flags().GetStringSlice("dns-resolvers")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			// Validate that either ip or cidr is provided
+			if len(ips) == 0 && cidr == "" {
+				a.OutputSignal.AddError(fmt.Errorf("either --ips or --cidr must be provided"))
+				return
+			}
+
+			// Validate IP addresses if provided
+			if len(ips) > 0 {
+				for _, ip := range ips {
+					if net.ParseIP(ip) == nil {
+						a.OutputSignal.AddError(fmt.Errorf("invalid IP address: %s", ip))
+						return
+					}
+				}
+			}
+
+			// Validate CIDR if provided
+			if cidr != "" {
+				if _, _, err := net.ParseCIDR(cidr); err != nil {
+					a.OutputSignal.AddError(fmt.Errorf("invalid CIDR range: %s", cidr))
+					return
+				}
+			}
+
+			// Validate DNS resolvers
+			if len(dnsResolvers) == 0 {
+				a.OutputSignal.AddError(fmt.Errorf("no DNS resolvers provided"))
+				return
+			}
+			for _, dnsResolver := range dnsResolvers {
+				err = utils.ValidateDNSServerAddress(dnsResolver)
+				if err != nil {
+					a.OutputSignal.AddError(fmt.Errorf("invalid DNS resolver: %w", err))
+					return
+				}
+			}
+
+			// Generate the report
+			config := getDiscoverIPDomainASNConfig(ips, cidr, dnsResolvers)
+			report := ip.GetDomainASNLookup(cmd.Context(), config)
+			a.OutputSignal.Content = report
+		},
+	}
+
+	// Target Flags
+	discoverIPDomainASNCmd.Flags().StringSlice("ips", []string{}, "The IP addresses to perform reverse DNS and ASN lookup on")
+	discoverIPDomainASNCmd.Flags().String("cidr", "", "The CIDR range to perform reverse DNS and ASN lookup on")
+	discoverIPDomainASNCmd.Flags().StringSlice("dns-resolvers", []string{"1.1.1.1:53"}, "Custom DNS resolver/servers to use for queries (e.g. 1.1.1.1:53)")
+
+	// Add command to 'ip' command
+	discoverIPCmd.AddCommand(discoverIPDomainASNCmd)
+	// ------------------------------------------------------------------------------------------------
+	// End - IP Address Discover Commands
+	// ------------------------------------------------------------------------------------------------
+
+	// ------------------------------------------------------------------------------------------------
+	// Start - ASN Address Discover Commands
+	// ------------------------------------------------------------------------------------------------
+
+	// ASN Address Discover Commands
+	discoverASNCmd := &cobra.Command{
+		Use:   "asn",
+		Short: "Discover ASN information",
+		Long:  `Discover information about ASN, including ASN description, CIDRs, country, and other metadata. This relies on BGPView's API and has built in retry and timeout mechanisms.`,
+		Run: func(cmd *cobra.Command, args []string) {
+			asnFlag, err := cmd.Flags().GetString("asn")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			timeout, err := cmd.Flags().GetInt("timeout")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			config := getDiscoverASNConfig(asnFlag, timeout)
+			report, err := discover.GetASNInfo(cmd.Context(), config)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			a.OutputSignal.Content = report
+		},
+	}
+
+	// Target Flags
+	discoverASNCmd.Flags().String("asn", "", "The ASN number to lookup (e.g., AS23028 or 23028)")
+	discoverASNCmd.Flags().Int("timeout", 120, "The timeout in seconds for the ASN lookup")
+
+	// Mark Required Flags
+	_ = discoverASNCmd.MarkFlagRequired("asn")
+
+	// Add command to 'discover' command
+	discoverCmd.AddCommand(discoverASNCmd)
+
+	// Add the 'discover' command to the root command
 	a.RootCmd.AddCommand(discoverCmd)
 }
 
@@ -591,4 +727,27 @@ func getDiscoverCdnConfig(domain string, ipAddresses []string, dnsResolvers []st
 		config.IpAddresses = ipAddresses
 	}
 	return config
+}
+
+// getDiscoverIPDomainASNConfig creates and returns a configuration for IP domain ASN discovery
+func getDiscoverIPDomainASNConfig(ips []string, cidr string, dnsResolvers []string) *ipfern.DiscoverIpDomainAsnConfig {
+	config := &ipfern.DiscoverIpDomainAsnConfig{
+		Ips:          ips,
+		DnsResolvers: dnsResolvers,
+	}
+
+	// Only set CIDR if it's not empty
+	if cidr != "" {
+		config.Cidr = &cidr
+	}
+
+	return config
+}
+
+// getDiscoverASNConfig creates and returns a configuration for ASN discovery
+func getDiscoverASNConfig(asn string, timeout int) *asnfern.DiscoverAsnConfig {
+	return &asnfern.DiscoverAsnConfig{
+		Asn:     asn,
+		Timeout: &timeout,
+	}
 }

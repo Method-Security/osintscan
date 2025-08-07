@@ -37,6 +37,24 @@ osintscan discover dns records --domain example.com
 ```bash
 osintscan discover dns certs --domain example.com
 
+### Developer Setup
+
+`osintscan` uses [Fern](https://buildwithfern.com/learn/sdks/overview/introduction) for creating multi-language bindings. This is used for structuring input and output amongst tools.
+
+1. Install Fern: https://buildwithfern.com/learn/sdks/overview/quickstart
+
+2. Generate your fern types with:
+
+```bash
+fern generate --group local
+```
+
+3. Ensure depedencies are installed and tested with:
+
+```bash
+./godelw verify
+```
+
 ### Building a Statically Compiled Container for Local Testing
 (Reference reusable-build.yaml)
 
