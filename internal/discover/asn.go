@@ -5,6 +5,7 @@ import (
 	"time"
 
 	asnfern "github.com/Method-Security/osintscan/generated/go/discover/asn"
+	utilsfern "github.com/Method-Security/osintscan/generated/go/utils"
 	"github.com/Method-Security/osintscan/utils"
 	"github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
@@ -29,7 +30,7 @@ func GetASNInfo(ctx context.Context, config *asnfern.DiscoverAsnConfig) (*asnfer
 	}
 
 	// Get comprehensive ASN information from BGPView API
-	var bgpInfo *utils.BGPViewResponse
+	var bgpInfo *utilsfern.BgpViewResponse
 	var err error
 
 	if timeout > 0 {
@@ -43,9 +44,9 @@ func GetASNInfo(ctx context.Context, config *asnfern.DiscoverAsnConfig) (*asnfer
 		errors = append(errors, "Failed to get ASN information: "+err.Error())
 	} else if bgpInfo != nil && bgpInfo.Data != nil {
 		// Extract description from BGPView response
-		if bgpInfo.Data.Description != "" {
-			lookup.Description = &bgpInfo.Data.Description
-			log.Debug("Retrieved ASN description from BGPView", svc1log.SafeParam("description", bgpInfo.Data.Description))
+		if bgpInfo.Data.DescriptionShort != "" {
+			lookup.Description = &bgpInfo.Data.DescriptionShort
+			log.Debug("Retrieved ASN description from BGPView", svc1log.SafeParam("description", bgpInfo.Data.DescriptionShort))
 		} else if bgpInfo.Data.Name != "" {
 			// Fallback to name if description is empty
 			lookup.Description = &bgpInfo.Data.Name
@@ -58,23 +59,23 @@ func GetASNInfo(ctx context.Context, config *asnfern.DiscoverAsnConfig) (*asnfer
 		}
 
 		// Extract registry and allocation information from RIR allocation
-		if bgpInfo.Data.RIRAllocation != nil {
-			if bgpInfo.Data.RIRAllocation.RIRName != "" {
-				lookup.Registry = &bgpInfo.Data.RIRAllocation.RIRName
+		if bgpInfo.Data.RirAllocation != nil {
+			if bgpInfo.Data.RirAllocation.RirName != "" {
+				lookup.Registry = &bgpInfo.Data.RirAllocation.RirName
 			}
-			if bgpInfo.Data.RIRAllocation.DateAllocated != "" {
-				lookup.AllocationDate = &bgpInfo.Data.RIRAllocation.DateAllocated
+			if bgpInfo.Data.RirAllocation.DateAllocated != "" {
+				lookup.AllocationDate = &bgpInfo.Data.RirAllocation.DateAllocated
 			}
-			if bgpInfo.Data.RIRAllocation.AllocationStatus != "" {
-				lookup.AllocationStatus = &bgpInfo.Data.RIRAllocation.AllocationStatus
+			if bgpInfo.Data.RirAllocation.AllocationStatus != "" {
+				lookup.AllocationStatus = &bgpInfo.Data.RirAllocation.AllocationStatus
 			}
 		}
 
 		log.Debug("Retrieved ASN metadata from BGPView",
 			svc1log.SafeParam("country", bgpInfo.Data.CountryCode),
 			svc1log.SafeParam("registry", func() string {
-				if bgpInfo.Data.RIRAllocation != nil {
-					return bgpInfo.Data.RIRAllocation.RIRName
+				if bgpInfo.Data.RirAllocation != nil {
+					return bgpInfo.Data.RirAllocation.RirName
 				}
 				return ""
 			}()))

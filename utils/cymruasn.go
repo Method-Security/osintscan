@@ -8,20 +8,12 @@ import (
 	"strings"
 	"time"
 
+	utilsfern "github.com/Method-Security/osintscan/generated/go/utils"
 	"github.com/miekg/dns"
 	"github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
 // Cymru offers quality WHOIS and DNS based ASN services particularly for IP to ASN lookups
-
-// CymruASNResult represents the parsed result from a Cymru ASN lookup
-type CymruASNResult struct {
-	ASN         string
-	BGPPrefix   string
-	CountryCode string
-	Registry    string
-	AllocDate   string
-}
 
 // IPASNLookup performs an ASN lookup using the Cymru DNS service
 // Returns ASN information for the given IP address using raw DNS queries
@@ -30,12 +22,12 @@ func IPASNLookup(ctx context.Context, ip string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return result.ASN, nil
+	return result.Asn, nil
 }
 
 // IPASNLookupDetailed performs an ASN lookup using the Cymru DNS service
 // Returns detailed ASN information for the given IP address using raw DNS queries
-func IPASNLookupDetailed(ctx context.Context, ip string) (*CymruASNResult, error) {
+func IPASNLookupDetailed(ctx context.Context, ip string) (*utilsfern.CymruAsnResult, error) {
 	log := svc1log.FromContext(ctx)
 
 	// Validate IP address
@@ -112,7 +104,7 @@ func reverseIPBare(ip string) (string, error) {
 // parseCymruTXTRecord parses a Cymru TXT record response
 // Format: "ASN | BGP Prefix | Country Code | Registry | Allocation Date"
 // Example: "23028 | 216.90.108.0/24 | US | arin | 1998-09-25"
-func parseCymruTXTRecord(record string) (*CymruASNResult, error) {
+func parseCymruTXTRecord(record string) (*utilsfern.CymruAsnResult, error) {
 	// Remove surrounding quotes if present
 	record = strings.Trim(record, "\"")
 
@@ -139,13 +131,13 @@ func parseCymruTXTRecord(record string) (*CymruASNResult, error) {
 		asn = "AS" + asn
 	}
 
-	result := &CymruASNResult{
-		ASN: asn,
+	result := &utilsfern.CymruAsnResult{
+		Asn: asn,
 	}
 
 	// Parse optional fields
 	if len(parts) >= 2 {
-		result.BGPPrefix = strings.TrimSpace(parts[1])
+		result.BgpPrefix = strings.TrimSpace(parts[1])
 	}
 	if len(parts) >= 3 {
 		result.CountryCode = strings.TrimSpace(parts[2])

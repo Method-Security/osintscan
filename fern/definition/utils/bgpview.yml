@@ -1,0 +1,126 @@
+types:
+  BgpViewResponse:
+    docs: Top-level response from BgpView API
+    properties:
+      status:
+        type: string
+        docs: Status of the API response
+      status_message:
+        type: string
+        docs: Status message from the API
+      data:
+        type: optional<BgpViewData>
+        docs: Data section of the response
+      meta:
+        type: optional<BgpViewMeta>
+        docs: Metadata about the API response
+
+  BgpViewData:
+    docs: Data section of BgpView response containing ASN and prefix information
+    properties:
+      ipv4_prefixes:
+        type: list<BgpViewPrefix>
+        docs: List of IPv4 prefixes
+      ipv6_prefixes:
+        type: list<BgpViewPrefix>
+        docs: List of IPv6 prefixes
+      asn:
+        type: integer
+        docs: Autonomous System Number
+      name:
+        type: string
+        docs: Name of the ASN
+      description_short:
+        type: string
+        docs: Short description of the ASN
+      country_code:
+        type: string
+        docs: Country code for the ASN
+      website:
+        type: string
+        docs: Website associated with the ASN
+      email_contacts:
+        type: list<string>
+        docs: List of email contacts
+      abuse_contacts:
+        type: list<string>
+        docs: List of abuse contacts
+      rir_allocation:
+        type: optional<BgpViewRirAllocation>
+        docs: Rir allocation information
+
+  BgpViewPrefix:
+    docs: Bgp prefix information from BgpView API
+    properties:
+      prefix:
+        type: string
+        docs: The IP prefix
+      ip:
+        type: string
+        docs: The IP address
+      cidr:
+        type: integer
+        docs: CIDR notation length
+      roa_status:
+        type: string
+        docs: Route Origin Authorization status
+      name:
+        type: string
+        docs: Name of the prefix
+      description:
+        type: string
+        docs: Description of the prefix
+      country_code:
+        type: string
+        docs: Country code for the prefix
+      parent:
+        type: optional<BgpViewPrefixParent>
+        docs: Parent prefix information
+
+  BgpViewPrefixParent:
+    docs: Parent prefix information
+    properties:
+      prefix:
+        type: string
+        docs: Parent prefix
+      ip:
+        type: string
+        docs: Parent IP address
+      cidr:
+        type: integer
+        docs: Parent CIDR notation length
+      rir_name:
+        type: string
+        docs: Rir name for the parent
+      allocation_status:
+        type: string
+        docs: Allocation status of the parent
+
+  BgpViewRirAllocation:
+    docs: Rir allocation information
+    properties:
+      rir_name:
+        type: string
+        docs: Name of the Regional Internet Registry
+      country_code:
+        type: string
+        docs: Country code for the allocation
+      date_allocated:
+        type: string
+        docs: Date when the allocation was made
+      allocation_status:
+        type: string
+        docs: Status of the allocation
+
+  BgpViewMeta:
+    docs: Metadata from BgpView API
+    properties:
+      time_zone:
+        type: string
+        docs: Time zone information
+      api_version:
+        type: integer
+        docs: API version number
+      execution_time:
+        type: string
+        docs: Execution time of the API call

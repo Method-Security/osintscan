@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	utilsfern "github.com/Method-Security/osintscan/generated/go/utils"
 	"github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
@@ -20,65 +21,6 @@ type BGPViewClient struct {
 	baseURL    string
 	httpClient *http.Client
 	userAgent  string
-}
-
-// BGPViewResponse represents the top-level response from BGPView API
-type BGPViewResponse struct {
-	Status        string       `json:"status"`
-	StatusMessage string       `json:"status_message"`
-	Data          *BGPViewData `json:"data"`
-	Meta          *BGPViewMeta `json:"@meta"`
-}
-
-// BGPViewData represents the data section of BGPView response
-type BGPViewData struct {
-	IPv4Prefixes []BGPViewPrefix `json:"ipv4_prefixes"`
-	IPv6Prefixes []BGPViewPrefix `json:"ipv6_prefixes"`
-	// ASN Info fields
-	ASN           int                   `json:"asn"`
-	Name          string                `json:"name"`
-	Description   string                `json:"description_short"`
-	CountryCode   string                `json:"country_code"`
-	Website       string                `json:"website"`
-	EmailContacts []string              `json:"email_contacts"`
-	AbuseContacts []string              `json:"abuse_contacts"`
-	RIRAllocation *BGPViewRIRAllocation `json:"rir_allocation"`
-}
-
-// BGPViewPrefix represents a BGP prefix from BGPView API
-type BGPViewPrefix struct {
-	Prefix      string               `json:"prefix"`
-	IP          string               `json:"ip"`
-	CIDR        int                  `json:"cidr"`
-	ROAStatus   string               `json:"roa_status"`
-	Name        string               `json:"name"`
-	Description string               `json:"description"`
-	CountryCode string               `json:"country_code"`
-	Parent      *BGPViewPrefixParent `json:"parent"`
-}
-
-// BGPViewPrefixParent represents parent prefix information
-type BGPViewPrefixParent struct {
-	Prefix           string `json:"prefix"`
-	IP               string `json:"ip"`
-	CIDR             int    `json:"cidr"`
-	RIRName          string `json:"rir_name"`
-	AllocationStatus string `json:"allocation_status"`
-}
-
-// BGPViewRIRAllocation represents RIR allocation information
-type BGPViewRIRAllocation struct {
-	RIRName          string `json:"rir_name"`
-	CountryCode      string `json:"country_code"`
-	DateAllocated    string `json:"date_allocated"`
-	AllocationStatus string `json:"allocation_status"`
-}
-
-// BGPViewMeta represents metadata from BGPView API
-type BGPViewMeta struct {
-	TimeZone      string `json:"time_zone"`
-	APIVersion    int    `json:"api_version"`
-	ExecutionTime string `json:"execution_time"`
 }
 
 // NewBGPViewClient creates a new BGPView API client
@@ -152,8 +94,8 @@ func (c *BGPViewClient) makeRequestWithRetry(ctx context.Context, url string, ti
 				return nil, fmt.Errorf("timeout exceeded after %v while retrying 429 responses", timeout)
 			}
 
-			// Calculate random backoff between 10-60 seconds
-			backoff := time.Duration(10+rand.Intn(51)) * time.Second
+			// Calculate random backoff between 10-30 seconds
+			backoff := time.Duration(10+rand.Intn(21)) * time.Second
 
 			log.Warn("Received 429 from BGPView API, retrying with backoff",
 				svc1log.SafeParam("attempt", attempt),
@@ -175,7 +117,7 @@ func (c *BGPViewClient) makeRequestWithRetry(ctx context.Context, url string, ti
 }
 
 // GetASNPrefixes retrieves all BGP prefixes for a given ASN
-func (c *BGPViewClient) GetASNPrefixes(ctx context.Context, asn string) (*BGPViewResponse, error) {
+func (c *BGPViewClient) GetASNPrefixes(ctx context.Context, asn string) (*utilsfern.BgpViewResponse, error) {
 	log := svc1log.FromContext(ctx)
 
 	// Normalize ASN format for API call
@@ -211,7 +153,7 @@ func (c *BGPViewClient) GetASNPrefixes(ctx context.Context, asn string) (*BGPVie
 	}
 
 	// Parse JSON response
-	var bgpResponse BGPViewResponse
+	var bgpResponse utilsfern.BgpViewResponse
 	if err := json.Unmarshal(body, &bgpResponse); err != nil {
 		return nil, fmt.Errorf("failed to parse JSON response: %w", err)
 	}
@@ -222,9 +164,24 @@ func (c *BGPViewClient) GetASNPrefixes(ctx context.Context, asn string) (*BGPVie
 	}
 
 	log.Debug("BGPView API response received",
-		svc1log.SafeParam("ipv4_prefixes", len(bgpResponse.Data.IPv4Prefixes)),
-		svc1log.SafeParam("ipv6_prefixes", len(bgpResponse.Data.IPv6Prefixes)),
-		svc1log.SafeParam("execution_time", bgpResponse.Meta.ExecutionTime))
+		svc1log.SafeParam("ipv4_prefixes", func() int {
+			if bgpResponse.Data != nil {
+				return len(bgpResponse.Data.Ipv4Prefixes)
+			}
+			return 0
+		}()),
+		svc1log.SafeParam("ipv6_prefixes", func() int {
+			if bgpResponse.Data != nil {
+				return len(bgpResponse.Data.Ipv6Prefixes)
+			}
+			return 0
+		}()),
+		svc1log.SafeParam("execution_time", func() string {
+			if bgpResponse.Meta != nil {
+				return bgpResponse.Meta.ExecutionTime
+			}
+			return ""
+		}()))
 
 	return &bgpResponse, nil
 }
@@ -251,14 +208,14 @@ func GetASNCIDRs(ctx context.Context, asn string) ([]string, error) {
 	var cidrs []string
 
 	// Add IPv4 prefixes
-	for _, prefix := range response.Data.IPv4Prefixes {
+	for _, prefix := range response.Data.Ipv4Prefixes {
 		if prefix.Prefix != "" {
 			cidrs = append(cidrs, prefix.Prefix)
 		}
 	}
 
 	// Add IPv6 prefixes
-	for _, prefix := range response.Data.IPv6Prefixes {
+	for _, prefix := range response.Data.Ipv6Prefixes {
 		if prefix.Prefix != "" {
 			cidrs = append(cidrs, prefix.Prefix)
 		}
@@ -267,8 +224,8 @@ func GetASNCIDRs(ctx context.Context, asn string) ([]string, error) {
 	log.Info("Retrieved ASN CIDRs from BGPView",
 		svc1log.SafeParam("asn", asn),
 		svc1log.SafeParam("total_cidrs", len(cidrs)),
-		svc1log.SafeParam("ipv4_cidrs", len(response.Data.IPv4Prefixes)),
-		svc1log.SafeParam("ipv6_cidrs", len(response.Data.IPv6Prefixes)))
+		svc1log.SafeParam("ipv4_cidrs", len(response.Data.Ipv4Prefixes)),
+		svc1log.SafeParam("ipv6_cidrs", len(response.Data.Ipv6Prefixes)))
 
 	return cidrs, nil
 }
@@ -296,14 +253,14 @@ func GetASNCIDRsWithTimeout(ctx context.Context, asn string, timeout time.Durati
 	var cidrs []string
 
 	// Add IPv4 prefixes
-	for _, prefix := range response.Data.IPv4Prefixes {
+	for _, prefix := range response.Data.Ipv4Prefixes {
 		if prefix.Prefix != "" {
 			cidrs = append(cidrs, prefix.Prefix)
 		}
 	}
 
 	// Add IPv6 prefixes
-	for _, prefix := range response.Data.IPv6Prefixes {
+	for _, prefix := range response.Data.Ipv6Prefixes {
 		if prefix.Prefix != "" {
 			cidrs = append(cidrs, prefix.Prefix)
 		}
@@ -312,15 +269,15 @@ func GetASNCIDRsWithTimeout(ctx context.Context, asn string, timeout time.Durati
 	log.Info("Retrieved ASN CIDRs from BGPView",
 		svc1log.SafeParam("asn", asn),
 		svc1log.SafeParam("total_cidrs", len(cidrs)),
-		svc1log.SafeParam("ipv4_cidrs", len(response.Data.IPv4Prefixes)),
-		svc1log.SafeParam("ipv6_cidrs", len(response.Data.IPv6Prefixes)))
+		svc1log.SafeParam("ipv4_cidrs", len(response.Data.Ipv4Prefixes)),
+		svc1log.SafeParam("ipv6_cidrs", len(response.Data.Ipv6Prefixes)))
 
 	return cidrs, nil
 }
 
 // GetASNCIDRsDetailed retrieves detailed CIDR information for a given ASN
 // Returns the full BGPView response with additional metadata
-func GetASNCIDRsDetailed(ctx context.Context, asn string) (*BGPViewResponse, error) {
+func GetASNCIDRsDetailed(ctx context.Context, asn string) (*utilsfern.BgpViewResponse, error) {
 	client := NewBGPViewClient()
 	return client.GetASNPrefixes(ctx, asn)
 }
@@ -340,7 +297,7 @@ func normalizeASNForAPI(asn string) string {
 }
 
 // ExtractCIDRsByCountry filters CIDRs by country code from BGPView response
-func ExtractCIDRsByCountry(response *BGPViewResponse, countryCode string) []string {
+func ExtractCIDRsByCountry(response *utilsfern.BgpViewResponse, countryCode string) []string {
 	if response == nil || response.Data == nil {
 		return nil
 	}
@@ -349,14 +306,14 @@ func ExtractCIDRsByCountry(response *BGPViewResponse, countryCode string) []stri
 	countryCode = strings.ToUpper(strings.TrimSpace(countryCode))
 
 	// Filter IPv4 prefixes by country
-	for _, prefix := range response.Data.IPv4Prefixes {
+	for _, prefix := range response.Data.Ipv4Prefixes {
 		if strings.ToUpper(prefix.CountryCode) == countryCode {
 			cidrs = append(cidrs, prefix.Prefix)
 		}
 	}
 
 	// Filter IPv6 prefixes by country
-	for _, prefix := range response.Data.IPv6Prefixes {
+	for _, prefix := range response.Data.Ipv6Prefixes {
 		if strings.ToUpper(prefix.CountryCode) == countryCode {
 			cidrs = append(cidrs, prefix.Prefix)
 		}
@@ -366,20 +323,20 @@ func ExtractCIDRsByCountry(response *BGPViewResponse, countryCode string) []stri
 }
 
 // GetASNInfo retrieves comprehensive ASN information using BGPView API
-func GetASNInfo(ctx context.Context, asn string) (*BGPViewResponse, error) {
+func GetASNInfo(ctx context.Context, asn string) (*utilsfern.BgpViewResponse, error) {
 	client := NewBGPViewClient()
 	return client.GetASNInfo(ctx, asn)
 }
 
 // GetASNInfoWithTimeout retrieves comprehensive ASN information using BGPView API with timeout
-func GetASNInfoWithTimeout(ctx context.Context, asn string, timeout time.Duration) (*BGPViewResponse, error) {
+func GetASNInfoWithTimeout(ctx context.Context, asn string, timeout time.Duration) (*utilsfern.BgpViewResponse, error) {
 	client := NewBGPViewClient()
 	return client.GetASNInfoWithTimeout(ctx, asn, timeout)
 }
 
 // GetASNInfo retrieves basic ASN information using BGPView API
 // This provides an alternative to Cymru DNS for ASN description lookup
-func (c *BGPViewClient) GetASNInfo(ctx context.Context, asn string) (*BGPViewResponse, error) {
+func (c *BGPViewClient) GetASNInfo(ctx context.Context, asn string) (*utilsfern.BgpViewResponse, error) {
 	log := svc1log.FromContext(ctx)
 
 	// Normalize ASN format for API call
@@ -414,7 +371,7 @@ func (c *BGPViewClient) GetASNInfo(ctx context.Context, asn string) (*BGPViewRes
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
-	var bgpResponse BGPViewResponse
+	var bgpResponse utilsfern.BgpViewResponse
 	if err := json.Unmarshal(body, &bgpResponse); err != nil {
 		return nil, fmt.Errorf("failed to parse JSON response: %w", err)
 	}
@@ -427,7 +384,7 @@ func (c *BGPViewClient) GetASNInfo(ctx context.Context, asn string) (*BGPViewRes
 }
 
 // GetASNPrefixesWithTimeout retrieves all BGP prefixes for a given ASN with timeout
-func (c *BGPViewClient) GetASNPrefixesWithTimeout(ctx context.Context, asn string, timeout time.Duration) (*BGPViewResponse, error) {
+func (c *BGPViewClient) GetASNPrefixesWithTimeout(ctx context.Context, asn string, timeout time.Duration) (*utilsfern.BgpViewResponse, error) {
 	log := svc1log.FromContext(ctx)
 
 	// Normalize ASN format for API call
@@ -466,7 +423,7 @@ func (c *BGPViewClient) GetASNPrefixesWithTimeout(ctx context.Context, asn strin
 	}
 
 	// Parse JSON response
-	var bgpResponse BGPViewResponse
+	var bgpResponse utilsfern.BgpViewResponse
 	if err := json.Unmarshal(body, &bgpResponse); err != nil {
 		return nil, fmt.Errorf("failed to parse JSON response: %w", err)
 	}
@@ -477,15 +434,30 @@ func (c *BGPViewClient) GetASNPrefixesWithTimeout(ctx context.Context, asn strin
 	}
 
 	log.Debug("BGPView API response received",
-		svc1log.SafeParam("ipv4_prefixes", len(bgpResponse.Data.IPv4Prefixes)),
-		svc1log.SafeParam("ipv6_prefixes", len(bgpResponse.Data.IPv6Prefixes)),
-		svc1log.SafeParam("execution_time", bgpResponse.Meta.ExecutionTime))
+		svc1log.SafeParam("ipv4_prefixes", func() int {
+			if bgpResponse.Data != nil {
+				return len(bgpResponse.Data.Ipv4Prefixes)
+			}
+			return 0
+		}()),
+		svc1log.SafeParam("ipv6_prefixes", func() int {
+			if bgpResponse.Data != nil {
+				return len(bgpResponse.Data.Ipv6Prefixes)
+			}
+			return 0
+		}()),
+		svc1log.SafeParam("execution_time", func() string {
+			if bgpResponse.Meta != nil {
+				return bgpResponse.Meta.ExecutionTime
+			}
+			return ""
+		}()))
 
 	return &bgpResponse, nil
 }
 
 // GetASNInfoWithTimeout retrieves basic ASN information using BGPView API with timeout
-func (c *BGPViewClient) GetASNInfoWithTimeout(ctx context.Context, asn string, timeout time.Duration) (*BGPViewResponse, error) {
+func (c *BGPViewClient) GetASNInfoWithTimeout(ctx context.Context, asn string, timeout time.Duration) (*utilsfern.BgpViewResponse, error) {
 	log := svc1log.FromContext(ctx)
 
 	// Normalize ASN format for API call
@@ -522,7 +494,7 @@ func (c *BGPViewClient) GetASNInfoWithTimeout(ctx context.Context, asn string, t
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
-	var bgpResponse BGPViewResponse
+	var bgpResponse utilsfern.BgpViewResponse
 	if err := json.Unmarshal(body, &bgpResponse); err != nil {
 		return nil, fmt.Errorf("failed to parse JSON response: %w", err)
 	}
