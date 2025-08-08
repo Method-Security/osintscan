@@ -1,0 +1,19 @@
+types:
+  CymruASNResult:
+    docs: Represents the parsed result from a Cymru ASN lookup
+    properties:
+      asn:
+        type: string
+        docs: The Autonomous System Number
+      bgpPrefix:
+        type: string
+        docs: The BGP prefix associated with the ASN
+      countryCode:
+        type: string
+        docs: The country code where the ASN is registered
+      registry:
+        type: string
+        docs: The registry that allocated the ASN
+      allocDate:
+        type: string
+        docs: The date when the ASN was allocated

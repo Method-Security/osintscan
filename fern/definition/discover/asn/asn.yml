@@ -1,0 +1,24 @@
+types:
+# Config Struct
+  DiscoverASNConfig:
+    properties:
+      asn: string
+      timeout: optional<integer>
+  DiscoverASNLookup:
+    properties:
+      asn: string
+      description: optional<string>
+      cidrs: optional<list<string>>
+      country: optional<string>
+      registry: optional<string>
+      allocationDate: optional<string>
+      allocationStatus: optional<string>
+# Report Structs
+  DiscoverASNResult:
+    properties:
+      lookup: optional<DiscoverASNLookup>
+  DiscoverASNReport:
+    properties:
+      config: DiscoverASNConfig
+      result: DiscoverASNResult
+      errors: optional<list<string>>
