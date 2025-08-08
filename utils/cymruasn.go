@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/miekg/dns"
 	"github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
@@ -44,14 +45,11 @@ func IPASNLookupDetailed(ctx context.Context, ip string) (*CymruASNResult, error
 	}
 
 	// Determine if IPv4 or IPv6 and construct the query domain
-	var queryDomain string
-	if parsedIP.To4() != nil {
-		// IPv4 - reverse the octets
-		queryDomain = reverseIPv4(ip) + ".origin.asn.cymru.com"
-	} else {
-		// IPv6 - reverse the nibbles
-		queryDomain = reverseIPv6(ip) + ".origin6.asn.cymru.com"
+	reversed, err := reverseIPBare(ip)
+	if err != nil {
+		return nil, fmt.Errorf("failed to reverse IP: %w", err)
 	}
+	queryDomain := reversed + ".origin.asn.cymru.com"
 
 	log.Debug("Performing Cymru ASN lookup", svc1log.SafeParam("ip", ip), svc1log.SafeParam("query_domain", queryDomain))
 
@@ -91,43 +89,24 @@ func IPASNLookupDetailed(ctx context.Context, ip string) (*CymruASNResult, error
 	return result, nil
 }
 
-// reverseIPv4 reverses the octets of an IPv4 address
-// Example: 216.90.108.31 becomes 31.108.90.216
-func reverseIPv4(ip string) string {
-	parts := strings.Split(ip, ".")
-	if len(parts) != 4 {
-		return ip // Return original if not valid IPv4 format
+// ReverseIPBare returns the reversed form used in PTR construction,
+// but without the zone suffixes (".in-addr.arpa" / ".ip6.arpa") and trailing dot.
+// Examples:
+//
+//	"216.90.108.31"        -> "31.108.90.216"
+//	"2001:db8::1"          -> "1.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.8.b.d.0.1.0.0.2"
+func reverseIPBare(ip string) (string, error) {
+	ptr, err := dns.ReverseAddr(ip)
+	if err != nil {
+		return "", err
 	}
 
-	// Reverse the order
-	return fmt.Sprintf("%s.%s.%s.%s", parts[3], parts[2], parts[1], parts[0])
-}
-
-// reverseIPv6 reverses the nibbles of an IPv6 address for PTR-style DNS queries
-// Example: 2001:db8::1 becomes 1.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.8.b.d.0.1.0.0.2
-func reverseIPv6(ip string) string {
-	parsedIP := net.ParseIP(ip)
-	if parsedIP == nil {
-		return ip
-	}
-
-	// Get the 16-byte representation of IPv6
-	ipv6Bytes := parsedIP.To16()
-	if ipv6Bytes == nil {
-		return ip
-	}
-
-	// Convert each byte to two hex digits and reverse the nibbles
-	var nibbles []string
-	for i := len(ipv6Bytes) - 1; i >= 0; i-- {
-		b := ipv6Bytes[i]
-		// Add the lower nibble first (reverse nibble order within byte)
-		nibbles = append(nibbles, fmt.Sprintf("%x", b&0x0f))
-		// Add the upper nibble
-		nibbles = append(nibbles, fmt.Sprintf("%x", (b&0xf0)>>4))
-	}
-
-	return strings.Join(nibbles, ".")
+	// Normalize and strip the trailing dot and known reverse zones.
+	s := strings.ToLower(ptr)
+	s = strings.TrimSuffix(s, ".")
+	s = strings.TrimSuffix(s, ".in-addr.arpa")
+	s = strings.TrimSuffix(s, ".ip6.arpa")
+	return s, nil
 }
 
 // parseCymruTXTRecord parses a Cymru TXT record response
@@ -183,8 +162,14 @@ func parseCymruTXTRecord(record string) (*CymruASNResult, error) {
 
 // GetASNDescription looks up the description for a given ASN using Cymru's asn.cymru.com zone
 // Example query: dig +short AS23028.asn.cymru.com TXT
-func GetASNDescription(ctx context.Context, asn string) (string, error) {
+func GetASNDescription(ctx context.Context, asn string, timeout ...time.Duration) (string, error) {
 	log := svc1log.FromContext(ctx)
+
+	// Set default timeout to 5 if not provided
+	actualTimeout := 5 * time.Second
+	if len(timeout) > 0 && timeout[0] > 0 {
+		actualTimeout = timeout[0]
+	}
 
 	// Normalize ASN format - ensure it starts with AS and is numeric
 	normalizedASN, err := normalizeASN(asn)
@@ -200,7 +185,7 @@ func GetASNDescription(ctx context.Context, asn string) (string, error) {
 		PreferGo: true,
 		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
 			d := net.Dialer{
-				Timeout: 5 * time.Second,
+				Timeout: actualTimeout * time.Second,
 			}
 			return d.DialContext(ctx, network, address)
 		},

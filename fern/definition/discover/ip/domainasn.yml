@@ -5,7 +5,7 @@ types:
       ip: string
       domain: optional<string>
       asn: optional<string>
-      geolocation: optional<string>
+      geoLocation: optional<string>
 # Config Struct
   DiscoverIPDomainASNConfig:
     properties:

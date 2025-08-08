@@ -516,10 +516,6 @@ func (a *OsintScan) InitDiscoverCommand() {
 	// Add command to the 'discover' command
 	discoverCmd.AddCommand(discoverCdnCmd)
 
-	// ------------------------------------------------------------------------------------------------
-	// Start - IP Address Discover Commands
-	// ------------------------------------------------------------------------------------------------
-
 	// IP Address Discover Commands
 	discoverIPCmd := &cobra.Command{
 		Use:   "ip",
@@ -531,7 +527,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 	discoverCmd.AddCommand(discoverIPCmd)
 
 	discoverIPDomainASNCmd := &cobra.Command{
-		Use:   "domainasn",
+		Use:   "domain-asn",
 		Short: "Perform a reverse DNS lookup and ASN lookup on a single IP, list of IPs, or a CIDR range",
 		Long:  `Perform a reverse DNS lookup and ASN lookup on a single IP, list of IPs, or a CIDR range. Warning: /16 and larger can take upwards of 30 minutes.`,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -603,13 +599,6 @@ func (a *OsintScan) InitDiscoverCommand() {
 
 	// Add command to 'ip' command
 	discoverIPCmd.AddCommand(discoverIPDomainASNCmd)
-	// ------------------------------------------------------------------------------------------------
-	// End - IP Address Discover Commands
-	// ------------------------------------------------------------------------------------------------
-
-	// ------------------------------------------------------------------------------------------------
-	// Start - ASN Address Discover Commands
-	// ------------------------------------------------------------------------------------------------
 
 	// ASN Address Discover Commands
 	discoverASNCmd := &cobra.Command{

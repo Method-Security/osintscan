@@ -16,8 +16,8 @@ func GetASNInfo(ctx context.Context, config *asnfern.DiscoverAsnConfig) (*asnfer
 
 	log.Info("Starting ASN information lookup via BGPView", svc1log.SafeParam("asn", config.Asn))
 
-	// Initialize result with the input ASN
-	result := &asnfern.DiscoverAsnResult{
+	// Initialize lookup with the input ASN
+	lookup := &asnfern.DiscoverAsnLookup{
 		Asn: config.Asn,
 	}
 
@@ -44,29 +44,29 @@ func GetASNInfo(ctx context.Context, config *asnfern.DiscoverAsnConfig) (*asnfer
 	} else if bgpInfo != nil && bgpInfo.Data != nil {
 		// Extract description from BGPView response
 		if bgpInfo.Data.Description != "" {
-			result.Description = &bgpInfo.Data.Description
+			lookup.Description = &bgpInfo.Data.Description
 			log.Debug("Retrieved ASN description from BGPView", svc1log.SafeParam("description", bgpInfo.Data.Description))
 		} else if bgpInfo.Data.Name != "" {
 			// Fallback to name if description is empty
-			result.Description = &bgpInfo.Data.Name
+			lookup.Description = &bgpInfo.Data.Name
 			log.Debug("Retrieved ASN name from BGPView", svc1log.SafeParam("name", bgpInfo.Data.Name))
 		}
 
 		// Extract country code from BGPView response
 		if bgpInfo.Data.CountryCode != "" {
-			result.Country = &bgpInfo.Data.CountryCode
+			lookup.Country = &bgpInfo.Data.CountryCode
 		}
 
 		// Extract registry and allocation information from RIR allocation
 		if bgpInfo.Data.RIRAllocation != nil {
 			if bgpInfo.Data.RIRAllocation.RIRName != "" {
-				result.Registry = &bgpInfo.Data.RIRAllocation.RIRName
+				lookup.Registry = &bgpInfo.Data.RIRAllocation.RIRName
 			}
 			if bgpInfo.Data.RIRAllocation.DateAllocated != "" {
-				result.AllocationDate = &bgpInfo.Data.RIRAllocation.DateAllocated
+				lookup.AllocationDate = &bgpInfo.Data.RIRAllocation.DateAllocated
 			}
 			if bgpInfo.Data.RIRAllocation.AllocationStatus != "" {
-				result.AllocationStatus = &bgpInfo.Data.RIRAllocation.AllocationStatus
+				lookup.AllocationStatus = &bgpInfo.Data.RIRAllocation.AllocationStatus
 			}
 		}
 
@@ -92,13 +92,15 @@ func GetASNInfo(ctx context.Context, config *asnfern.DiscoverAsnConfig) (*asnfer
 		log.Warn("Failed to get ASN CIDRs from BGPView", svc1log.SafeParam("asn", config.Asn), svc1log.SafeParam("error", err.Error()))
 		errors = append(errors, "Failed to get ASN CIDRs: "+err.Error())
 	} else if len(cidrs) > 0 {
-		result.Cidrs = cidrs
+		lookup.Cidrs = cidrs
 		log.Debug("Retrieved ASN CIDRs from BGPView", svc1log.SafeParam("cidr_count", len(cidrs)))
 	}
 
 	report := &asnfern.DiscoverAsnReport{
 		Config: config,
-		Result: result,
+		Result: &asnfern.DiscoverAsnResult{
+			Lookup: lookup,
+		},
 	}
 
 	if len(errors) > 0 {
@@ -107,10 +109,10 @@ func GetASNInfo(ctx context.Context, config *asnfern.DiscoverAsnConfig) (*asnfer
 
 	log.Info("Completed ASN information lookup via BGPView",
 		svc1log.SafeParam("asn", config.Asn),
-		svc1log.SafeParam("has_description", result.Description != nil),
-		svc1log.SafeParam("has_country", result.Country != nil),
-		svc1log.SafeParam("has_registry", result.Registry != nil),
-		svc1log.SafeParam("cidr_count", len(result.Cidrs)),
+		svc1log.SafeParam("has_description", lookup.Description != nil),
+		svc1log.SafeParam("has_country", lookup.Country != nil),
+		svc1log.SafeParam("has_registry", lookup.Registry != nil),
+		svc1log.SafeParam("cidr_count", len(lookup.Cidrs)),
 		svc1log.SafeParam("error_count", len(errors)))
 
 	return report, nil

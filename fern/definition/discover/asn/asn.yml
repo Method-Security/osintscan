@@ -4,8 +4,7 @@ types:
     properties:
       asn: string
       timeout: optional<integer>
-# Report Structs
-  DiscoverASNResult:
+  DiscoverASNLookup:
     properties:
       asn: string
       description: optional<string>
@@ -14,6 +13,10 @@ types:
       registry: optional<string>
       allocationDate: optional<string>
       allocationStatus: optional<string>
+# Report Structs
+  DiscoverASNResult:
+    properties:
+      lookup: optional<DiscoverASNLookup>
   DiscoverASNReport:
     properties:
       config: DiscoverASNConfig
