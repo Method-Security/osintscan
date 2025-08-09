@@ -79,10 +79,17 @@ func getSubdomainsActive(ctx context.Context, domain string, subdomainList []str
 		ctx, cancel = context.WithTimeout(ctx, time.Duration(timeout)*time.Minute)
 		defer cancel()
 	}
-	resolvers := []*net.Resolver{}
-	for _, dnsServerAddress := range dnsServerAddresses {
-		resolvers = append(resolvers, utils.GetResolver(dnsServerAddress, log))
-	}
+	resolvers := func() []*net.Resolver {
+		if len(dnsServerAddresses) == 0 {
+			return []*net.Resolver{utils.GetResolver("", log)}
+		}
+
+		result := make([]*net.Resolver, 0, len(dnsServerAddresses))
+		for _, dnsServerAddress := range dnsServerAddresses {
+			result = append(result, utils.GetResolver(dnsServerAddress, log))
+		}
+		return result
+	}()
 
 	// First iteration - test all base subdomains for wildcards
 	log.Info("Detecting wildcards", svc1log.SafeParam("domain", domain))
