@@ -142,7 +142,6 @@ func (a *OsintScan) InitDiscoverCommand() {
 	// subdomain Commands
 	// subdomain active
 	// subdomain passive
-	// subdomain intelligent
 	discoverDNSSubdomainCmd := &cobra.Command{
 		Use:   "subdomain",
 		Short: "Discover subdomains for a domain",
