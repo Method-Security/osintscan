@@ -50,8 +50,20 @@ func makeDeadline(d time.Duration) fasttime {
 
 	// Start or extend clock if necessary.
 	if end > fast.clockEnd.read() {
+		// If time.Since(last use) > timeout, there's a chance that
+		// fast.current will no longer be updated, which can lead to
+		// incorrect 'end' calculations that can trigger a false timeout
+		fast.mu.Lock()
+		if !fast.running && !fast.start.IsZero() {
+			// update fast.current
+			fast.current.write(durationToTicks(time.Since(fast.start)))
+			// recalculate our end value
+			end = fast.current.read() + durationToTicks(d+clockPeriod)
+		}
+		fast.mu.Unlock()
 		extendClock(end)
 	}
+
 	return end
 }
 
@@ -76,14 +88,36 @@ func extendClock(end fasttime) {
 	}
 }
 
+// stop the timeout clock in the background
+// should only used for unit tests to abandon the background goroutine
+func stopClock() {
+	fast.mu.Lock()
+	if fast.running {
+		fast.clockEnd.write(fasttime(0))
+	}
+	fast.mu.Unlock()
+
+	// pause until not running
+	// get and release the lock
+	isRunning := true
+	for isRunning {
+		time.Sleep(clockPeriod / 2)
+		fast.mu.Lock()
+		isRunning = fast.running
+		fast.mu.Unlock()
+	}
+}
+
 func durationToTicks(d time.Duration) fasttime {
 	// Downscale nanoseconds to approximately a millisecond so that we can avoid
 	// overflow even if the caller passes in math.MaxInt64.
 	return fasttime(d) >> 20
 }
 
+const DefaultClockPeriod = 100 * time.Millisecond
+
 // clockPeriod is the approximate interval between updates of approximateClock.
-const clockPeriod = 100 * time.Millisecond
+var clockPeriod = DefaultClockPeriod
 
 func runClock() {
 	fast.mu.Lock()
