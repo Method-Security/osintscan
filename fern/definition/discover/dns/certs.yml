@@ -4,7 +4,7 @@ types:
       issuerCAID: integer
       issuerName: string
       commonName: string
-      nameValue: string
+      nameValue: list<string>
       id: integer
       entryTimestamp: string
       notBefore: string
