@@ -91,8 +91,8 @@ func getSubdomainsActive(ctx context.Context, domain string, subdomainList []str
 		return []string{}, err
 	}
 	if wildcardDNS != nil {
-		domain = *wildcardDNS
-		subdomains = append(subdomains, domain)
+		// Wildcard DNS detected - skip brute forcing to avoid false positives
+		log.Info("Wildcard DNS detected, skipping brute force", svc1log.SafeParam("wildcard", *wildcardDNS))
 		return subdomains, nil
 	}
 
@@ -122,8 +122,10 @@ func getSubdomainsActive(ctx context.Context, domain string, subdomainList []str
 				continue
 			}
 			if wildcardDNS != nil {
-				domain = *wildcardDNS
-				subdomains = append(subdomains, domain)
+				// Wildcard DNS detected for this subdomain - skip to avoid false positives
+				log.Info("Wildcard DNS detected for subdomain, skipping",
+					svc1log.SafeParam("subdomain", subdomain),
+					svc1log.SafeParam("wildcard", *wildcardDNS))
 				continue
 			}
 			validSubdomains = append(validSubdomains, subdomain)
