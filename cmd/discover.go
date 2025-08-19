@@ -141,6 +141,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 
 	// subdomain Commands
 	// subdomain active
+	// subdomain correlation
 	// subdomain passive
 	discoverDNSSubdomainCmd := &cobra.Command{
 		Use:   "subdomain",
@@ -149,54 +150,6 @@ func (a *OsintScan) InitDiscoverCommand() {
 	}
 
 	discoverDNSCmd.AddCommand(discoverDNSSubdomainCmd)
-
-	discoverDNSSubdomainPassiveCmd := &cobra.Command{
-		Use:   "passive",
-		Short: "Passively discover subdomains",
-		Long:  `Identify subdomains for the specified domain using only passive data sources (no direct interaction with the target).`,
-		Run: func(cmd *cobra.Command, args []string) {
-			// Parse flags
-			domain, err := cmd.Flags().GetString("domain")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-
-			// Config Flags
-			requestsPerSecond, err := cmd.Flags().GetInt("requests-per-second")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-			threads, err := cmd.Flags().GetInt("threads")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-
-			// Create config
-			config := getDiscoverDNSPassiveSubdomainConfig(domain, requestsPerSecond, threads)
-
-			// Create report
-			report, err := subdomain.GetDomainSubdomainsPassive(cmd.Context(), config)
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-			a.OutputSignal.Content = report
-		},
-	}
-
-	// Target Flags
-	discoverDNSSubdomainPassiveCmd.Flags().String("domain", "", "The domain name to passively enumerate subdomains for")
-	discoverDNSSubdomainPassiveCmd.Flags().Int("requests-per-second", 0, "Maximum number of requests per second to send to the DNS resolvers")
-	discoverDNSSubdomainPassiveCmd.Flags().Int("threads", 10, "Number of concurrent threads for scanning")
-
-	// Mark Required Flags
-	_ = discoverDNSSubdomainPassiveCmd.MarkFlagRequired("domain")
-
-	// Add command to 'subdomain' command
-	discoverDNSSubdomainCmd.AddCommand(discoverDNSSubdomainPassiveCmd)
 
 	discoverDNSSubdomainActiveCmd := &cobra.Command{
 		Use:   "active",
@@ -317,6 +270,107 @@ func (a *OsintScan) InitDiscoverCommand() {
 
 	// Add command to 'subdomain' command
 	discoverDNSSubdomainCmd.AddCommand(discoverDNSSubdomainActiveCmd)
+
+	discoverDNSSubdomainCorrelationCmd := &cobra.Command{
+		Use:   "correlation",
+		Short: "Correlate subdomains across multiple domains",
+		Long:  `Correlate subdomains across multiple domains using active data sources (no direct interaction with the target).`,
+		Run: func(cmd *cobra.Command, args []string) {
+			// Grab Domains
+			domains, err := cmd.Flags().GetStringSlice("domains")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			// Config Flags
+			threads, err := cmd.Flags().GetInt("threads")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			timeout, err := cmd.Flags().GetInt("timeout")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			dnsResolvers, err := cmd.Flags().GetStringSlice("dns-resolvers")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			// Create config
+			config := getDiscoverDNSCorrelationSubdomainConfig(domains, threads, timeout, dnsResolvers)
+
+			// Create report
+			report, err := subdomain.GetDomainSubdomainsCorrelation(cmd.Context(), config)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			a.OutputSignal.Content = report
+		},
+	}
+
+	// Target Flags
+	discoverDNSSubdomainCorrelationCmd.Flags().StringSlice("domains", []string{}, "The domains to test")
+	discoverDNSSubdomainCorrelationCmd.Flags().Int("threads", 10, "Number of parallel threads to use for testing")
+	discoverDNSSubdomainCorrelationCmd.Flags().Int("timeout", 0, "Maximum time (in seconds) to spend on each lookup")
+	discoverDNSSubdomainCorrelationCmd.Flags().StringSlice("dns-resolvers", []string{}, "Custom DNS resolver/servers to use for queries (e.g. 1.1.1.1:53)")
+
+	// Mark Required Flags
+	_ = discoverDNSSubdomainCorrelationCmd.MarkFlagRequired("domains")
+
+	// Add command to 'subdomain' command
+	discoverDNSSubdomainCmd.AddCommand(discoverDNSSubdomainCorrelationCmd)
+
+	discoverDNSSubdomainPassiveCmd := &cobra.Command{
+		Use:   "passive",
+		Short: "Passively discover subdomains",
+		Long:  `Identify subdomains for the specified domain using only passive data sources (no direct interaction with the target).`,
+		Run: func(cmd *cobra.Command, args []string) {
+			// Parse flags
+			domain, err := cmd.Flags().GetString("domain")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			// Config Flags
+			requestsPerSecond, err := cmd.Flags().GetInt("requests-per-second")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			threads, err := cmd.Flags().GetInt("threads")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			// Create config
+			config := getDiscoverDNSPassiveSubdomainConfig(domain, requestsPerSecond, threads)
+
+			// Create report
+			report, err := subdomain.GetDomainSubdomainsPassive(cmd.Context(), config)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			a.OutputSignal.Content = report
+		},
+	}
+
+	// Target Flags
+	discoverDNSSubdomainPassiveCmd.Flags().String("domain", "", "The domain name to passively enumerate subdomains for")
+	discoverDNSSubdomainPassiveCmd.Flags().Int("requests-per-second", 0, "Maximum number of requests per second to send to the DNS resolvers")
+	discoverDNSSubdomainPassiveCmd.Flags().Int("threads", 10, "Number of concurrent threads for scanning")
+
+	// Mark Required Flags
+	_ = discoverDNSSubdomainPassiveCmd.MarkFlagRequired("domain")
+
+	// Add command to 'subdomain' command
+	discoverDNSSubdomainCmd.AddCommand(discoverDNSSubdomainPassiveCmd)
 
 	discoverShodanCmd := &cobra.Command{
 		Use:   "shodan",
@@ -595,18 +649,6 @@ func getDiscoverDNSForwardReverseConfig(domain string, dnsResolvers []string) dn
 	}
 }
 
-// getDiscoverDNSPassiveSubdomainConfig creates and returns a configuration for passive subdomain discovery
-func getDiscoverDNSPassiveSubdomainConfig(domain string, requestsPerSecond int, threads int) dnsfern.DiscoverDnsSubdomainConfig {
-	return dnsfern.DiscoverDnsSubdomainConfig{
-		DiscoveryType: strings.ToLower(string(dnsfern.DiscoverDnsSubdomainTypePassive)),
-		Passive: &dnsfern.DiscoverDnsSubdomainPassiveConfig{
-			Domain:            domain,
-			RequestsPerSecond: requestsPerSecond,
-			Threads:           threads,
-		},
-	}
-}
-
 // getDiscoverDNSActiveSubdomainConfig creates and returns a configuration for active subdomain discovery
 func getDiscoverDNSActiveSubdomainConfig(domain string, subdomains []string, wordlistSize *dnsfern.WordlistSize, wordlistFile *string, threads, maxDepth, timeout int, dnsResolvers []string) dnsfern.DiscoverDnsSubdomainConfig {
 	return dnsfern.DiscoverDnsSubdomainConfig{
@@ -620,6 +662,31 @@ func getDiscoverDNSActiveSubdomainConfig(domain string, subdomains []string, wor
 			MaxDepth:     maxDepth,
 			Timeout:      timeout,
 			DnsResolvers: dnsResolvers,
+		},
+	}
+}
+
+// getDiscoverDNSCorrelationSubdomainConfig creates and returns a configuration for correlation subdomain discovery
+func getDiscoverDNSCorrelationSubdomainConfig(domains []string, threads int, timeout int, dnsResolvers []string) dnsfern.DiscoverDnsSubdomainConfig {
+	return dnsfern.DiscoverDnsSubdomainConfig{
+		DiscoveryType: strings.ToLower(string(dnsfern.DiscoverDnsSubdomainTypeCorrelation)),
+		Correlation: &dnsfern.DiscoverDnsSubdomainCorrelationConfig{
+			Domains:      domains,
+			Threads:      threads,
+			Timeout:      timeout,
+			DnsResolvers: dnsResolvers,
+		},
+	}
+}
+
+// getDiscoverDNSPassiveSubdomainConfig creates and returns a configuration for passive subdomain discovery
+func getDiscoverDNSPassiveSubdomainConfig(domain string, requestsPerSecond int, threads int) dnsfern.DiscoverDnsSubdomainConfig {
+	return dnsfern.DiscoverDnsSubdomainConfig{
+		DiscoveryType: strings.ToLower(string(dnsfern.DiscoverDnsSubdomainTypePassive)),
+		Passive: &dnsfern.DiscoverDnsSubdomainPassiveConfig{
+			Domain:            domain,
+			RequestsPerSecond: requestsPerSecond,
+			Threads:           threads,
 		},
 	}
 }
