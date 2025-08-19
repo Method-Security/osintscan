@@ -43,28 +43,6 @@ func GetDomainSubdomainsActive(ctx context.Context, config dnsfern.DiscoverDnsSu
 	return report, nil
 }
 
-// detectWildcardDNS tests a random high-entropy subdomain to check if a wildcard DNS record is present.
-// Returns the wildcard domain if detected, otherwise nil.
-func detectWildcardDNS(ctx context.Context, domain string, resolver *net.Resolver) (*string, error) {
-	// Generate a high-entropy 16-character random subdomain
-	randomSubdomain, err := generateRandomSubdomain(domain)
-	if err != nil {
-		return nil, err
-	}
-
-	// Check if the random subdomain resolves
-	_, err = resolver.LookupHost(ctx, randomSubdomain)
-
-	// If no error, it resolved, meaning wildcard is present
-	if err == nil {
-		wildcardDomain := "*." + domain
-		return &wildcardDomain, nil
-	}
-
-	// If the error is NXDOMAIN or SERVFAIL, wildcard is NOT present
-	return nil, nil
-}
-
 // getSubdomainsActive performs recursive bruteforce subdomain enumeration with concurrency and wildcard detection.
 func getSubdomainsActive(ctx context.Context, domain string, subdomainList []string, parallelThreads int, recursiveDepth int, timeout int, dnsServerAddresses []string) ([]string, error) {
 	log := svc1log.FromContext(ctx)
@@ -86,7 +64,7 @@ func getSubdomainsActive(ctx context.Context, domain string, subdomainList []str
 
 	// First iteration - test all base subdomains for wildcards
 	log.Info("Detecting wildcards", svc1log.SafeParam("domain", domain))
-	wildcardDNS, err := detectWildcardDNS(ctx, domain, resolvers[0])
+	wildcardDNS, err := detectWildcardForFullDomain(ctx, domain, resolvers[0])
 	if err != nil {
 		return []string{}, err
 	}
@@ -117,7 +95,7 @@ func getSubdomainsActive(ctx context.Context, domain string, subdomainList []str
 
 		validSubdomains := []string{}
 		for _, subdomain := range currentDepthSubdomains {
-			wildcardDNS, err := detectWildcardDNS(ctx, subdomain, resolvers[0]) // Use resolvers[0] for wildcard detection
+			wildcardDNS, err := detectWildcardForFullDomain(ctx, subdomain, resolvers[0]) // Use resolvers[0] for wildcard detection
 			if err != nil {
 				continue
 			}

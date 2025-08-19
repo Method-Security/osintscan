@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -144,29 +143,11 @@ func validateSingleFQDNCorrelation(ctx context.Context, fqdn string, resolver *n
 			svc1log.SafeParam("fqdn", fqdn),
 			svc1log.SafeParam("error", err.Error()))
 	} else if wildcardDomain != nil {
+		log.Info("Wildcard DNS detected",
+			svc1log.SafeParam("fqdn", fqdn),
+			svc1log.SafeParam("wildcard_domain", *wildcardDomain))
 		return true, true, nil
 	}
 
 	return true, false, nil
-}
-
-// detectWildcardForFullDomain tests if the given FQDN has wildcard DNS behavior
-// This tests the parent domain of the given FQDN to see if it has wildcard records
-func detectWildcardForFullDomain(ctx context.Context, fqdn string, resolver *net.Resolver) (*string, error) {
-	// Extract the parent domain to test for wildcards
-	// e.g., for "api.example.com", test if "example.com" has wildcard behavior
-	parts := strings.Split(fqdn, ".")
-	if len(parts) < 2 {
-		return nil, fmt.Errorf("invalid FQDN format for wildcard detection")
-	}
-
-	// Get parent domain (remove first subdomain)
-	if len(parts) == 2 {
-		// This is already a root domain, test it directly
-		return detectWildcardDNS(ctx, fqdn, resolver)
-	}
-
-	// Get parent domain by removing the first part
-	parentDomain := strings.Join(parts[1:], ".")
-	return detectWildcardDNS(ctx, parentDomain, resolver)
 }
