@@ -3,8 +3,8 @@ types:
   DiscoverDnsSubdomainType:
     enum:
       - ACTIVE
+      - CORRELATION
       - PASSIVE
-      - INTELLIGENT
   WordlistSize:
     enum:
       - TINY
@@ -22,6 +22,12 @@ types:
       maxDepth: integer
       timeout: integer
       dnsResolvers: optional<list<string>>
+  DiscoverDnsSubdomainCorrelationConfig:
+    properties:
+      domains: list<string>
+      threads: integer
+      timeout: integer
+      dnsResolvers: optional<list<string>>
   DiscoverDnsSubdomainPassiveConfig:
     properties:
       domain: string
@@ -32,6 +38,7 @@ types:
     discriminant: discoveryType
     union:
       active: DiscoverDnsSubdomainActiveConfig
+      correlation: DiscoverDnsSubdomainCorrelationConfig
       passive: DiscoverDnsSubdomainPassiveConfig
   DiscoverDnsSubdomainResult:
     properties:
