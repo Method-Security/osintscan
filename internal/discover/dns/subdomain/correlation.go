@@ -144,6 +144,9 @@ func validateSingleFQDNCorrelation(ctx context.Context, fqdn string, resolver *n
 			svc1log.SafeParam("fqdn", fqdn),
 			svc1log.SafeParam("error", err.Error()))
 	} else if wildcardDomain != nil {
+		log.Info("Wildcard DNS detected",
+			svc1log.SafeParam("fqdn", fqdn),
+			svc1log.SafeParam("wildcard_domain", *wildcardDomain))
 		return true, true, nil
 	}
 
@@ -151,22 +154,45 @@ func validateSingleFQDNCorrelation(ctx context.Context, fqdn string, resolver *n
 }
 
 // detectWildcardForFullDomain tests if the given FQDN has wildcard DNS behavior
-// This tests the parent domain of the given FQDN to see if it has wildcard records
+// This tests all parent domains of the given FQDN to see if any have wildcard records
 func detectWildcardForFullDomain(ctx context.Context, fqdn string, resolver *net.Resolver) (*string, error) {
-	// Extract the parent domain to test for wildcards
-	// e.g., for "api.example.com", test if "example.com" has wildcard behavior
+	// Extract all parent domains to test for wildcards
+	// e.g., for "api.staging.app.example.com", test:
+	// - "staging.app.example.com"
+	// - "app.example.com"
+	// - "example.com"
 	parts := strings.Split(fqdn, ".")
 	if len(parts) < 2 {
 		return nil, fmt.Errorf("invalid FQDN format for wildcard detection")
 	}
 
-	// Get parent domain (remove first subdomain)
+	// If this is already a root domain, test it directly
 	if len(parts) == 2 {
-		// This is already a root domain, test it directly
 		return detectWildcardDNS(ctx, fqdn, resolver)
 	}
 
-	// Get parent domain by removing the first part
-	parentDomain := strings.Join(parts[1:], ".")
-	return detectWildcardDNS(ctx, parentDomain, resolver)
+	// Check each parent domain level for wildcards
+	// Start from the immediate parent and work up to the root domain
+	for i := 1; i < len(parts); i++ {
+		parentDomain := strings.Join(parts[i:], ".")
+
+		// Skip if we've reached a single-part domain (invalid)
+		if len(strings.Split(parentDomain, ".")) < 2 {
+			continue
+		}
+
+		wildcardDomain, err := detectWildcardDNS(ctx, parentDomain, resolver)
+		if err != nil {
+			// Log the error but continue checking other parent domains
+			continue
+		}
+
+		// If we found a wildcard, return it immediately
+		if wildcardDomain != nil {
+			return wildcardDomain, nil
+		}
+	}
+
+	// No wildcards found in any parent domain
+	return nil, nil
 }
