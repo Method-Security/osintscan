@@ -3,9 +3,10 @@ package subdomain
 import (
 	// standard
 	"context"
+	"crypto/rand"
 	"fmt"
+	"math/big"
 	"net"
-	"strings"
 )
 
 // detectWildcardDNS tests a random high-entropy subdomain to check if a wildcard DNS record is present.
@@ -26,50 +27,22 @@ func detectWildcardDNS(ctx context.Context, domain string, resolver *net.Resolve
 		return &wildcardDomain, nil
 	}
 
-	// If the error is NXDOMAIN or SERVFAIL, wildcard is NOT present
+	// If the error, domain didnt resolve so wildcard is NOT present
 	return nil, nil
 }
 
-// detectWildcardForFullDomain tests if the given FQDN has wildcard DNS behavior
-// This tests all parent domains of the given FQDN to see if any have wildcard records
-func detectWildcardForFullDomain(ctx context.Context, fqdn string, resolver *net.Resolver) (*string, error) {
-	// Extract all parent domains to test for wildcards
-	// e.g., for "api.staging.app.example.com", test:
-	// - "staging.app.example.com"
-	// - "app.example.com"
-	// - "example.com"
-	parts := strings.Split(fqdn, ".")
-	if len(parts) < 2 {
-		return nil, fmt.Errorf("invalid FQDN format for wildcard detection")
-	}
+// generateRandomSubdomain generates a high-entropy subdomain with only letters (16 characters).
+func generateRandomSubdomain(domain string) (string, error) {
+	letterBytes := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
-	// If this is already a root domain, test it directly
-	if len(parts) == 2 {
-		return detectWildcardDNS(ctx, fqdn, resolver)
-	}
-
-	// Check each parent domain level for wildcards
-	// Start from the immediate parent and work up to the root domain
-	for i := 1; i < len(parts); i++ {
-		parentDomain := strings.Join(parts[i:], ".")
-
-		// Skip if we've reached a single-part domain (invalid)
-		if len(strings.Split(parentDomain, ".")) < 2 {
-			continue
-		}
-
-		wildcardDomain, err := detectWildcardDNS(ctx, parentDomain, resolver)
+	randomString := make([]byte, 16)
+	for i := range randomString {
+		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(letterBytes))))
 		if err != nil {
-			// Log the error but continue checking other parent domains
-			continue
+			return "", err
 		}
-
-		// If we found a wildcard, return it immediately
-		if wildcardDomain != nil {
-			return wildcardDomain, nil
-		}
+		randomString[i] = letterBytes[n.Int64()]
 	}
 
-	// No wildcards found in any parent domain
-	return nil, nil
+	return fmt.Sprintf("%s.%s", string(randomString), domain), nil
 }
