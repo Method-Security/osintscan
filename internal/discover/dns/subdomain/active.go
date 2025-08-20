@@ -2,9 +2,7 @@ package subdomain
 
 import (
 	"context"
-	"crypto/rand"
 	"fmt"
-	"math/big"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -195,22 +193,6 @@ func generatePermutations(validSubdomains []string, subdomainList []string) []st
 		}
 	}
 	return results
-}
-
-// generateRandomSubdomain generates a high-entropy subdomain with only letters (16 characters).
-func generateRandomSubdomain(domain string) (string, error) {
-	letterBytes := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-
-	randomString := make([]byte, 16)
-	for i := range randomString {
-		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(letterBytes))))
-		if err != nil {
-			return "", err
-		}
-		randomString[i] = letterBytes[n.Int64()]
-	}
-
-	return fmt.Sprintf("%s.%s", string(randomString), domain), nil
 }
 
 // GetDiscoverDNSSubdomainActiveWordlistPath returns the file path for a given wordlist size
