@@ -86,7 +86,7 @@ func validateFQDNsWithCorrelation(ctx context.Context, fqdns []string, threads i
 			resolverIdx := currentIndex % int64(len(resolvers))
 			resolver := resolvers[resolverIdx]
 
-			isValid, hasWildcard, err := validateSingleFQDNCorrelation(ctx, fqdn, resolver, timeout, log)
+			isValid, err := validateSingleFQDNCorrelation(ctx, fqdn, resolver, timeout, log)
 			if err != nil {
 				log.Error("Error validating FQDN",
 					svc1log.SafeParam("fqdn", fqdn),
@@ -98,12 +98,11 @@ func validateFQDNsWithCorrelation(ctx context.Context, fqdns []string, threads i
 			log.Info("FQDN correlation check",
 				svc1log.SafeParam("fqdn", fqdn),
 				svc1log.SafeParam("valid", isValid),
-				svc1log.SafeParam("wildcard", hasWildcard),
 				svc1log.SafeParam("completed", completed),
 				svc1log.SafeParam("total", totalDomains))
 
 			// Only include valid, non-wildcard domains in results
-			if isValid && !hasWildcard {
+			if isValid {
 				validDomainsMutex.Lock()
 				validDomains = append(validDomains, fqdn)
 				validDomainsMutex.Unlock()
@@ -121,7 +120,11 @@ func validateFQDNsWithCorrelation(ctx context.Context, fqdns []string, threads i
 }
 
 // validateSingleFQDNCorrelation validates a single FQDN and checks if it has wildcard DNS
-func validateSingleFQDNCorrelation(ctx context.Context, fqdn string, resolver *net.Resolver, timeout int, log svc1log.Logger) (bool, bool, error) {
+// Returns:
+// - isValid: true if the FQDN is valid
+// - hasWildcard: true if the FQDN has wildcard DNS
+// - err: error if the FQDN is invalid
+func validateSingleFQDNCorrelation(ctx context.Context, fqdn string, resolver *net.Resolver, timeout int, log svc1log.Logger) (bool, error) {
 	// Create timeout context for DNS lookup if specified
 	lookupCtx := ctx
 	var cancel context.CancelFunc
@@ -133,21 +136,22 @@ func validateSingleFQDNCorrelation(ctx context.Context, fqdn string, resolver *n
 	// Try to resolve the FQDN
 	_, err := resolver.LookupHost(lookupCtx, fqdn)
 	if err != nil {
-		return false, false, fmt.Errorf("DNS resolution failed: %v", err)
+		return false, fmt.Errorf("DNS resolution failed: %v", err)
 	}
 
 	// Check for wildcard DNS - test the full FQDN directly
-	wildcardDomain, err := detectWildcardForFullDomain(lookupCtx, fqdn, resolver)
+	wildcardDomain, err := detectWildcardDNS(lookupCtx, fqdn, resolver)
 	if err != nil {
 		log.Warn("Failed to detect wildcard DNS",
 			svc1log.SafeParam("fqdn", fqdn),
 			svc1log.SafeParam("error", err.Error()))
+		return false, fmt.Errorf("wildcard detection failed: %v", err)
 	} else if wildcardDomain != nil {
 		log.Info("Wildcard DNS detected",
 			svc1log.SafeParam("fqdn", fqdn),
 			svc1log.SafeParam("wildcard_domain", *wildcardDomain))
-		return true, true, nil
+		return false, nil
 	}
 
-	return true, false, nil
+	return true, nil
 }

@@ -64,7 +64,7 @@ func getSubdomainsActive(ctx context.Context, domain string, subdomainList []str
 
 	// First iteration - test all base subdomains for wildcards
 	log.Info("Detecting wildcards", svc1log.SafeParam("domain", domain))
-	wildcardDNS, err := detectWildcardForFullDomain(ctx, domain, resolvers[0])
+	wildcardDNS, err := detectWildcardDNS(ctx, domain, resolvers[0])
 	if err != nil {
 		return []string{}, err
 	}
@@ -95,7 +95,7 @@ func getSubdomainsActive(ctx context.Context, domain string, subdomainList []str
 
 		validSubdomains := []string{}
 		for _, subdomain := range currentDepthSubdomains {
-			wildcardDNS, err := detectWildcardForFullDomain(ctx, subdomain, resolvers[0]) // Use resolvers[0] for wildcard detection
+			wildcardDNS, err := detectWildcardDNS(ctx, subdomain, resolvers[0]) // Use resolvers[0] for wildcard detection
 			if err != nil {
 				continue
 			}
