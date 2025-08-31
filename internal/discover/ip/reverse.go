@@ -14,14 +14,14 @@ import (
 )
 
 // GetReverseLookup performs reverse DNS lookups for a list of IP addresses
-func GetReverseLookup(ctx context.Context, config *ipfern.DiscoverIpReverseConfig) *ipfern.DiscoverDnsReverseReport {
+func GetReverseLookup(ctx context.Context, config *ipfern.DiscoverIpReverseConfig) *ipfern.DiscoverIpReverseReport {
 	log := svc1log.FromContext(ctx)
 	errors := []string{}
 
 	// Validate IPs
 	if err := validateIPAddresses(config.Ips); err != nil {
 		errors = append(errors, err.Error())
-		return &ipfern.DiscoverDnsReverseReport{
+		return &ipfern.DiscoverIpReverseReport{
 			Config: config,
 			Result: &ipfern.DiscoverIpReverseResult{},
 			Errors: errors,
@@ -54,7 +54,7 @@ func GetReverseLookup(ctx context.Context, config *ipfern.DiscoverIpReverseConfi
 		svc1log.SafeParam("total_lookups", len(lookups)),
 		svc1log.SafeParam("errors", len(errors)))
 
-	return &ipfern.DiscoverDnsReverseReport{
+	return &ipfern.DiscoverIpReverseReport{
 		Config: config,
 		Result: result,
 		Errors: errors,
