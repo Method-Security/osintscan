@@ -8,8 +8,8 @@ types:
 # Result Structs
   ReverseDetails:
     properties:
-      ip: string
-      reversePtrs: optional<list<string>>
+      ipAddress: string
+      reverseDnsNames: list<string>
   DiscoverIpReverseResult:
     properties:
       lookups: optional<list<ReverseDetails>>

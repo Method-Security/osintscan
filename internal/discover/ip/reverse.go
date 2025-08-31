@@ -144,18 +144,16 @@ func performSingleReverseLookup(ctx context.Context, ip string, resolver *net.Re
 	names, err := resolver.LookupAddr(ctx, ip)
 	if err != nil {
 		// Return the lookup details even if reverse lookup fails, but with empty PTR records
-		return &ipfern.ReverseDetails{
-			Ip: ip,
-		}, fmt.Errorf("reverse DNS lookup failed: %w", err)
+		return nil, fmt.Errorf("reverse DNS lookup failed: %w", err)
 	}
 
 	lookup := &ipfern.ReverseDetails{
-		Ip: ip,
+		IpAddress: ip,
 	}
 
 	// Add all PTR records found (not just the first one like in domainasn.go)
 	if len(names) > 0 {
-		lookup.ReversePtrs = names
+		lookup.ReverseDnsNames = names
 	}
 
 	return lookup, nil
