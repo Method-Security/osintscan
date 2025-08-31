@@ -18,8 +18,9 @@ func GetReverseLookup(ctx context.Context, config *ipfern.DiscoverIpReverseConfi
 	log := svc1log.FromContext(ctx)
 	errors := []string{}
 
-	// Validate IPs
-	if err := validateIPAddresses(config.IpAddresses); err != nil {
+	// Collect all IPs to process
+	allIPs, err := explodeIPsFromReverseConfig(config)
+	if err != nil {
 		errors = append(errors, err.Error())
 		return &ipfern.DiscoverIpReverseReport{
 			Config: config,
@@ -35,13 +36,13 @@ func GetReverseLookup(ctx context.Context, config *ipfern.DiscoverIpReverseConfi
 	}
 
 	log.Info("Starting reverse DNS lookup",
-		svc1log.SafeParam("total_ips", len(config.IpAddresses)),
+		svc1log.SafeParam("total_ips", len(allIPs)),
 		svc1log.SafeParam("threads", threads))
 
 	dnsResolvers := config.DnsResolvers
 
 	// Perform concurrent reverse lookups
-	lookups, lookupErrors := performConcurrentReverseLookups(ctx, config.IpAddresses, dnsResolvers, threads)
+	lookups, lookupErrors := performConcurrentReverseLookups(ctx, allIPs, dnsResolvers, threads)
 	if len(lookupErrors) > 0 {
 		errors = append(errors, lookupErrors...)
 	}
@@ -61,19 +62,9 @@ func GetReverseLookup(ctx context.Context, config *ipfern.DiscoverIpReverseConfi
 	}
 }
 
-// validateIPAddresses validates that all provided strings are valid IP addresses
-func validateIPAddresses(ips []string) error {
-	if len(ips) == 0 {
-		return fmt.Errorf("no IP addresses provided")
-	}
-
-	for _, ip := range ips {
-		if net.ParseIP(ip) == nil {
-			return fmt.Errorf("invalid IP address: %s", ip)
-		}
-	}
-
-	return nil
+// explodeIPsFromReverseConfig extracts and expands all IPs from the reverse configuration
+func explodeIPsFromReverseConfig(config *ipfern.DiscoverIpReverseConfig) ([]string, error) {
+	return utils.ExplodeIPsFromAddressesAndCIDR(config.IpAddresses, config.Cidr)
 }
 
 // performConcurrentReverseLookups performs reverse DNS lookups concurrently using round-robin resolver selection

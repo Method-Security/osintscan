@@ -252,7 +252,7 @@ func (c *WhoisClient) rawQueryWithOptions(ctx context.Context, query, server str
 }
 
 // ExtractASN extracts ASN information from whois output
-func ExtractASN(whoisOutput string) string {
+func ExtractASN(whoisOutput string) []string {
 	// Common patterns for ASN in whois output
 	asnPatterns := []*regexp.Regexp{
 		regexp.MustCompile(`(?i)origin(?:al)?\s*as(?:n)?:?\s*(as\d+)`),
@@ -263,6 +263,7 @@ func ExtractASN(whoisOutput string) string {
 	}
 
 	lines := strings.Split(whoisOutput, "\n")
+	asns := []string{}
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		for _, pattern := range asnPatterns {
@@ -273,30 +274,30 @@ func ExtractASN(whoisOutput string) string {
 				if !strings.HasPrefix(asn, "AS") {
 					asn = "AS" + asn
 				}
-				return asn
+				asns = append(asns, asn)
 			}
 		}
 	}
 
-	return ""
+	return asns
 }
 
 // WhoisASN performs a whois lookup and extracts ASN information
-func WhoisASN(query string) (string, error) {
+func WhoisASN(query string) ([]string, error) {
 	client := NewWhoisClient()
 	output, err := client.Whois(query)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	return ExtractASN(output), nil
 }
 
 // WhoisASNWithContext performs a whois lookup with context and extracts ASN information
-func WhoisASNWithContext(ctx context.Context, query string) (string, error) {
+func WhoisASNWithContext(ctx context.Context, query string) ([]string, error) {
 	client := NewWhoisClient()
 	output, err := client.WhoisWithContext(ctx, query)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	return ExtractASN(output), nil
 }

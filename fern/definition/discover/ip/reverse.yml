@@ -2,7 +2,8 @@ types:
 # Config Struct
   DiscoverIpReverseConfig:
     properties:
-      ipAddresses: list<string>
+      ipAddresses: optional<list<string>>
+      cidr: optional<string>
       dnsResolvers: optional<list<string>>
       threads: integer
 # Result Structs

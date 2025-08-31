@@ -586,7 +586,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 		Long:  `Perform a reverse DNS lookup and ASN lookup on a single IP, list of IPs, or a CIDR range. Warning: /16 and larger can take upwards of 30 minutes.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			// Parse flags
-			ips, err := cmd.Flags().GetStringSlice("ips")
+			ips, err := cmd.Flags().GetStringSlice("ip-addresses")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -660,12 +660,23 @@ func (a *OsintScan) InitDiscoverCommand() {
 		Short: "Perform a reverse DNS lookup on a single IP, list of IPs, or a CIDR range",
 		Long:  `Perform a reverse DNS lookup on a single IP, list of IPs, or a CIDR range.`,
 		Run: func(cmd *cobra.Command, args []string) {
-			// Flags
-			ips, err := cmd.Flags().GetStringSlice("ips")
+			// Target Flags
+			ips, err := cmd.Flags().GetStringSlice("ip-addresses")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
+			cidr, err := cmd.Flags().GetString("cidr")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			if len(ips) == 0 && cidr == "" {
+				a.OutputSignal.AddError(fmt.Errorf("either --ips or --cidr must be provided"))
+				return
+			}
+
+			// Config Flags
 			dnsResolvers, err := cmd.Flags().GetStringSlice("dns-resolvers")
 			if err != nil {
 				a.OutputSignal.AddError(err)
@@ -678,7 +689,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 			}
 
 			// Create config
-			config := getDiscoverIPReverseConfig(ips, dnsResolvers, threads)
+			config := getDiscoverIPReverseConfig(ips, cidr, dnsResolvers, threads)
 
 			// Create report
 			report := ip.GetReverseLookup(cmd.Context(), config)
@@ -687,12 +698,10 @@ func (a *OsintScan) InitDiscoverCommand() {
 	}
 
 	// Target Flags
-	discoverIPReverseCmd.Flags().StringSlice("ips", []string{}, "The IP addresses to perform reverse DNS lookup on")
+	discoverIPReverseCmd.Flags().StringSlice("ip-addresses", []string{}, "The IP addresses to perform reverse DNS lookup on")
+	discoverIPReverseCmd.Flags().String("cidr", "", "The CIDR range to perform reverse DNS lookup on")
 	discoverIPReverseCmd.Flags().StringSlice("dns-resolvers", []string{"1.1.1.1:53"}, "Custom DNS resolver/servers to use for queries (e.g. 1.1.1.1:53)")
 	discoverIPReverseCmd.Flags().Int("threads", 0, "Number of concurrent threads for scanning (Default is number of CPUS on machine)")
-
-	// Mark Required Flags
-	_ = discoverIPReverseCmd.MarkFlagRequired("ips")
 
 	// Add command to 'ip' command
 	discoverIPCmd.AddCommand(discoverIPReverseCmd)
@@ -789,7 +798,7 @@ func getDiscoverCdnConfig(domain string, ipAddresses []string, dnsResolvers []st
 // getDiscoverIPDomainASNConfig creates and returns a configuration for IP domain ASN discovery
 func getDiscoverIPDomainASNConfig(ips []string, cidr string, dnsResolvers []string) *ipfern.DiscoverIpDomainAsnConfig {
 	config := &ipfern.DiscoverIpDomainAsnConfig{
-		Ips:          ips,
+		IpAddresses:  ips,
 		DnsResolvers: dnsResolvers,
 	}
 
@@ -802,10 +811,14 @@ func getDiscoverIPDomainASNConfig(ips []string, cidr string, dnsResolvers []stri
 }
 
 // getDiscoverIPReverseConfig creates and returns a configuration for IP reverse DNS lookup
-func getDiscoverIPReverseConfig(ips []string, dnsResolvers []string, threads int) *ipfern.DiscoverIpReverseConfig {
-	return &ipfern.DiscoverIpReverseConfig{
+func getDiscoverIPReverseConfig(ips []string, cidr string, dnsResolvers []string, threads int) *ipfern.DiscoverIpReverseConfig {
+	config := &ipfern.DiscoverIpReverseConfig{
 		IpAddresses:  ips,
 		DnsResolvers: dnsResolvers,
 		Threads:      max(threads, 0),
 	}
+	if cidr != "" {
+		config.Cidr = &cidr
+	}
+	return config
 }

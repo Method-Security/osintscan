@@ -2,9 +2,9 @@ types:
   CymruASNResult:
     docs: Represents the parsed result from a Cymru ASN lookup
     properties:
-      asn:
-        type: string
-        docs: The Autonomous System Number
+      asns:
+        type: list<string>
+        docs: All Autonomous System Numbers associated with the IP (may be multiple for multi-homed networks)
       bgpPrefix:
         type: string
         docs: The BGP prefix associated with the ASN
