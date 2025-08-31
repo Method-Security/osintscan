@@ -19,7 +19,7 @@ func GetReverseLookup(ctx context.Context, config *ipfern.DiscoverIpReverseConfi
 	errors := []string{}
 
 	// Validate IPs
-	if err := validateIPAddresses(config.Ips); err != nil {
+	if err := validateIPAddresses(config.IpAddresses); err != nil {
 		errors = append(errors, err.Error())
 		return &ipfern.DiscoverIpReverseReport{
 			Config: config,
@@ -35,13 +35,13 @@ func GetReverseLookup(ctx context.Context, config *ipfern.DiscoverIpReverseConfi
 	}
 
 	log.Info("Starting reverse DNS lookup",
-		svc1log.SafeParam("total_ips", len(config.Ips)),
+		svc1log.SafeParam("total_ips", len(config.IpAddresses)),
 		svc1log.SafeParam("threads", threads))
 
 	dnsResolvers := config.DnsResolvers
 
 	// Perform concurrent reverse lookups
-	lookups, lookupErrors := performConcurrentReverseLookups(ctx, config.Ips, dnsResolvers, threads)
+	lookups, lookupErrors := performConcurrentReverseLookups(ctx, config.IpAddresses, dnsResolvers, threads)
 	if len(lookupErrors) > 0 {
 		errors = append(errors, lookupErrors...)
 	}

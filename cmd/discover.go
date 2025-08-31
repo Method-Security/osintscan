@@ -647,7 +647,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 	}
 
 	// Target Flags
-	discoverIPDomainASNCmd.Flags().StringSlice("ips", []string{}, "The IP addresses to perform reverse DNS and ASN lookup on")
+	discoverIPDomainASNCmd.Flags().StringSlice("ip-addresses", []string{}, "The IP addresses to perform reverse DNS and ASN lookup on")
 	discoverIPDomainASNCmd.Flags().String("cidr", "", "The CIDR range to perform reverse DNS and ASN lookup on")
 	discoverIPDomainASNCmd.Flags().StringSlice("dns-resolvers", []string{"1.1.1.1:53"}, "Custom DNS resolver/servers to use for queries (e.g. 1.1.1.1:53)")
 
@@ -804,7 +804,7 @@ func getDiscoverIPDomainASNConfig(ips []string, cidr string, dnsResolvers []stri
 // getDiscoverIPReverseConfig creates and returns a configuration for IP reverse DNS lookup
 func getDiscoverIPReverseConfig(ips []string, dnsResolvers []string, threads int) *ipfern.DiscoverIpReverseConfig {
 	return &ipfern.DiscoverIpReverseConfig{
-		Ips:          ips,
+		IpAddresses:  ips,
 		DnsResolvers: dnsResolvers,
 		Threads:      max(threads, 0),
 	}
