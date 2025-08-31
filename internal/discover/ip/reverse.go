@@ -38,7 +38,6 @@ func GetReverseLookup(ctx context.Context, config *ipfern.DiscoverIpReverseConfi
 		svc1log.SafeParam("total_ips", len(config.Ips)),
 		svc1log.SafeParam("threads", threads))
 
-	// Set default DNS resolvers if none provided
 	dnsResolvers := config.DnsResolvers
 
 	// Perform concurrent reverse lookups
@@ -81,6 +80,9 @@ func validateIPAddresses(ips []string) error {
 func performConcurrentReverseLookups(ctx context.Context, ips []string, dnsResolvers []string, threads int) ([]*ipfern.ReverseDetails, []string) {
 	log := svc1log.FromContext(ctx)
 	maxWorkers := threads // Use configured thread count for concurrency control
+	if maxWorkers == 0 {
+		maxWorkers = runtime.NumCPU()
+	}
 
 	lookups := make([]*ipfern.ReverseDetails, 0, len(ips))
 	errors := []string{}
@@ -89,7 +91,6 @@ func performConcurrentReverseLookups(ctx context.Context, ips []string, dnsResol
 
 	semaphore := make(chan struct{}, maxWorkers)
 	var wg sync.WaitGroup
-	var completedCount int64
 	var resolverIndex int64
 
 	// Create resolvers for round-robin usage
@@ -118,22 +119,14 @@ func performConcurrentReverseLookups(ctx context.Context, ips []string, dnsResol
 
 			// Perform reverse lookup
 			lookup, err := performSingleReverseLookup(ctx, ip, resolver)
-			completed := atomic.AddInt64(&completedCount, 1)
-
 			if err != nil {
 				errorsMutex.Lock()
 				errors = append(errors, fmt.Sprintf("reverse lookup failed for %s: %s", ip, err.Error()))
 				errorsMutex.Unlock()
 			}
 
-			// Log progress for every 100 lookups or on completion
-			if completed%100 == 0 || completed == int64(len(ips)) {
-				log.Info("Reverse lookup progress",
-					svc1log.SafeParam("completed", completed),
-					svc1log.SafeParam("total", len(ips)))
-			}
-
 			if lookup != nil {
+				log.Info("Reverse lookup completed", svc1log.SafeParam("ip", ip))
 				lookupsMutex.Lock()
 				lookups = append(lookups, lookup)
 				lookupsMutex.Unlock()
