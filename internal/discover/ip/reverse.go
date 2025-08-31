@@ -40,10 +40,6 @@ func GetReverseLookup(ctx context.Context, config *ipfern.DiscoverIpReverseConfi
 
 	// Set default DNS resolvers if none provided
 	dnsResolvers := config.DnsResolvers
-	if len(dnsResolvers) == 0 {
-		dnsResolvers = []string{"1.1.1.1:53", "8.8.8.8:53"}
-		log.Info("Using default DNS resolvers", svc1log.SafeParam("resolvers", dnsResolvers))
-	}
 
 	// Perform concurrent reverse lookups
 	lookups, lookupErrors := performConcurrentReverseLookups(ctx, config.Ips, dnsResolvers, threads)

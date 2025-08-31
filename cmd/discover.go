@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	// Generated
-	cdnfern "github.com/Method-Security/osintscan/generated/go/discover"
 	asnfern "github.com/Method-Security/osintscan/generated/go/discover/asn"
+	cdnfern "github.com/Method-Security/osintscan/generated/go/discover/cdn"
 	dnsfern "github.com/Method-Security/osintscan/generated/go/discover/dns"
 	ipfern "github.com/Method-Security/osintscan/generated/go/discover/ip"
 

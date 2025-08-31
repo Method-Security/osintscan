@@ -12,7 +12,7 @@ import (
 	"sync/atomic"
 
 	// Generated
-	cdnfern "github.com/Method-Security/osintscan/generated/go/discover"
+	cdnfern "github.com/Method-Security/osintscan/generated/go/discover/cdn"
 	// Utils
 	"github.com/Method-Security/osintscan/utils"
 	// External
