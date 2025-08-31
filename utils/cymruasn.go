@@ -17,16 +17,21 @@ import (
 
 // IPASNLookup performs an ASN lookup using the Cymru DNS service
 // Returns ASN information for the given IP address using raw DNS queries
-func IPASNLookup(ctx context.Context, ip string) (string, error) {
-	result, err := IPASNLookupDetailed(ctx, ip)
+// Returns the first ASN if multiple ASNs are found (for backward compatibility)
+func IPASNLookup(ctx context.Context, ip string) ([]string, error) {
+	asns, err := IPASNLookupMultiple(ctx, ip)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return result.Asn, nil
+	if len(asns) == 0 {
+		return nil, fmt.Errorf("no ASNs found for IP %s", ip)
+	}
+	return asns, nil
 }
 
 // IPASNLookupDetailed performs an ASN lookup using the Cymru DNS service
 // Returns detailed ASN information for the given IP address using raw DNS queries
+// Now returns ALL ASNs associated with the IP (handles multi-homed networks)
 func IPASNLookupDetailed(ctx context.Context, ip string) (*utilsfern.CymruAsnResult, error) {
 	log := svc1log.FromContext(ctx)
 
@@ -69,15 +74,60 @@ func IPASNLookupDetailed(ctx context.Context, ip string) (*utilsfern.CymruAsnRes
 		return nil, fmt.Errorf("no TXT records found for %s", queryDomain)
 	}
 
-	// Parse the first TXT record (Cymru typically returns one record)
-	txtRecord := records[0]
-	log.Debug("Cymru TXT record", svc1log.SafeParam("record", txtRecord))
+	// Collect ALL ASNs from ALL records
+	allASNs := make(map[string]bool)          // Use map to deduplicate
+	var firstRecord *utilsfern.CymruAsnResult // Keep first record for metadata
 
-	result, err := parseCymruTXTRecord(txtRecord)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse Cymru TXT record '%s': %w", txtRecord, err)
+	log.Debug("Processing Cymru TXT records", svc1log.SafeParam("record_count", len(records)))
+
+	// Parse all TXT records to get all ASNs
+	for i, record := range records {
+		log.Debug("Processing Cymru TXT record", svc1log.SafeParam("record_index", i), svc1log.SafeParam("record", record))
+
+		// Parse the record to get metadata (for first record)
+		parsedRecord, err := parseCymruTXTRecord(record)
+		if err != nil {
+			log.Debug("Failed to parse record, skipping", svc1log.SafeParam("record", record), svc1log.SafeParam("error", err.Error()))
+			continue
+		}
+
+		if firstRecord == nil {
+			firstRecord = parsedRecord
+		}
+
+		// Extract ASN field and handle multiple space-separated ASNs
+		record = strings.Trim(record, "\"")
+		parts := strings.Split(record, "|")
+		if len(parts) > 0 {
+			asnField := strings.TrimSpace(parts[0])
+			asnNumbers := strings.Fields(asnField)
+
+			for _, asnStr := range asnNumbers {
+				if asnStr == "" {
+					continue
+				}
+
+				// Validate ASN is numeric
+				if _, err := strconv.Atoi(asnStr); err != nil {
+					continue // Skip invalid ASNs
+				}
+
+				// Ensure AS prefix
+				asn := asnStr
+				if !strings.HasPrefix(strings.ToUpper(asn), "AS") {
+					asn = "AS" + asn
+				}
+				allASNs[asn] = true
+			}
+		}
 	}
 
+	if len(allASNs) == 0 {
+		return nil, fmt.Errorf("no valid ASNs found for %s", queryDomain)
+	}
+
+	// Create result with first ASN and metadata from first record
+	result := firstRecord
 	return result, nil
 }
 
@@ -114,25 +164,40 @@ func parseCymruTXTRecord(record string) (*utilsfern.CymruAsnResult, error) {
 		return nil, fmt.Errorf("invalid Cymru record format: expected at least 2 pipe-separated fields, got %d", len(parts))
 	}
 
-	// Parse ASN (first field)
+	// Parse ASN (first field) - may contain multiple space-separated ASNs
 	asnStr := strings.TrimSpace(parts[0])
 	if asnStr == "" {
 		return nil, fmt.Errorf("empty ASN field in Cymru record")
 	}
 
-	// Validate ASN is numeric and convert to standard ASN format
-	if _, err := strconv.Atoi(asnStr); err != nil {
-		return nil, fmt.Errorf("invalid ASN format '%s': %w", asnStr, err)
+	// Handle multiple ASNs in single field (space-separated)
+	asnNumbers := strings.Fields(asnStr)
+	asns := make([]string, 0, len(asnNumbers))
+
+	for _, asnStr := range asnNumbers {
+		if asnStr == "" {
+			continue
+		}
+
+		// Validate ASN is numeric
+		if _, err := strconv.Atoi(asnStr); err != nil {
+			continue // Skip invalid ASNs
+		}
+
+		// Ensure AS prefix
+		asn := asnStr
+		if !strings.HasPrefix(strings.ToUpper(asn), "AS") {
+			asn = "AS" + asn
+		}
+		asns = append(asns, asn)
 	}
 
-	// Ensure ASN has AS prefix
-	asn := asnStr
-	if !strings.HasPrefix(strings.ToUpper(asn), "AS") {
-		asn = "AS" + asn
+	if len(asns) == 0 {
+		return nil, fmt.Errorf("no valid ASNs found in field '%s'", asnStr)
 	}
 
 	result := &utilsfern.CymruAsnResult{
-		Asn: asn,
+		Asns: asns,
 	}
 
 	// Parse optional fields
@@ -222,14 +287,96 @@ func normalizeASN(asn string) (string, error) {
 	return "AS" + asnNum, nil
 }
 
-// IPASNLookupWithFallback tries Cymru DNS first, then falls back to whois if needed
-func IPASNLookupWithFallback(ctx context.Context, ip string) (string, error) {
-	// Try Cymru first
-	asn, err := IPASNLookup(ctx, ip)
-	if err == nil && asn != "" {
-		return asn, nil
+// IPASNLookupMultiple performs an ASN lookup and returns ALL ASNs associated with an IP
+// This is useful for detecting multi-homed networks, anycast deployments, or route hijacking
+// Returns a slice of ASN strings, empty slice if none found
+func IPASNLookupMultiple(ctx context.Context, ip string) ([]string, error) {
+	log := svc1log.FromContext(ctx)
+
+	// Validate IP address
+	parsedIP := net.ParseIP(ip)
+	if parsedIP == nil {
+		return nil, fmt.Errorf("invalid IP address: %s", ip)
 	}
 
-	// Fall back to whois
-	return WhoisASNWithContext(ctx, ip)
+	// Construct query domain
+	reversed, err := reverseIPBare(ip)
+	if err != nil {
+		return nil, fmt.Errorf("failed to reverse IP: %w", err)
+	}
+	queryDomain := reversed + ".origin.asn.cymru.com"
+
+	log.Debug("Performing multi-ASN Cymru lookup", svc1log.SafeParam("ip", ip), svc1log.SafeParam("query_domain", queryDomain))
+
+	// Create resolver
+	resolver := &net.Resolver{
+		PreferGo: true,
+		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
+			d := net.Dialer{
+				Timeout: 5 * time.Second,
+			}
+			return d.DialContext(ctx, network, address)
+		},
+	}
+
+	// Perform TXT record lookup
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	records, err := resolver.LookupTXT(ctx, queryDomain)
+	if err != nil {
+		return nil, fmt.Errorf("failed to lookup TXT record for %s: %w", queryDomain, err)
+	}
+
+	if len(records) == 0 {
+		return []string{}, nil // No ASNs found
+	}
+
+	allASNs := make(map[string]bool) // Use map to deduplicate
+
+	// Parse all TXT records
+	for _, record := range records {
+		log.Debug("Processing Cymru TXT record", svc1log.SafeParam("record", record))
+
+		// Extract ASN field and handle multiple space-separated ASNs
+		record = strings.Trim(record, "\"")
+		parts := strings.Split(record, "|")
+		if len(parts) > 0 {
+			asnField := strings.TrimSpace(parts[0])
+			asnNumbers := strings.Fields(asnField)
+
+			for _, asnStr := range asnNumbers {
+				if asnStr == "" {
+					continue
+				}
+
+				// Validate ASN is numeric
+				if _, err := strconv.Atoi(asnStr); err != nil {
+					continue // Skip invalid ASNs
+				}
+
+				// Ensure AS prefix
+				asn := asnStr
+				if !strings.HasPrefix(strings.ToUpper(asn), "AS") {
+					asn = "AS" + asn
+				}
+				allASNs[asn] = true
+			}
+		}
+	}
+
+	// Convert map to slice
+	result := make([]string, 0, len(allASNs))
+	for asn := range allASNs {
+		result = append(result, asn)
+	}
+
+	if len(result) > 1 {
+		log.Info("Multi-ASN IP detected",
+			svc1log.SafeParam("ip", ip),
+			svc1log.SafeParam("asn_count", len(result)),
+			svc1log.SafeParam("asns", result))
+	}
+
+	return result, nil
 }

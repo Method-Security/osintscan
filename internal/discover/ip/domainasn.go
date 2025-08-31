@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -49,53 +50,7 @@ func GetDomainASNLookup(ctx context.Context, config *ipfern.DiscoverIpDomainAsnC
 
 // explodeIPsFromConfig extracts and expands all IPs from the configuration
 func explodeIPsFromConfig(config *ipfern.DiscoverIpDomainAsnConfig) ([]string, error) {
-	allIPs := []string{}
-
-	// Add individual IPs
-	if config.Ips != nil {
-		for _, ip := range config.Ips {
-			if net.ParseIP(ip) == nil {
-				return nil, fmt.Errorf("invalid IP address: %s", ip)
-			}
-			allIPs = append(allIPs, ip)
-		}
-	}
-
-	// Add CIDR range IPs
-	if config.Cidr != nil && *config.Cidr != "" {
-		cidrIPs, err := expandCIDR(*config.Cidr)
-		if err != nil {
-			return nil, fmt.Errorf("error expanding CIDR %s: %w", *config.Cidr, err)
-		}
-		allIPs = append(allIPs, cidrIPs...)
-	}
-
-	return allIPs, nil
-}
-
-// expandCIDR expands a CIDR range into individual IP addresses
-func expandCIDR(cidr string) ([]string, error) {
-	_, ipNet, err := net.ParseCIDR(cidr)
-	if err != nil {
-		return nil, err
-	}
-
-	var ips []string
-	for ip := ipNet.IP.Mask(ipNet.Mask); ipNet.Contains(ip); incrementIP(ip) {
-		ips = append(ips, ip.String())
-	}
-
-	return ips, nil
-}
-
-// incrementIP increments an IP address by 1
-func incrementIP(ip net.IP) {
-	for j := len(ip) - 1; j >= 0; j-- {
-		ip[j]++
-		if ip[j] > 0 {
-			break
-		}
-	}
+	return utils.ExplodeIPsFromAddressesAndCIDR(config.IpAddresses, config.Cidr)
 }
 
 // performConcurrentLookups performs reverse DNS and ASN lookups concurrently
@@ -159,7 +114,7 @@ func performConcurrentLookups(ctx context.Context, ips []string, dnsResolvers []
 // performSingleLookup performs reverse DNS and ASN lookup for a single IP
 func performSingleLookup(ctx context.Context, ip string, resolver *net.Resolver) *ipfern.LookupDetails {
 	lookup := &ipfern.LookupDetails{
-		Ip: ip,
+		IpAddress: ip,
 	}
 
 	// Perform reverse DNS lookup
@@ -167,9 +122,9 @@ func performSingleLookup(ctx context.Context, ip string, resolver *net.Resolver)
 		lookup.Domain = &domain
 	}
 
-	// Perform ASN lookup using whois
-	if asn := performASNLookup(ctx, ip); asn != "" {
-		lookup.Asn = &asn
+	// Perform ASN lookup using Cymru DNS service and WHOIS
+	if asns, err := performASNLookup(ctx, ip); err == nil && len(asns) > 0 {
+		lookup.Asns = asns
 	}
 
 	return lookup
@@ -185,12 +140,58 @@ func performReverseDNSLookup(ctx context.Context, ip string, resolver *net.Resol
 	return names[0]
 }
 
-// performASNLookup performs ASN lookup using Cymru DNS service
-func performASNLookup(ctx context.Context, ip string) string {
-	// Use Cymru DNS service with fallback to whois
-	asn, err := utils.IPASNLookupWithFallback(ctx, ip)
-	if err != nil {
-		return ""
+// performASNLookup performs comprehensive ASN lookup using multiple sources (Cymru and WHOIS) with deduplication
+func performASNLookup(ctx context.Context, ip string) ([]string, error) {
+	log := svc1log.FromContext(ctx)
+	allASNs := make(map[string]bool) // Use map to deduplicate ASNs
+
+	// Try Cymru DNS first (primary source)
+	cymruASNs, err := utils.IPASNLookupMultiple(ctx, ip)
+	if err == nil && len(cymruASNs) > 0 {
+		for _, asn := range cymruASNs {
+			if asn != "" {
+				allASNs[asn] = true
+			}
+		}
+		log.Debug("Cymru ASN lookup successful", svc1log.SafeParam("ip", ip), svc1log.SafeParam("asns", cymruASNs))
+	} else {
+		log.Debug("Cymru ASN lookup failed", svc1log.SafeParam("ip", ip), svc1log.SafeParam("error", err))
 	}
-	return asn
+
+	// Try WHOIS lookup as additional source
+	whoisASNs, err := utils.WhoisASNWithContext(ctx, ip)
+	if err == nil && len(whoisASNs) > 0 {
+		// WhoisASNWithContext returns []string now, so we need to handle it properly
+		for _, asn := range whoisASNs {
+			if asn != "" {
+				// Ensure AS prefix for consistency
+				if !strings.HasPrefix(strings.ToUpper(asn), "AS") {
+					asn = "AS" + asn
+				}
+				allASNs[asn] = true
+			}
+		}
+		log.Debug("WHOIS ASN lookup successful", svc1log.SafeParam("ip", ip), svc1log.SafeParam("asns", whoisASNs))
+	} else {
+		log.Debug("WHOIS ASN lookup failed", svc1log.SafeParam("ip", ip), svc1log.SafeParam("error", err))
+	}
+
+	// Convert deduplicated map to slice
+	result := make([]string, 0, len(allASNs))
+	for asn := range allASNs {
+		result = append(result, asn)
+	}
+
+	if len(result) == 0 {
+		return nil, fmt.Errorf("no ASNs found for IP %s from any source", ip)
+	}
+
+	if len(result) > 1 {
+		log.Info("Multi-source ASN lookup completed",
+			svc1log.SafeParam("ip", ip),
+			svc1log.SafeParam("total_asns", len(result)),
+			svc1log.SafeParam("asns", result))
+	}
+
+	return result, nil
 }
