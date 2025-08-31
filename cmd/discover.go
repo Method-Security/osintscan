@@ -28,12 +28,64 @@ import (
 )
 
 func (a *OsintScan) InitDiscoverCommand() {
+	// Discover Command
+	// Subcommands:
+	// - asn
+	// - cdn
+	// - dns
+	// - ip
+	// - shodan
 	discoverCmd := &cobra.Command{
 		Use:   "discover",
 		Short: "Discover DNS assets such as records, certificates, and subdomains",
 		Long:  `Collect detailed information about DNS assets, including records, certificates, and subdomains, using various discovery techniques.`,
 	}
 
+	// ASN Command
+	discoverASNCmd := &cobra.Command{
+		Use:   "asn",
+		Short: "Discover ASN information",
+		Long:  `Discover information about ASN, including ASN description, CIDRs, country, and other metadata. This relies on BGPView's API and has built in retry and timeout mechanisms.`,
+		Run: func(cmd *cobra.Command, args []string) {
+			asnFlag, err := cmd.Flags().GetString("asn")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			timeout, err := cmd.Flags().GetInt("timeout")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			config := getDiscoverASNConfig(asnFlag, timeout)
+			report, err := discover.GetASNInfo(cmd.Context(), config)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			a.OutputSignal.Content = report
+		},
+	}
+
+	// Target Flags
+	discoverASNCmd.Flags().String("asn", "", "The ASN number to lookup (e.g., AS23028 or 23028)")
+	discoverASNCmd.Flags().Int("timeout", 120, "The timeout in seconds for the ASN lookup")
+
+	// Mark Required Flags
+	_ = discoverASNCmd.MarkFlagRequired("asn")
+
+	// Add command to 'discover' command
+	discoverCmd.AddCommand(discoverASNCmd)
+
+	// DNS Commands
+	// Subcommands:
+	// - certs
+	// - records
+	// - forward-reverse
+	// - subdomain
+	//   - active
+	//   - correlation
+	//   - passive
 	discoverDNSCmd := &cobra.Command{
 		Use:   "dns",
 		Short: "Gather intelligence on DNS services and assets",
@@ -43,6 +95,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 	// Add command to the 'discover' command
 	discoverCmd.AddCommand(discoverDNSCmd)
 
+	// Certs Command
 	discoverDNSCertsCmd := &cobra.Command{
 		Use:   "certs",
 		Short: "Retrieve SSL/TLS certificates for a domain",
@@ -74,6 +127,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 	// Add command to 'dns' command
 	discoverDNSCmd.AddCommand(discoverDNSCertsCmd)
 
+	// Records Command
 	discoverDNSRecordsCmd := &cobra.Command{
 		Use:   "records",
 		Short: "Fetch DNS records for a domain",
@@ -105,6 +159,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 	// Add command to 'dns' command
 	discoverDNSCmd.AddCommand(discoverDNSRecordsCmd)
 
+	// Forward-Reverse Command
 	discoverDNSForwardReverseCmd := &cobra.Command{
 		Use:   "forward-reverse",
 		Short: "Perform forward and reverse DNS lookups",
@@ -139,10 +194,11 @@ func (a *OsintScan) InitDiscoverCommand() {
 	// Add command to 'dns' command
 	discoverDNSCmd.AddCommand(discoverDNSForwardReverseCmd)
 
-	// subdomain Commands
-	// subdomain active
-	// subdomain correlation
-	// subdomain passive
+	// subdomain Cmd
+	// Subcommands:
+	//  - active
+	//  - correlation
+	//  - passive
 	discoverDNSSubdomainCmd := &cobra.Command{
 		Use:   "subdomain",
 		Short: "Discover subdomains for a domain",
@@ -151,6 +207,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 
 	discoverDNSCmd.AddCommand(discoverDNSSubdomainCmd)
 
+	// Active Command
 	discoverDNSSubdomainActiveCmd := &cobra.Command{
 		Use:   "active",
 		Short: "Actively discover subdomains",
@@ -271,6 +328,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 	// Add command to 'subdomain' command
 	discoverDNSSubdomainCmd.AddCommand(discoverDNSSubdomainActiveCmd)
 
+	// Correlation Command
 	discoverDNSSubdomainCorrelationCmd := &cobra.Command{
 		Use:   "correlation",
 		Short: "Correlate subdomains across multiple domains",
@@ -324,6 +382,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 	// Add command to 'subdomain' command
 	discoverDNSSubdomainCmd.AddCommand(discoverDNSSubdomainCorrelationCmd)
 
+	// Passive Command
 	discoverDNSSubdomainPassiveCmd := &cobra.Command{
 		Use:   "passive",
 		Short: "Passively discover subdomains",
@@ -372,6 +431,9 @@ func (a *OsintScan) InitDiscoverCommand() {
 	// Add command to 'subdomain' command
 	discoverDNSSubdomainCmd.AddCommand(discoverDNSSubdomainPassiveCmd)
 
+	// Shodan Command
+	// Subcommands:
+	// - hostname
 	discoverShodanCmd := &cobra.Command{
 		Use:   "shodan",
 		Short: "Query Shodan for host and service information",
@@ -380,6 +442,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 
 	discoverCmd.AddCommand(discoverShodanCmd)
 
+	// Hostname Command
 	discoverShodanHostnameCmd := &cobra.Command{
 		Use:   "hostname",
 		Short: "Search Shodan for a specific hostname",
@@ -443,7 +506,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 	// Add command to 'shodan' command
 	discoverShodanCmd.AddCommand(discoverShodanHostnameCmd)
 
-	// CDN Commands
+	// CDN Command
 	discoverCdnCmd := &cobra.Command{
 		Use:   "cdn",
 		Short: "Discover CDN providers for IP addresses",
@@ -503,7 +566,10 @@ func (a *OsintScan) InitDiscoverCommand() {
 	// Add command to the 'discover' command
 	discoverCmd.AddCommand(discoverCdnCmd)
 
-	// IP Address Discover Commands
+	// IP Address Command
+	// Subcommands:
+	// - domain-asn
+	// - reverse
 	discoverIPCmd := &cobra.Command{
 		Use:   "ip",
 		Short: "Discover IP address and CIDR information",
@@ -513,6 +579,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 	// Add discoverIPCmd to the 'discover' command
 	discoverCmd.AddCommand(discoverIPCmd)
 
+	// Domain ASN Command
 	discoverIPDomainASNCmd := &cobra.Command{
 		Use:   "domain-asn",
 		Short: "Perform a reverse DNS lookup and ASN lookup on a single IP, list of IPs, or a CIDR range",
@@ -587,44 +654,59 @@ func (a *OsintScan) InitDiscoverCommand() {
 	// Add command to 'ip' command
 	discoverIPCmd.AddCommand(discoverIPDomainASNCmd)
 
-	// ASN Address Discover Commands
-	discoverASNCmd := &cobra.Command{
-		Use:   "asn",
-		Short: "Discover ASN information",
-		Long:  `Discover information about ASN, including ASN description, CIDRs, country, and other metadata. This relies on BGPView's API and has built in retry and timeout mechanisms.`,
+	// Reverse Command
+	discoverIPReverseCmd := &cobra.Command{
+		Use:   "reverse",
+		Short: "Perform a reverse DNS lookup on a single IP, list of IPs, or a CIDR range",
+		Long:  `Perform a reverse DNS lookup on a single IP, list of IPs, or a CIDR range.`,
 		Run: func(cmd *cobra.Command, args []string) {
-			asnFlag, err := cmd.Flags().GetString("asn")
+			// Flags
+			ips, err := cmd.Flags().GetStringSlice("ips")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			timeout, err := cmd.Flags().GetInt("timeout")
+			dnsResolvers, err := cmd.Flags().GetStringSlice("dns-resolvers")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			config := getDiscoverASNConfig(asnFlag, timeout)
-			report, err := discover.GetASNInfo(cmd.Context(), config)
+			threads, err := cmd.Flags().GetInt("threads")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
+
+			// Create config
+			config := getDiscoverIPReverseConfig(ips, dnsResolvers, threads)
+
+			// Create report
+			report := ip.GetReverseLookup(cmd.Context(), config)
 			a.OutputSignal.Content = report
 		},
 	}
 
 	// Target Flags
-	discoverASNCmd.Flags().String("asn", "", "The ASN number to lookup (e.g., AS23028 or 23028)")
-	discoverASNCmd.Flags().Int("timeout", 120, "The timeout in seconds for the ASN lookup")
+	discoverIPReverseCmd.Flags().StringSlice("ips", []string{}, "The IP addresses to perform reverse DNS lookup on")
+	discoverIPReverseCmd.Flags().StringSlice("dns-resolvers", []string{"1.1.1.1:53"}, "Custom DNS resolver/servers to use for queries (e.g. 1.1.1.1:53)")
+	discoverIPReverseCmd.Flags().Int("threads", 0, "Number of concurrent threads for scanning (Default is number of CPUS on machine)")
 
 	// Mark Required Flags
-	_ = discoverASNCmd.MarkFlagRequired("asn")
+	_ = discoverIPReverseCmd.MarkFlagRequired("ips")
 
-	// Add command to 'discover' command
-	discoverCmd.AddCommand(discoverASNCmd)
+	// Add command to 'ip' command
+	discoverIPCmd.AddCommand(discoverIPReverseCmd)
 
 	// Add the 'discover' command to the root command
 	a.RootCmd.AddCommand(discoverCmd)
+}
+
+// getDiscoverASNConfig creates and returns a configuration for ASN discovery
+func getDiscoverASNConfig(asn string, timeout int) *asnfern.DiscoverAsnConfig {
+	return &asnfern.DiscoverAsnConfig{
+		Asn:     asn,
+		Timeout: &timeout,
+	}
 }
 
 // getDiscoverDNSCertsConfig creates and returns a configuration for DNS certificate discovery
@@ -719,10 +801,11 @@ func getDiscoverIPDomainASNConfig(ips []string, cidr string, dnsResolvers []stri
 	return config
 }
 
-// getDiscoverASNConfig creates and returns a configuration for ASN discovery
-func getDiscoverASNConfig(asn string, timeout int) *asnfern.DiscoverAsnConfig {
-	return &asnfern.DiscoverAsnConfig{
-		Asn:     asn,
-		Timeout: &timeout,
+// getDiscoverIPReverseConfig creates and returns a configuration for IP reverse DNS lookup
+func getDiscoverIPReverseConfig(ips []string, dnsResolvers []string, threads int) *ipfern.DiscoverIpReverseConfig {
+	return &ipfern.DiscoverIpReverseConfig{
+		Ips:          ips,
+		DnsResolvers: dnsResolvers,
+		Threads:      max(threads, 0),
 	}
 }

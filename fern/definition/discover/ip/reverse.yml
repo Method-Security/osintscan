@@ -1,0 +1,21 @@
+types:
+# Config Struct
+  DiscoverIpReverseConfig:
+    properties:
+      ips: list<string>
+      dnsResolvers: optional<list<string>>
+      threads: integer
+# Result Structs
+  ReverseDetails:
+    properties:
+      ip: string
+      reversePtrs: optional<list<string>>
+  DiscoverIpReverseResult:
+    properties:
+      lookups: optional<list<ReverseDetails>>
+# Report Structs
+  DiscoverDnsReverseReport:
+    properties:
+      config: DiscoverIpReverseConfig
+      result: DiscoverIpReverseResult
+      errors: optional<list<string>>
