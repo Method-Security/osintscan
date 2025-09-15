@@ -1,18 +1,22 @@
 package dns
 
 import (
+	// Standard
 	"context"
 	"math/rand"
 	"net"
 
+	// Generated
 	dnsfern "github.com/Method-Security/osintscan/generated/go/discover/dns"
+	// Utils
 	"github.com/Method-Security/osintscan/utils"
+	// External
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
-// GetForwardReverseDNSLookup performs both forward (A/AAAA) and reverse (PTR) DNS lookups for a given FQDN.
-// Returns a report containing all resolved IPs and their associated hostnames, along with any errors encountered.
-func GetForwardReverseDNSLookup(config dnsfern.DiscoverDnsForwardReverseConfig) dnsfern.DiscoverDnsForwardReverseReport {
+// GetForwardDNSLookup performs forward (A/AAAA) DNS lookups for a given FQDN.
+// Returns a report containing all resolved IPs, along with any errors encountered.
+func GetForwardDNSLookup(config dnsfern.DiscoverDnsForwardConfig) dnsfern.DiscoverDnsForwardReverseReport {
 	errors := []string{}
 
 	lookUps, errs := getLookups(config.Domain, config.DnsResolvers)
@@ -20,7 +24,7 @@ func GetForwardReverseDNSLookup(config dnsfern.DiscoverDnsForwardReverseConfig) 
 		errors = append(errors, errs...)
 	}
 
-	results := dnsfern.DiscoverDnsForwardReverseResult{
+	results := dnsfern.DiscoverDnsForwardResult{
 		Lookups: lookUps,
 	}
 
@@ -54,16 +58,10 @@ func getLookups(domain string, dnsResolvers []string) ([]*dnsfern.LookupDetails,
 			continue
 		}
 
-		// Perform a reverse lookup (PTR record) for each IP
-		names, err := resolver.LookupAddr(ctx, ip.String())
-		if err != nil {
-			errors = append(errors, err.Error())
-		}
-
-		// Store resolved hostnames per IP
+		// Store domain and IP address for each resolved IP
 		lookUps = append(lookUps, &dnsfern.LookupDetails{
-			ForwardIp:   &ipStr,
-			ReversePtrs: names,
+			Domain:    domain,
+			IpAddress: &ipStr,
 		})
 	}
 

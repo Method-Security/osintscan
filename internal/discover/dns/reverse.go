@@ -1,4 +1,4 @@
-package ip
+package dns
 
 import (
 	"context"
@@ -8,13 +8,13 @@ import (
 	"sync"
 	"sync/atomic"
 
-	ipfern "github.com/Method-Security/osintscan/generated/go/discover/ip"
+	dnsfern "github.com/Method-Security/osintscan/generated/go/discover/dns"
 	"github.com/Method-Security/osintscan/utils"
 	"github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
 // GetReverseLookup performs reverse DNS lookups for a list of IP addresses
-func GetReverseLookup(ctx context.Context, config *ipfern.DiscoverIpReverseConfig) *ipfern.DiscoverIpReverseReport {
+func GetReverseLookup(ctx context.Context, config *dnsfern.DiscoverDnsReverseConfig) *dnsfern.DiscoverDnsReverseReport {
 	log := svc1log.FromContext(ctx)
 	errors := []string{}
 
@@ -22,9 +22,9 @@ func GetReverseLookup(ctx context.Context, config *ipfern.DiscoverIpReverseConfi
 	allIPs, err := explodeIPsFromReverseConfig(config)
 	if err != nil {
 		errors = append(errors, err.Error())
-		return &ipfern.DiscoverIpReverseReport{
+		return &dnsfern.DiscoverDnsReverseReport{
 			Config: config,
-			Result: &ipfern.DiscoverIpReverseResult{},
+			Result: &dnsfern.DiscoverDnsReverseResult{},
 			Errors: errors,
 		}
 	}
@@ -47,7 +47,7 @@ func GetReverseLookup(ctx context.Context, config *ipfern.DiscoverIpReverseConfi
 		errors = append(errors, lookupErrors...)
 	}
 
-	result := &ipfern.DiscoverIpReverseResult{
+	result := &dnsfern.DiscoverDnsReverseResult{
 		Lookups: lookups,
 	}
 
@@ -55,7 +55,7 @@ func GetReverseLookup(ctx context.Context, config *ipfern.DiscoverIpReverseConfi
 		svc1log.SafeParam("total_lookups", len(lookups)),
 		svc1log.SafeParam("errors", len(errors)))
 
-	return &ipfern.DiscoverIpReverseReport{
+	return &dnsfern.DiscoverDnsReverseReport{
 		Config: config,
 		Result: result,
 		Errors: errors,
@@ -63,19 +63,19 @@ func GetReverseLookup(ctx context.Context, config *ipfern.DiscoverIpReverseConfi
 }
 
 // explodeIPsFromReverseConfig extracts and expands all IPs from the reverse configuration
-func explodeIPsFromReverseConfig(config *ipfern.DiscoverIpReverseConfig) ([]string, error) {
+func explodeIPsFromReverseConfig(config *dnsfern.DiscoverDnsReverseConfig) ([]string, error) {
 	return utils.ExplodeIPsFromAddressesAndCIDR(config.IpAddresses, config.Cidr)
 }
 
 // performConcurrentReverseLookups performs reverse DNS lookups concurrently using round-robin resolver selection
-func performConcurrentReverseLookups(ctx context.Context, ips []string, dnsResolvers []string, threads int) ([]*ipfern.ReverseDetails, []string) {
+func performConcurrentReverseLookups(ctx context.Context, ips []string, dnsResolvers []string, threads int) ([]*dnsfern.ReverseDetails, []string) {
 	log := svc1log.FromContext(ctx)
 	maxWorkers := threads // Use configured thread count for concurrency control
 	if maxWorkers == 0 {
 		maxWorkers = runtime.NumCPU()
 	}
 
-	lookups := make([]*ipfern.ReverseDetails, 0, len(ips))
+	lookups := make([]*dnsfern.ReverseDetails, 0, len(ips))
 	errors := []string{}
 	lookupsMutex := &sync.Mutex{}
 	errorsMutex := &sync.Mutex{}
@@ -130,7 +130,7 @@ func performConcurrentReverseLookups(ctx context.Context, ips []string, dnsResol
 }
 
 // performSingleReverseLookup performs a reverse DNS lookup for a single IP address
-func performSingleReverseLookup(ctx context.Context, ip string, resolver *net.Resolver) (*ipfern.ReverseDetails, error) {
+func performSingleReverseLookup(ctx context.Context, ip string, resolver *net.Resolver) (*dnsfern.ReverseDetails, error) {
 	// Perform reverse DNS lookup to get all PTR records
 	names, err := resolver.LookupAddr(ctx, ip)
 	if err != nil {
@@ -138,7 +138,7 @@ func performSingleReverseLookup(ctx context.Context, ip string, resolver *net.Re
 		return nil, fmt.Errorf("reverse DNS lookup failed: %w", err)
 	}
 
-	lookup := &ipfern.ReverseDetails{
+	lookup := &dnsfern.ReverseDetails{
 		IpAddress: ip,
 	}
 

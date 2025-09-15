@@ -1,6 +1,6 @@
 types:
 # Config Struct
-  DiscoverIpReverseConfig:
+  DiscoverDnsReverseConfig:
     properties:
       ipAddresses: optional<list<string>>
       cidr: optional<string>
@@ -11,12 +11,12 @@ types:
     properties:
       ipAddress: string
       reverseDnsNames: list<string>
-  DiscoverIpReverseResult:
+  DiscoverDnsReverseResult:
     properties:
       lookups: optional<list<ReverseDetails>>
 # Report Structs
-  DiscoverIpReverseReport:
+  DiscoverDnsReverseReport:
     properties:
-      config: DiscoverIpReverseConfig
-      result: DiscoverIpReverseResult
+      config: DiscoverDnsReverseConfig
+      result: DiscoverDnsReverseResult
       errors: optional<list<string>>
