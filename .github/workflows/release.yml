@@ -34,8 +34,19 @@ jobs:
         env:
           FERN_TOKEN: ${{ secrets.FERN_TOKEN }}
           PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
-          
+
     permissions:
       id-token: write # For cosign
       packages: write # For GHCR
       contents: write # To upload archives as release assets
+
+  upload-to-s3:
+    name: Upload to S3
+    needs: [release]
+    uses: ./.github/workflows/upload-to-s3.yml
+    with:
+      version: ${{ github.ref_name }}
+    secrets: inherit
+    permissions:
+      id-token: write
+      contents: read
