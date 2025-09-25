@@ -12,11 +12,11 @@ jobs:
     name: 🧪 Test S3 Bucket Access
     runs-on: ubuntu-latest
     steps:
-      - name: 🔑 Configure AWS Credentials
+      - name: 🔑 Configure AWS Credentials (Test)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: us-east-1
+          role-to-assume: ${{ secrets.CODEARTIFACT_READER_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
       - name: 🧪 Test S3 Bucket Access
         env:
