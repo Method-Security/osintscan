@@ -31,11 +31,11 @@ jobs:
         with:
           path: artifacts
 
-      - name: Configure AWS credentials
+      - name: 🔑 Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: us-east-1
+          role-to-assume: ${{ secrets.S3_BUCKET_WRITER_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Upload release assets to S3
         run: ./scripts/upload-release-to-s3.sh
