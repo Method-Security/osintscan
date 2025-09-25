@@ -1,0 +1,32 @@
+name: 🧪 Test S3 Bucket Access
+
+on:
+  workflow_call:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  test-s3-access:
+    name: 🧪 Test S3 Bucket Access
+    runs-on: ubuntu-latest
+    steps:
+      - name: 🔑 Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: 🧪 Test S3 Bucket Access
+        env:
+          S3_BUCKET_URL: ${{ secrets.S3_BUCKET_URL }}
+        run: |
+          echo "Testing S3 access for bucket: ${S3_BUCKET_URL}"
+
+          if aws s3 ls "${S3_BUCKET_URL}/" --max-items 1 > /dev/null 2>&1; then
+            echo "✅ S3 bucket access confirmed"
+          else
+            echo "❌ S3 bucket access failed"
+            exit 1
+          fi
