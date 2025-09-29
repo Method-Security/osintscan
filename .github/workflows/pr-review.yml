@@ -48,18 +48,6 @@ jobs:
     needs: code-gen
     secrets: inherit
 
-  # Temporary to test script
-  upload-to-s3:
-    name: Upload to S3
-    needs: [test-build]
-    uses: ./.github/workflows/upload-to-s3.yml
-    with:
-      version: ${{ github.ref_name }}
-    secrets: inherit
-    permissions:
-      id-token: write
-      contents: read
-
   check:
     name: ✅ Check
     if: always()
