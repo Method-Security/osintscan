@@ -27,11 +27,12 @@ find artifacts/ -type f -name "*osintscan*" | head -20
 mkdir -p "s3_content/$REPO_NAME/$VERSION_CLEAN"
 
 # Define platform mappings for artifact directories to S3 structure
-declare -A PLATFORM_MAPPINGS=(
-    ["linux-amd64-dist"]="linux-amd64"
-    ["linux-arm64-dist"]="linux-arm64"
-    ["macos-latest-dist"]="darwin-arm64"
-    ["windows-latest-dist"]="windows-amd64"
+# Format: "artifact_dir:s3_platform"
+PLATFORM_MAPPINGS=(
+    "linux-amd64-dist:linux-amd64"
+    "linux-arm64-dist:linux-arm64"
+    "macos-latest-dist:darwin-arm64"
+    "windows-latest-dist:windows-amd64"
 )
 
 process_artifact_directory() {
@@ -72,12 +73,13 @@ process_artifact_directory() {
 # Process each platform
 echo "=== Processing build artifacts ==="
 success_count=0
-for artifact_dir in "${!PLATFORM_MAPPINGS[@]}"; do
-    s3_platform="${PLATFORM_MAPPINGS[$artifact_dir]}"
+for mapping in "${PLATFORM_MAPPINGS[@]}"; do
+    artifact_dir="${mapping%:*}"
+    s3_platform="${mapping#*:}"
 
     if [ -d "artifacts/$artifact_dir" ]; then
         if process_artifact_directory "$artifact_dir" "$s3_platform"; then
-            ((success_count++))
+            success_count=$((success_count + 1))
         fi
     else
         echo "Warning: Artifact directory $artifact_dir not found, skipping $s3_platform"
