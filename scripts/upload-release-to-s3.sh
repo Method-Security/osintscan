@@ -16,7 +16,7 @@ echo "Processing version: $VERSION_CLEAN"
 
 # Check if artifacts directory exists
 if [ ! -d "artifacts" ]; then
-    echo "✗ No artifacts directory found. This script should run after downloading build artifacts."
+    echo "No artifacts directory found. This script should run after downloading build artifacts."
     exit 1
 fi
 
@@ -52,7 +52,7 @@ process_artifact_directory() {
         executable_path=$(find "artifacts/$artifact_dir" -name "${REPO_NAME}.exe" -type f | head -1)
         if [ -n "$executable_path" ]; then
             cp "$executable_path" "s3_content/$REPO_NAME/$VERSION_CLEAN/$s3_platform/${REPO_NAME}.exe"
-            echo "✓ Copied Windows executable for $s3_platform"
+            echo "Copied Windows executable for $s3_platform"
             return 0
         fi
     else
@@ -61,12 +61,12 @@ process_artifact_directory() {
         if [ -n "$executable_path" ]; then
             cp "$executable_path" "s3_content/$REPO_NAME/$VERSION_CLEAN/$s3_platform/$REPO_NAME"
             chmod +x "s3_content/$REPO_NAME/$VERSION_CLEAN/$s3_platform/$REPO_NAME"
-            echo "✓ Copied Unix executable for $s3_platform"
+            echo "Copied Unix executable for $s3_platform"
             return 0
         fi
     fi
 
-    echo "✗ Could not find executable in $artifact_dir"
+    echo "Could not find executable in $artifact_dir"
     return 1
 }
 
@@ -87,11 +87,11 @@ for mapping in "${PLATFORM_MAPPINGS[@]}"; do
 done
 
 if [ $success_count -eq 0 ]; then
-    echo "✗ No artifacts were successfully processed"
+    echo "No artifacts were successfully processed"
     exit 1
 fi
 
-echo "✓ Successfully processed $success_count platform executables"
+echo "Successfully processed $success_count platform executables"
 
 # Show what we've prepared for upload
 echo "=== Prepared files for S3 upload ==="
@@ -102,14 +102,10 @@ if [ -n "$S3_BUCKET_URL" ]; then
     echo "=== Uploading to S3 ==="
     echo "Uploading to S3 bucket: $S3_BUCKET_URL"
 
-    # Upload the entire repository structure to S3
-    aws s3 sync "s3_content/$REPO_NAME/" "$S3_BUCKET_URL/$REPO_NAME/" --delete
+    # Upload to version-specific path
+    aws s3 sync "s3_content/$REPO_NAME/$VERSION_CLEAN/" "$S3_BUCKET_URL/$REPO_NAME/$VERSION_CLEAN/"
 
-    echo "✓ Successfully uploaded $REPO_NAME version $VERSION_CLEAN to S3"
-
-    # List what was uploaded
-    echo "=== Files uploaded to S3 ==="
-    aws s3 ls "$S3_BUCKET_URL/$REPO_NAME/$VERSION_CLEAN/" --recursive
+    echo "Successfully uploaded $REPO_NAME version $VERSION_CLEAN to S3"
 else
     echo "S3_BUCKET_URL not set, skipping S3 upload"
     echo "Files are ready in s3_content/ directory"
