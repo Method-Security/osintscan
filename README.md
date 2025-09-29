@@ -21,21 +21,39 @@ To learn more about osintscan, please see the [Documentation site](https://metho
 
 ### Get osintscan
 
-For the full list of available installation options, please see the [Installation](./getting-started/installation.md) page. For convenience, here are some of the most commonly used options:
+For the full list of available installation options, please see the [Installation](./docs/getting-started/installation.md) page. For convenience, here are some of the most commonly used options:
 
 - `docker run methodsecurity/osintscan`
 - `docker run ghcr.io/method-security/osintscan`
 - Download the latest binary from the [Github Releases](https://github.com/Method-Security/osintscan/releases/latest) page
-- [Installation documentation](./getting-started/installation.md)
+- [Installation documentation](./docs/getting-started/installation.md)
 
 #### Examples
 
 ```bash
+# Discover DNS records for a domain
 osintscan discover dns records --domain example.com
 ```
 
 ```bash
+# Get SSL certificates for a domain
 osintscan discover dns certs --domain example.com
+```
+
+```bash
+# Discover ASN information
+osintscan discover asn --asn AS23028
+```
+
+```bash
+# Actively discover subdomains
+osintscan discover dns subdomain active --domain example.com --wordlist-size small
+```
+
+```bash
+# Check for CDN usage
+osintscan discover cdn --domain example.com
+```
 
 ### Developer Setup
 
@@ -49,7 +67,7 @@ osintscan discover dns certs --domain example.com
 fern generate --group local
 ```
 
-3. Ensure depedencies are installed and tested with:
+3. Ensure dependencies are installed and tested with:
 
 ```bash
 ./godelw verify
@@ -72,8 +90,7 @@ fern generate --group local
 
 
 ### Note:
-This tool runs on a headless-shell base image to support chrome/chromium browser automation. The dockerfile uses debian-based install tools. 
-```
+This tool runs on a headless-shell base image to support chrome/chromium browser automation. The dockerfile uses debian-based install tools.
 
 ## Contributing
 
