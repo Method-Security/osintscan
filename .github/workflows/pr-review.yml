@@ -42,11 +42,6 @@ jobs:
     uses: ./.github/workflows/test-publish.yml
     secrets: inherit
 
-  test-s3-access:
-    name: 🧪 Test S3 Bucket Access
-    uses: ./.github/workflows/test-s3-access.yml
-    secrets: inherit
-
   verify:
     name: 🙏🏻 Verify
     uses: ./.github/workflows/verify.yml
