@@ -15,7 +15,7 @@ jobs:
       - name: 🔑 Configure AWS Credentials (Test)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.CODEARTIFACT_READER_ROLE_ARN }}
+          role-to-assume: ${{ secrets.S3_BUCKET_WRITER_ROLE_ARN }}
           aws-region: ${{ secrets.AWS_REGION }}
 
       - name: 🧪 Test S3 Bucket Access
