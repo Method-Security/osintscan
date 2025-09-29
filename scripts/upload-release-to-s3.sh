@@ -102,10 +102,10 @@ if [ -n "$S3_BUCKET_URL" ]; then
     echo "=== Uploading to S3 ==="
     echo "Uploading to S3 bucket: $S3_BUCKET_URL"
 
-    # Upload to version-specific path
-    aws s3 sync "s3_content/$REPO_NAME/$VERSION_CLEAN/" "$S3_BUCKET_URL/$REPO_NAME/$VERSION_CLEAN/"
+    # Upload to version-specific path with SHA256 checksums
+    aws s3 sync "s3_content/$REPO_NAME/$VERSION_CLEAN/" "$S3_BUCKET_URL/$REPO_NAME/$VERSION_CLEAN/" --checksum-algorithm SHA256
 
-    echo "Successfully uploaded $REPO_NAME version $VERSION_CLEAN to S3"
+    echo "✓ Successfully uploaded $REPO_NAME version $VERSION_CLEAN to S3"
 else
     echo "S3_BUCKET_URL not set, skipping S3 upload"
     echo "Files are ready in s3_content/ directory"
