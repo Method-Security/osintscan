@@ -8,7 +8,10 @@ osintscan organizes functionality under three primary command groups and their m
 
 ### discover
 
-- [DNS](./dns.md) – records, certificates, subdomain enumeration, reverse lookups
+- [ASN](./dns.md) – ASN information discovery using BGPView API
+- [CDN](./dns.md) – CDN provider detection for IP addresses and domains
+- [DNS](./dns.md) – records, certificates, subdomain enumeration, forward/reverse lookups
+- [IP](./dns.md) – IP address and CIDR information, domain-ASN lookups
 - [Shodan](./shodan.md) – query the Shodan search engine
 
 ### enumerate
