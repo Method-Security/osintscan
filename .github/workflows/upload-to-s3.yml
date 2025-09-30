@@ -34,11 +34,11 @@ jobs:
       - name: 🔑 Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.S3_BUCKET_WRITER_ROLE_ARN }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          role-to-assume: ${{ secrets.CLI_S3_UPLOAD_ARN }}
+          aws-region: ${{ secrets.CLI_S3_UPLOAD_REGION }}
 
       - name: Upload release assets to S3
         run: ./scripts/upload-release-to-s3.sh
         env:
-          S3_BUCKET_URL: ${{ secrets.S3_BUCKET_URL }}
+          S3_BUCKET_URL: ${{ secrets.CLI_S3_UPLOAD_URL }}
           VERSION: ${{ inputs.version }}
