@@ -74,12 +74,15 @@ func getDNSRecords(domain string, questionTypes []uint16) ([]*common.DnsRecord, 
 		return dnsRecordsSlice
 	}
 
-	// Populate each record type if requested
+	// Populate each record type if requested (in alphabetical order)
 	if slices.Contains(questionTypes, dns.TypeA) {
 		dnsRecords = append(dnsRecords, populateRecords(results.A, "A")...)
 	}
 	if slices.Contains(questionTypes, dns.TypeAAAA) {
 		dnsRecords = append(dnsRecords, populateRecords(results.AAAA, "AAAA")...)
+	}
+	if slices.Contains(questionTypes, dns.TypeCAA) {
+		dnsRecords = append(dnsRecords, populateRecords(results.CAA, "CAA")...)
 	}
 	if slices.Contains(questionTypes, dns.TypeCNAME) {
 		dnsRecords = append(dnsRecords, populateRecords(results.CNAME, "CNAME")...)
@@ -90,14 +93,8 @@ func getDNSRecords(domain string, questionTypes []uint16) ([]*common.DnsRecord, 
 	if slices.Contains(questionTypes, dns.TypeNS) {
 		dnsRecords = append(dnsRecords, populateRecords(results.NS, "NS")...)
 	}
-	if slices.Contains(questionTypes, dns.TypeTXT) {
-		dnsRecords = append(dnsRecords, populateRecords(results.TXT, "TXT")...)
-	}
 	if slices.Contains(questionTypes, dns.TypePTR) {
 		dnsRecords = append(dnsRecords, populateRecords(results.PTR, "PTR")...)
-	}
-	if slices.Contains(questionTypes, dns.TypeSRV) {
-		dnsRecords = append(dnsRecords, populateRecords(results.SRV, "SRV")...)
 	}
 	if slices.Contains(questionTypes, dns.TypeSOA) {
 		// SOA records have a different structure, need to convert them to strings
@@ -107,6 +104,34 @@ func getDNSRecords(domain string, questionTypes []uint16) ([]*common.DnsRecord, 
 			soaStrings = append(soaStrings, soaString)
 		}
 		dnsRecords = append(dnsRecords, populateRecords(soaStrings, "SOA")...)
+	}
+	if slices.Contains(questionTypes, dns.TypeSRV) {
+		dnsRecords = append(dnsRecords, populateRecords(results.SRV, "SRV")...)
+	}
+	if slices.Contains(questionTypes, dns.TypeTXT) {
+		dnsRecords = append(dnsRecords, populateRecords(results.TXT, "TXT")...)
+	}
+
+	// Handle unknown record types by checking AllRecords for any records we didn't process
+	if len(results.AllRecords) > 0 {
+		// Create a set of processed records to avoid duplicates
+		processedRecords := make(map[string]bool)
+		for _, record := range dnsRecords {
+			processedRecords[record.Value] = true
+		}
+
+		// Check for unprocessed records in AllRecords
+		var unknownRecords []string
+		for _, record := range results.AllRecords {
+			if !processedRecords[record] {
+				unknownRecords = append(unknownRecords, record)
+			}
+		}
+
+		// Add unknown records with UNKNOWN type
+		if len(unknownRecords) > 0 {
+			dnsRecords = append(dnsRecords, populateRecords(unknownRecords, "UNKNOWN")...)
+		}
 	}
 
 	return dnsRecords, nil
@@ -118,7 +143,7 @@ func DiscoverDomainDNSRecords(ctx context.Context, config dnsfern.DiscoverDnsRec
 	errors := []string{}
 
 	// Get all the DNS records (query all types, then filter)
-	questionTypes := []uint16{dns.TypeA, dns.TypeAAAA, dns.TypeMX, dns.TypeTXT, dns.TypeNS, dns.TypeCNAME, dns.TypePTR, dns.TypeSRV, dns.TypeSOA}
+	questionTypes := []uint16{dns.TypeA, dns.TypeAAAA, dns.TypeCAA, dns.TypeCNAME, dns.TypeMX, dns.TypeNS, dns.TypePTR, dns.TypeSOA, dns.TypeSRV, dns.TypeTXT}
 	allDNSRecords, err := getDNSRecords(config.Domain, questionTypes)
 	if err != nil {
 		errors = append(errors, err.Error())

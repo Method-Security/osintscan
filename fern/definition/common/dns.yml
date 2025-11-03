@@ -3,13 +3,14 @@ types:
     enum:
       - A
       - AAAA
+      - CAA
       - CNAME
       - MX
       - NS
-      - SOA
-      - TXT
       - PTR
+      - SOA
       - SRV
+      - TXT
       - UNKNOWN
       - ALL
   DnsRecord:
