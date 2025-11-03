@@ -2,6 +2,7 @@ package dns
 
 import (
 	"context"
+	"fmt"
 	"slices"
 
 	common "github.com/Method-Security/osintscan/generated/go/common"
@@ -9,6 +10,37 @@ import (
 	"github.com/miekg/dns"
 	"github.com/projectdiscovery/dnsx/libs/dnsx"
 )
+
+// filterDNSRecordsByType filters DNS records based on the requested record types
+func filterDNSRecordsByType(records []*common.DnsRecord, recordTypes []common.DnsRecordType) []*common.DnsRecord {
+	// If no specific types requested or ALL is requested, return everything
+	for _, recordType := range recordTypes {
+		if recordType == common.DnsRecordTypeAll {
+			return records
+		}
+	}
+
+	// If no types specified, return everything
+	if len(recordTypes) == 0 {
+		return records
+	}
+
+	// Create a set of requested types for quick lookup
+	requestedTypes := make(map[common.DnsRecordType]bool)
+	for _, recordType := range recordTypes {
+		requestedTypes[recordType] = true
+	}
+
+	// Filter records
+	var filteredRecords []*common.DnsRecord
+	for _, record := range records {
+		if requestedTypes[record.Type] {
+			filteredRecords = append(filteredRecords, record)
+		}
+	}
+
+	return filteredRecords
+}
 
 // getDNSRecords queries DNS for the specified record types for a domain and returns a DnsRecords struct.
 func getDNSRecords(domain string, questionTypes []uint16) ([]*common.DnsRecord, error) {
@@ -67,6 +99,15 @@ func getDNSRecords(domain string, questionTypes []uint16) ([]*common.DnsRecord, 
 	if slices.Contains(questionTypes, dns.TypeSRV) {
 		dnsRecords = append(dnsRecords, populateRecords(results.SRV, "SRV")...)
 	}
+	if slices.Contains(questionTypes, dns.TypeSOA) {
+		// SOA records have a different structure, need to convert them to strings
+		var soaStrings []string
+		for _, soa := range results.SOA {
+			soaString := fmt.Sprintf("%s %s %d %d %d %d %d", soa.NS, soa.Mbox, soa.Serial, soa.Refresh, soa.Retry, soa.Expire, soa.Minttl)
+			soaStrings = append(soaStrings, soaString)
+		}
+		dnsRecords = append(dnsRecords, populateRecords(soaStrings, "SOA")...)
+	}
 
 	return dnsRecords, nil
 }
@@ -76,12 +117,15 @@ func getDNSRecords(domain string, questionTypes []uint16) ([]*common.DnsRecord, 
 func DiscoverDomainDNSRecords(ctx context.Context, config dnsfern.DiscoverDnsRecordsConfig) (*dnsfern.DiscoverDnsRecordsReport, error) {
 	errors := []string{}
 
-	// Get all the DNS records
-	questionTypes := []uint16{dns.TypeA, dns.TypeAAAA, dns.TypeMX, dns.TypeTXT, dns.TypeNS, dns.TypeCNAME, dns.TypePTR, dns.TypeSRV}
-	dnsRecords, err := getDNSRecords(config.Domain, questionTypes)
+	// Get all the DNS records (query all types, then filter)
+	questionTypes := []uint16{dns.TypeA, dns.TypeAAAA, dns.TypeMX, dns.TypeTXT, dns.TypeNS, dns.TypeCNAME, dns.TypePTR, dns.TypeSRV, dns.TypeSOA}
+	allDNSRecords, err := getDNSRecords(config.Domain, questionTypes)
 	if err != nil {
 		errors = append(errors, err.Error())
 	}
+
+	// Filter DNS records based on requested types
+	dnsRecords := filterDNSRecordsByType(allDNSRecords, config.RecordTypes)
 
 	// The DMARC record is always in the _dmarc subdomain (RFC-7489)
 	dmarcRecords, err := getDNSRecords("_dmarc."+config.Domain, []uint16{dns.TypeTXT})

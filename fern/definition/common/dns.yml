@@ -11,6 +11,7 @@ types:
       - PTR
       - SRV
       - UNKNOWN
+      - ALL
   DnsRecord:
     properties:
       name: string

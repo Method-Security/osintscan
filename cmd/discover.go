@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	// Generated
+	common "github.com/Method-Security/osintscan/generated/go/common"
 	asnfern "github.com/Method-Security/osintscan/generated/go/discover/asn"
 	cdnfern "github.com/Method-Security/osintscan/generated/go/discover/cdn"
 	dnsfern "github.com/Method-Security/osintscan/generated/go/discover/dns"
@@ -140,7 +141,13 @@ func (a *OsintScan) InitDiscoverCommand() {
 				return
 			}
 
-			config := getDiscoverDNSRecordsConfig(domain)
+			recordTypes, err := cmd.Flags().GetStringSlice("record-types")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			config := getDiscoverDNSRecordsConfig(domain, recordTypes)
 
 			report, err := dns.DiscoverDomainDNSRecords(cmd.Context(), config)
 			if err != nil {
@@ -153,6 +160,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 
 	// Target Flags
 	discoverDNSRecordsCmd.Flags().String("domain", "", "The domain name to query for DNS records")
+	discoverDNSRecordsCmd.Flags().StringSlice("record-types", []string{"ALL"}, "Comma-separated list of DNS record types to query (A, AAAA, CNAME, MX, NS, SOA, TXT, PTR, SRV, UNKNOWN, ALL)")
 
 	// Mark Required Flags
 	_ = discoverDNSRecordsCmd.MarkFlagRequired("domain")
@@ -733,9 +741,18 @@ func getDiscoverDNSCertsConfig(domain string) dnsfern.DiscoverDnsCertsConfig {
 }
 
 // getDiscoverDNSRecordsConfig creates and returns a configuration for DNS records discovery
-func getDiscoverDNSRecordsConfig(domain string) dnsfern.DiscoverDnsRecordsConfig {
+func getDiscoverDNSRecordsConfig(domain string, recordTypes []string) dnsfern.DiscoverDnsRecordsConfig {
+	// Convert string slice to DnsRecordType slice
+	var dnsRecordTypes []common.DnsRecordType
+	for _, recordType := range recordTypes {
+		if recordTypeEnum, err := common.NewDnsRecordTypeFromString(recordType); err == nil {
+			dnsRecordTypes = append(dnsRecordTypes, recordTypeEnum)
+		}
+	}
+
 	return dnsfern.DiscoverDnsRecordsConfig{
-		Domain: domain,
+		Domain:      domain,
+		RecordTypes: dnsRecordTypes,
 	}
 }
 

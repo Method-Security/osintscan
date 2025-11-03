@@ -5,6 +5,7 @@ types:
   DiscoverDnsRecordsConfig:
     properties:
       domain: string
+      recordTypes: list<dns.DnsRecordType>
   DiscoverDnsRecordsResult:
     properties:
       dnsRecords: optional<list<dns.DnsRecord>>
