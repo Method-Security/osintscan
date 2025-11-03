@@ -112,27 +112,8 @@ func getDNSRecords(domain string, questionTypes []uint16) ([]*common.DnsRecord, 
 		dnsRecords = append(dnsRecords, populateRecords(results.TXT, "TXT")...)
 	}
 
-	// Handle unknown record types by checking AllRecords for any records we didn't process
-	if len(results.AllRecords) > 0 {
-		// Create a set of processed records to avoid duplicates
-		processedRecords := make(map[string]bool)
-		for _, record := range dnsRecords {
-			processedRecords[record.Value] = true
-		}
-
-		// Check for unprocessed records in AllRecords
-		var unknownRecords []string
-		for _, record := range results.AllRecords {
-			if !processedRecords[record] {
-				unknownRecords = append(unknownRecords, record)
-			}
-		}
-
-		// Add unknown records with UNKNOWN type
-		if len(unknownRecords) > 0 {
-			dnsRecords = append(dnsRecords, populateRecords(unknownRecords, "UNKNOWN")...)
-		}
-	}
+	// Note: We don't process unknown record types to avoid noise from DNS protocol overhead
+	// and non-existent subdomain responses
 
 	return dnsRecords, nil
 }

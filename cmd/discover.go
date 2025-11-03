@@ -160,7 +160,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 
 	// Target Flags
 	discoverDNSRecordsCmd.Flags().String("domain", "", "The domain name to query for DNS records")
-	discoverDNSRecordsCmd.Flags().StringSlice("record-types", []string{"ALL"}, "Comma-separated list of DNS record types to query (A, AAAA, CNAME, MX, NS, SOA, TXT, PTR, SRV, UNKNOWN, ALL)")
+	discoverDNSRecordsCmd.Flags().StringSlice("record-types", []string{"ALL"}, "Comma-separated list of DNS record types to query (A, AAAA, CNAME, MX, NS, SOA, TXT, PTR, SRV, ALL)")
 
 	// Mark Required Flags
 	_ = discoverDNSRecordsCmd.MarkFlagRequired("domain")
