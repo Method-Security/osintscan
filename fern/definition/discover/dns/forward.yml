@@ -13,7 +13,7 @@ types:
     properties:
       lookups: optional<list<LookupDetails>>
 # Report Struct
-  DiscoverDnsForwardReverseReport:
+  DiscoverDnsForwardReport:
     properties:
       config: DiscoverDnsForwardConfig
       result: DiscoverDnsForwardResult
