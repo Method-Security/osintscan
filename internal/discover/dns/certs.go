@@ -28,7 +28,7 @@ func DiscoverDomainCerts(ctx context.Context, config dnsfern.DiscoverDnsCertsCon
 	// Make the HTTP request to crt.sh API
 	resp, err := http.Get(apiURL)
 	if err != nil {
-		log.Warn("Failed to query crt.sh API", 
+		log.Warn("Failed to query crt.sh API",
 			svc1log.SafeParam("domain", config.Domain),
 			svc1log.SafeParam("error", err.Error()))
 		errors = append(errors, err.Error())
@@ -79,7 +79,7 @@ func DiscoverDomainCerts(ctx context.Context, config dnsfern.DiscoverDnsCertsCon
 		Errors: errors,
 	}
 
-	log.Info("Completed certificate discovery", 
+	log.Info("Completed certificate discovery",
 		svc1log.SafeParam("domain", config.Domain),
 		svc1log.SafeParam("certificates_found", len(records)),
 		svc1log.SafeParam("error_count", len(errors)))

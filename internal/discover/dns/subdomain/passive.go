@@ -17,13 +17,13 @@ func GetDomainSubdomainsPassive(ctx context.Context, config dnsfern.DiscoverDnsS
 	log := svc1log.FromContext(ctx)
 	errors := []string{}
 
-	log.Info("Starting passive subdomain discovery", 
+	log.Info("Starting passive subdomain discovery",
 		svc1log.SafeParam("domain", config.Passive.Domain))
 
 	// Get all valid subdomains using passive enumeration
 	subdomains, err := getSubdomainsPassive(ctx, *config.Passive)
 	if err != nil {
-		log.Warn("Passive subdomain discovery encountered errors", 
+		log.Warn("Passive subdomain discovery encountered errors",
 			svc1log.SafeParam("domain", config.Passive.Domain),
 			svc1log.SafeParam("error", err.Error()))
 		errors = append(errors, err.Error())
@@ -39,7 +39,7 @@ func GetDomainSubdomainsPassive(ctx context.Context, config dnsfern.DiscoverDnsS
 		Errors: errors,
 	}
 
-	log.Info("Completed passive subdomain discovery", 
+	log.Info("Completed passive subdomain discovery",
 		svc1log.SafeParam("domain", config.Passive.Domain),
 		svc1log.SafeParam("subdomains_found", len(subdomains)),
 		svc1log.SafeParam("error_count", len(errors)))
@@ -53,7 +53,7 @@ func GetDomainSubdomainsPassive(ctx context.Context, config dnsfern.DiscoverDnsS
 func getSubdomainsPassive(ctx context.Context, config dnsfern.DiscoverDnsSubdomainPassiveConfig) ([]string, error) {
 	log := svc1log.FromContext(ctx)
 
-	log.Debug("Configuring subfinder for passive discovery", 
+	log.Debug("Configuring subfinder for passive discovery",
 		svc1log.SafeParam("domain", config.Domain),
 		svc1log.SafeParam("threads", config.Threads),
 		svc1log.SafeParam("rate_limit", config.RequestsPerSecond))
@@ -69,7 +69,7 @@ func getSubdomainsPassive(ctx context.Context, config dnsfern.DiscoverDnsSubdoma
 	// Initialize subfinder runner
 	subfinder, err := runner.NewRunner(subfinderOpts)
 	if err != nil {
-		log.Warn("Failed to initialize subfinder runner", 
+		log.Warn("Failed to initialize subfinder runner",
 			svc1log.SafeParam("domain", config.Domain),
 			svc1log.SafeParam("error", err.Error()))
 		return []string{}, err
@@ -80,7 +80,7 @@ func getSubdomainsPassive(ctx context.Context, config dnsfern.DiscoverDnsSubdoma
 	output := &bytes.Buffer{}
 	// Run subdomain enumeration for the given domain
 	if err = subfinder.EnumerateSingleDomainWithCtx(ctx, config.Domain, []io.Writer{output}); err != nil {
-		log.Warn("Subfinder enumeration failed", 
+		log.Warn("Subfinder enumeration failed",
 			svc1log.SafeParam("domain", config.Domain),
 			svc1log.SafeParam("error", err.Error()))
 		return []string{}, err
@@ -94,7 +94,7 @@ func getSubdomainsPassive(ctx context.Context, config dnsfern.DiscoverDnsSubdoma
 		subdomains = subdomains[:len(subdomains)-1]
 	}
 
-	log.Debug("Subfinder enumeration completed", 
+	log.Debug("Subfinder enumeration completed",
 		svc1log.SafeParam("domain", config.Domain),
 		svc1log.SafeParam("subdomains_found", len(subdomains)))
 

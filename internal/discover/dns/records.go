@@ -46,8 +46,8 @@ func filterDNSRecordsByType(records []*common.DnsRecord, recordTypes []common.Dn
 // getDNSRecords queries DNS for the specified record types for a domain and returns a DnsRecords struct.
 func getDNSRecords(ctx context.Context, domain string, questionTypes []uint16) ([]*common.DnsRecord, error) {
 	log := svc1log.FromContext(ctx)
-	
-	log.Debug("Querying DNS records", 
+
+	log.Debug("Querying DNS records",
 		svc1log.SafeParam("domain", domain),
 		svc1log.SafeParam("record_types_count", len(questionTypes)))
 
@@ -55,7 +55,7 @@ func getDNSRecords(ctx context.Context, domain string, questionTypes []uint16) (
 	options.QuestionTypes = questionTypes
 	client, err := dnsx.New(options)
 	if err != nil {
-		log.Warn("Failed to create DNS client", 
+		log.Warn("Failed to create DNS client",
 			svc1log.SafeParam("domain", domain),
 			svc1log.SafeParam("error", err.Error()))
 		return []*common.DnsRecord{}, err
@@ -66,7 +66,7 @@ func getDNSRecords(ctx context.Context, domain string, questionTypes []uint16) (
 	// Query all requested DNS record types
 	results, err := client.QueryMultiple(domain)
 	if err != nil {
-		log.Warn("DNS query failed", 
+		log.Warn("DNS query failed",
 			svc1log.SafeParam("domain", domain),
 			svc1log.SafeParam("error", err.Error()))
 		return []*common.DnsRecord{}, err
@@ -130,7 +130,7 @@ func getDNSRecords(ctx context.Context, domain string, questionTypes []uint16) (
 	// Note: We don't process unknown record types to avoid noise from DNS protocol overhead
 	// and non-existent subdomain responses
 
-	log.Debug("Processed DNS records", 
+	log.Debug("Processed DNS records",
 		svc1log.SafeParam("domain", domain),
 		svc1log.SafeParam("total_records", len(dnsRecords)))
 
@@ -143,7 +143,7 @@ func DiscoverDomainDNSRecords(ctx context.Context, config dnsfern.DiscoverDnsRec
 	log := svc1log.FromContext(ctx)
 	errors := []string{}
 
-	log.Info("Starting DNS records discovery", 
+	log.Info("Starting DNS records discovery",
 		svc1log.SafeParam("domain", config.Domain),
 		svc1log.SafeParam("requested_record_types", len(config.RecordTypes)))
 
@@ -151,7 +151,7 @@ func DiscoverDomainDNSRecords(ctx context.Context, config dnsfern.DiscoverDnsRec
 	questionTypes := []uint16{dns.TypeA, dns.TypeAAAA, dns.TypeCAA, dns.TypeCNAME, dns.TypeMX, dns.TypeNS, dns.TypePTR, dns.TypeSOA, dns.TypeSRV, dns.TypeTXT}
 	allDNSRecords, err := getDNSRecords(ctx, config.Domain, questionTypes)
 	if err != nil {
-		log.Warn("Failed to get DNS records", 
+		log.Warn("Failed to get DNS records",
 			svc1log.SafeParam("domain", config.Domain),
 			svc1log.SafeParam("error", err.Error()))
 		errors = append(errors, err.Error())
@@ -159,7 +159,7 @@ func DiscoverDomainDNSRecords(ctx context.Context, config dnsfern.DiscoverDnsRec
 
 	// Filter DNS records based on requested types
 	dnsRecords := filterDNSRecordsByType(allDNSRecords, config.RecordTypes)
-	log.Debug("Filtered DNS records", 
+	log.Debug("Filtered DNS records",
 		svc1log.SafeParam("domain", config.Domain),
 		svc1log.SafeParam("total_records", len(allDNSRecords)),
 		svc1log.SafeParam("filtered_records", len(dnsRecords)))
@@ -169,12 +169,12 @@ func DiscoverDomainDNSRecords(ctx context.Context, config dnsfern.DiscoverDnsRec
 	log.Debug("Querying DMARC records", svc1log.SafeParam("dmarc_domain", dmarcDomain))
 	dmarcRecords, err := getDNSRecords(ctx, dmarcDomain, []uint16{dns.TypeTXT})
 	if err != nil {
-		log.Warn("Failed to get DMARC records", 
+		log.Warn("Failed to get DMARC records",
 			svc1log.SafeParam("dmarc_domain", dmarcDomain),
 			svc1log.SafeParam("error", err.Error()))
 		errors = append(errors, err.Error())
 	} else {
-		log.Debug("Retrieved DMARC records", 
+		log.Debug("Retrieved DMARC records",
 			svc1log.SafeParam("dmarc_domain", dmarcDomain),
 			svc1log.SafeParam("dmarc_record_count", len(dmarcRecords)))
 	}
@@ -183,7 +183,7 @@ func DiscoverDomainDNSRecords(ctx context.Context, config dnsfern.DiscoverDnsRec
 	// but the selector is not known in advance, so check common selectors.
 	dkimRecords := []*common.DnsRecord{}
 	var selectors []string = []string{"default", "selector1", "selector2", "google", "amazonses", "microsoft"}
-	log.Debug("Querying DKIM records", 
+	log.Debug("Querying DKIM records",
 		svc1log.SafeParam("domain", config.Domain),
 		svc1log.SafeParam("selector_count", len(selectors)))
 
@@ -191,13 +191,13 @@ func DiscoverDomainDNSRecords(ctx context.Context, config dnsfern.DiscoverDnsRec
 		dkimDomain := selector + "._domainkey." + config.Domain
 		dkimRecordForSelector, err := getDNSRecords(ctx, dkimDomain, []uint16{dns.TypeTXT})
 		if err != nil {
-			log.Debug("Failed to get DKIM records for selector", 
+			log.Debug("Failed to get DKIM records for selector",
 				svc1log.SafeParam("selector", selector),
 				svc1log.SafeParam("dkim_domain", dkimDomain),
 				svc1log.SafeParam("error", err.Error()))
 			errors = append(errors, err.Error())
 		} else if len(dkimRecordForSelector) > 0 {
-			log.Debug("Retrieved DKIM records for selector", 
+			log.Debug("Retrieved DKIM records for selector",
 				svc1log.SafeParam("selector", selector),
 				svc1log.SafeParam("dkim_domain", dkimDomain),
 				svc1log.SafeParam("dkim_record_count", len(dkimRecordForSelector)))
@@ -216,7 +216,7 @@ func DiscoverDomainDNSRecords(ctx context.Context, config dnsfern.DiscoverDnsRec
 		Errors: errors,
 	}
 
-	log.Info("Completed DNS records discovery", 
+	log.Info("Completed DNS records discovery",
 		svc1log.SafeParam("domain", config.Domain),
 		svc1log.SafeParam("dns_records", len(dnsRecords)),
 		svc1log.SafeParam("dmarc_records", len(dmarcRecords)),
