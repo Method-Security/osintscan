@@ -10,6 +10,12 @@ import (
 	"github.com/projectdiscovery/subfinder/v2/pkg/runner"
 )
 
+// ContextKey is the type for context keys used in the subdomain passive workflow.
+type ContextKey string
+
+// ContextKeyAllSources enables using all passive sources in subfinder when set to true in the context.
+const ContextKeyAllSources ContextKey = "osintscan:discover:dns:subdomain:passive:all-sources"
+
 // GetDomainSubdomainsPassive queries subfinder for all subdomains for a given domain using passive sources.
 // Returns a report containing all discovered subdomains and any errors encountered.
 func GetDomainSubdomainsPassive(ctx context.Context, config dnsfern.DiscoverDnsSubdomainConfig) (dnsfern.DiscoverDnsSubdomainReport, error) {
@@ -58,7 +64,9 @@ func getSubdomainsPassive(ctx context.Context, config dnsfern.DiscoverDnsSubdoma
 		svc1log.SafeParam("rate_limit", config.RequestsPerSecond))
 
 	// Set subfinder config
+	useAllSources, _ := ctx.Value(ContextKeyAllSources).(bool)
 	subfinderOpts := &runner.Options{
+		All:                useAllSources,
 		Threads:            config.Threads,
 		Timeout:            30,
 		MaxEnumerationTime: 10,

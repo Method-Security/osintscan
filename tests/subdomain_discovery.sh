@@ -25,8 +25,9 @@ fi
 echo "[+] Ensuring new image is built and ready to launch"
 ./tests/build_new_release.sh
 
+export COMMAND="docker run osintscan:local discover dns subdomain passive --domain "$TEST_DOMAIN" --all-sources -o json | jq"
 echo "[+] Running subdomain discovery"
-export RESULTS=$(docker run osintscan:local discover dns subdomain passive --domain "$TEST_DOMAIN" -o json | jq)
+export RESULTS=$($COMMAND)
 
 echo "[+] Checking if results are not empty"
 if [ -z "$RESULTS" ]; then
@@ -71,10 +72,10 @@ fi
 echo "[+] Saving Results to $OUTPUT_FILE"
 if [ ! -f "$OUTPUT_FILE" ]; then
     echo "[+] File does not exist, Creating file"
-    echo '"domain","start_time","total_domains","domains_found"' > "$OUTPUT_FILE"
+    echo '"domain","start_time","total_domains","domains_found","command"' > "$OUTPUT_FILE"
 fi
 
-echo "\"$TEST_DOMAIN\",\"$RUNTIME\",\"$TOTAL_DOMAINS\",\"$DOMAINS_ARRAY\"" >> "$OUTPUT_FILE"
+echo "\"$TEST_DOMAIN\",\"$RUNTIME\",\"$TOTAL_DOMAINS\",\"$DOMAINS_ARRAY\",\"$COMMAND\"" >> "$OUTPUT_FILE"
 
 if [ "$ERROR" -eq 1 ]; then
     echo "[!] Error: current total ($TOTAL_DOMAINS) is less than previous ($PREV_TOTAL)"
