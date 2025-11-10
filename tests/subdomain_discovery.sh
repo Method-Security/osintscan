@@ -27,6 +27,7 @@ echo "[+] Ensuring new image is built and ready to launch"
 
 export COMMAND="docker run osintscan:local discover dns subdomain passive --domain "$TEST_DOMAIN" --all-sources -o json | jq"
 echo "[+] Running subdomain discovery"
+echo "[+] Command: $COMMAND"
 export RESULTS=$($COMMAND)
 
 echo "[+] Checking if results are not empty"
