@@ -188,7 +188,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 
 			config := getDiscoverDNSForwardConfig(domain, dnsResolvers)
 
-			report := dns.GetForwardDNSLookup(config)
+			report := dns.GetForwardDNSLookup(cmd.Context(), config)
 			a.OutputSignal.Content = report
 		},
 	}
