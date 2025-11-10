@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"io"
-	"strings"
 
 	dnsfern "github.com/Method-Security/osintscan/generated/go/discover/dns"
 	"github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
@@ -79,19 +78,18 @@ func getSubdomainsPassive(ctx context.Context, config dnsfern.DiscoverDnsSubdoma
 
 	output := &bytes.Buffer{}
 	// Run subdomain enumeration for the given domain
-	if err = subfinder.EnumerateSingleDomainWithCtx(ctx, config.Domain, []io.Writer{output}); err != nil {
+	results, err := subfinder.EnumerateSingleDomainWithCtx(ctx, config.Domain, []io.Writer{output})
+	if err != nil {
 		log.Warn("Subfinder enumeration failed",
 			svc1log.SafeParam("domain", config.Domain),
 			svc1log.SafeParam("error", err.Error()))
 		return []string{}, err
 	}
 
-	// Convert output buffer to string and split by new line
-	subdomains := strings.Split(output.String(), "\n")
-
-	// Remove trailing empty string if present
-	if len(subdomains) > 0 && subdomains[len(subdomains)-1] == "" {
-		subdomains = subdomains[:len(subdomains)-1]
+	// Collect subdomains from results map keys
+	subdomains := make([]string, 0, len(results))
+	for sub := range results {
+		subdomains = append(subdomains, sub)
 	}
 
 	log.Debug("Subfinder enumeration completed",

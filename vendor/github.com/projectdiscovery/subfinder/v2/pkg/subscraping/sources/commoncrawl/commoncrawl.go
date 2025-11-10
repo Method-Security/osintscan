@@ -59,13 +59,13 @@ func (s *Source) Run(ctx context.Context, domain string, session *subscraping.Se
 		if err != nil {
 			results <- subscraping.Result{Source: s.Name(), Type: subscraping.Error, Error: err}
 			s.errors++
-			resp.Body.Close()
+			session.DiscardHTTPResponse(resp)
 			return
 		}
-		resp.Body.Close()
+		session.DiscardHTTPResponse(resp)
 
 		years := make([]string, 0)
-		for i := 0; i < maxYearsBack; i++ {
+		for i := range maxYearsBack {
 			years = append(years, strconv.Itoa(year-i))
 		}
 
@@ -131,6 +131,7 @@ func (s *Source) getSubdomains(ctx context.Context, searchURL, domain string, se
 			resp, err := session.Get(ctx, fmt.Sprintf("%s?url=*.%s", searchURL, domain), "", headers)
 			if err != nil {
 				results <- subscraping.Result{Source: s.Name(), Type: subscraping.Error, Error: err}
+				s.errors++
 				session.DiscardHTTPResponse(resp)
 				return false
 			}
@@ -150,10 +151,11 @@ func (s *Source) getSubdomains(ctx context.Context, searchURL, domain string, se
 						subdomain = strings.TrimPrefix(subdomain, "2f")
 
 						results <- subscraping.Result{Source: s.Name(), Type: subscraping.Subdomain, Value: subdomain}
+						s.results++
 					}
 				}
 			}
-			resp.Body.Close()
+			session.DiscardHTTPResponse(resp)
 			return true
 		}
 	}
