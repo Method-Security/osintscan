@@ -34,6 +34,7 @@ types:
       domain: string
       requestsPerSecond: integer
       threads: integer
+      allSources: boolean
 # Reports
   DiscoverDnsSubdomainConfig:
     discriminant: discoveryType
