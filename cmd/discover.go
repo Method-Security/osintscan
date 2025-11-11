@@ -2,7 +2,6 @@ package cmd
 
 import (
 	// Standard
-	"context"
 	"fmt"
 	"net"
 	"os"
@@ -474,18 +473,12 @@ func (a *OsintScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			allSources, err := cmd.Flags().GetBool("all-sources")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
 
 			// Create config
 			config := getDiscoverDNSPassiveSubdomainConfig(domain, requestsPerSecond, threads)
 
 			// Create report
-			ctx := context.WithValue(cmd.Context(), subdomain.ContextKeyAllSources, allSources)
-			report, err := subdomain.GetDomainSubdomainsPassive(ctx, config)
+			report, err := subdomain.GetDomainSubdomainsPassive(cmd.Context(), config)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -498,7 +491,6 @@ func (a *OsintScan) InitDiscoverCommand() {
 	discoverDNSSubdomainPassiveCmd.Flags().String("domain", "", "The domain name to passively enumerate subdomains for")
 	discoverDNSSubdomainPassiveCmd.Flags().Int("requests-per-second", 0, "Maximum number of requests per second to send to the DNS resolvers")
 	discoverDNSSubdomainPassiveCmd.Flags().Int("threads", 10, "Number of concurrent threads for scanning")
-	discoverDNSSubdomainPassiveCmd.Flags().Bool("all-sources", false, "Use all passive sources for enumeration (slow)")
 
 	// Mark Required Flags
 	_ = discoverDNSSubdomainPassiveCmd.MarkFlagRequired("domain")
