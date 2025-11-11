@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"sort"
 
 	dnsfern "github.com/Method-Security/osintscan/generated/go/discover/dns"
 	"github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
@@ -92,6 +93,9 @@ func getSubdomainsPassive(ctx context.Context, config dnsfern.DiscoverDnsSubdoma
 	for sub := range results {
 		subdomains = append(subdomains, sub)
 	}
+
+	// Sort subdomains for deterministic output
+	sort.Strings(subdomains)
 
 	log.Debug("Subfinder enumeration completed",
 		svc1log.SafeParam("domain", config.Domain),
