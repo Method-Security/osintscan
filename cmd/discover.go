@@ -473,9 +473,14 @@ func (a *OsintScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
+			allSources, err := cmd.Flags().GetBool("all-sources")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
 
 			// Create config
-			config := getDiscoverDNSPassiveSubdomainConfig(domain, requestsPerSecond, threads)
+			config := getDiscoverDNSPassiveSubdomainConfig(domain, requestsPerSecond, threads, allSources)
 
 			// Create report
 			report, err := subdomain.GetDomainSubdomainsPassive(cmd.Context(), config)
@@ -491,6 +496,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 	discoverDNSSubdomainPassiveCmd.Flags().String("domain", "", "The domain name to passively enumerate subdomains for")
 	discoverDNSSubdomainPassiveCmd.Flags().Int("requests-per-second", 0, "Maximum number of requests per second to send to the DNS resolvers")
 	discoverDNSSubdomainPassiveCmd.Flags().Int("threads", 10, "Number of concurrent threads for scanning")
+	discoverDNSSubdomainPassiveCmd.Flags().Bool("all-sources", false, "Use all passive sources (subfinder equivalent of --all)")
 
 	// Mark Required Flags
 	_ = discoverDNSSubdomainPassiveCmd.MarkFlagRequired("domain")
@@ -809,13 +815,14 @@ func getDiscoverDNSCorrelationSubdomainConfig(domains []string, threads int, tim
 }
 
 // getDiscoverDNSPassiveSubdomainConfig creates and returns a configuration for passive subdomain discovery
-func getDiscoverDNSPassiveSubdomainConfig(domain string, requestsPerSecond int, threads int) dnsfern.DiscoverDnsSubdomainConfig {
+func getDiscoverDNSPassiveSubdomainConfig(domain string, requestsPerSecond int, threads int, allSources bool) dnsfern.DiscoverDnsSubdomainConfig {
 	return dnsfern.DiscoverDnsSubdomainConfig{
 		DiscoveryType: strings.ToLower(string(dnsfern.DiscoverDnsSubdomainTypePassive)),
 		Passive: &dnsfern.DiscoverDnsSubdomainPassiveConfig{
 			Domain:            domain,
 			RequestsPerSecond: requestsPerSecond,
 			Threads:           threads,
+			AllSources:        allSources,
 		},
 	}
 }
