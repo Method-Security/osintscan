@@ -13,9 +13,6 @@ import (
 // ContextKey is the type for context keys used in the subdomain passive workflow.
 type ContextKey string
 
-// ContextKeyAllSources enables using all passive sources in subfinder when set to true in the context.
-const ContextKeyAllSources ContextKey = "osintscan:discover:dns:subdomain:passive:all-sources"
-
 // GetDomainSubdomainsPassive queries subfinder for all subdomains for a given domain using passive sources.
 // Returns a report containing all discovered subdomains and any errors encountered.
 func GetDomainSubdomainsPassive(ctx context.Context, config dnsfern.DiscoverDnsSubdomainConfig) (dnsfern.DiscoverDnsSubdomainReport, error) {
@@ -52,8 +49,6 @@ func GetDomainSubdomainsPassive(ctx context.Context, config dnsfern.DiscoverDnsS
 	return report, nil
 }
 
-// SubdomainsEnumReport represents the report of all subdomains for a given domain including all non-fatal errors that occurred.
-
 // getSubdomainsPassive runs subfinder in passive mode for a single domain and returns the discovered subdomains.
 func getSubdomainsPassive(ctx context.Context, config dnsfern.DiscoverDnsSubdomainPassiveConfig) ([]string, error) {
 	log := svc1log.FromContext(ctx)
@@ -61,12 +56,13 @@ func getSubdomainsPassive(ctx context.Context, config dnsfern.DiscoverDnsSubdoma
 	log.Debug("Configuring subfinder for passive discovery",
 		svc1log.SafeParam("domain", config.Domain),
 		svc1log.SafeParam("threads", config.Threads),
-		svc1log.SafeParam("rate_limit", config.RequestsPerSecond))
+		svc1log.SafeParam("rate_limit", config.RequestsPerSecond),
+		svc1log.SafeParam("all_sources", config.AllSources),
+	)
 
 	// Set subfinder config
-	useAllSources, _ := ctx.Value(ContextKeyAllSources).(bool)
 	subfinderOpts := &runner.Options{
-		All:                useAllSources,
+		All:                config.AllSources,
 		Threads:            config.Threads,
 		Timeout:            30,
 		MaxEnumerationTime: 10,
