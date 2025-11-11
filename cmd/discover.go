@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"strings"
+	"encoding/json"
 
 	// Generated
 	common "github.com/Method-Security/osintscan/generated/go/common"
@@ -478,9 +479,39 @@ func (a *OsintScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
+			module, err := cmd.Flags().GetString("module")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			if module != "" {
+				switch strings.ToLower(module) {
+				case "subfinder", "amass", "all":
+				default:
+					a.OutputSignal.AddError(fmt.Errorf("invalid value for --module: %s (allowed: subfinder, amass, all)", module))
+					return
+				}
+			}
 
 			// Create config
 			config := getDiscoverDNSPassiveSubdomainConfig(domain, requestsPerSecond, threads, allSources)
+
+			// Inject module into passive config extra properties (works without regenerating SDKs)
+			if module != "" && config.Passive != nil {
+				passiveMap := map[string]interface{}{
+					"domain":             config.Passive.GetDomain(),
+					"requestsPerSecond":  config.Passive.GetRequestsPerSecond(),
+					"threads":            config.Passive.GetThreads(),
+					"allSources":         config.Passive.GetAllSources(),
+					"module":             strings.ToLower(module),
+				}
+				if data, mErr := json.Marshal(passiveMap); mErr == nil {
+					var withModule dnsfern.DiscoverDnsSubdomainPassiveConfig
+					if uErr := json.Unmarshal(data, &withModule); uErr == nil {
+						config.Passive = &withModule
+					}
+				}
+			}
 
 			// Create report
 			report, err := subdomain.GetDomainSubdomainsPassive(cmd.Context(), config)
@@ -497,6 +528,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 	discoverDNSSubdomainPassiveCmd.Flags().Int("requests-per-second", 0, "Maximum number of requests per second to send to the DNS resolvers")
 	discoverDNSSubdomainPassiveCmd.Flags().Int("threads", 10, "Number of concurrent threads for scanning")
 	discoverDNSSubdomainPassiveCmd.Flags().Bool("all-sources", false, "Use all passive sources (subfinder equivalent of --all)")
+	discoverDNSSubdomainPassiveCmd.Flags().String("module", "", "Which passive module to run: subfinder, amass, or all (default: subfinder)")
 
 	// Mark Required Flags
 	_ = discoverDNSSubdomainPassiveCmd.MarkFlagRequired("domain")
