@@ -10,9 +10,6 @@ import (
 	"github.com/projectdiscovery/subfinder/v2/pkg/runner"
 )
 
-// ContextKey is the type for context keys used in the subdomain passive workflow.
-type ContextKey string
-
 // GetDomainSubdomainsPassive queries subfinder for all subdomains for a given domain using passive sources.
 // Returns a report containing all discovered subdomains and any errors encountered.
 func GetDomainSubdomainsPassive(ctx context.Context, config dnsfern.DiscoverDnsSubdomainConfig) (dnsfern.DiscoverDnsSubdomainReport, error) {
