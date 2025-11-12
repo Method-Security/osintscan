@@ -19,7 +19,7 @@ import (
 func GetSubdomainsPassiveWithAmass(ctx context.Context, cfg dnsfern.DiscoverDnsSubdomainPassiveConfig) ([]string, error) {
 	log := svc1log.FromContext(ctx)
 
-	log.Info("Configuring amass v4 for passive discovery",
+	log.Info("Configuring Amass v4 for passive discovery",
 		svc1log.SafeParam("domain", cfg.Domain),
 	)
 
