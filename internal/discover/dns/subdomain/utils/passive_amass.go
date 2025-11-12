@@ -62,7 +62,6 @@ func GetSubdomainsPassiveWithAmass(ctx context.Context, cfg dnsfern.DiscoverDnsS
 			svc1log.SafeParam("error", err.Error()))
 		return []string{}, err
 	}
-	defer sys.Shutdown()
 
 	// Load all available data sources
 	allSources := datasrcs.GetAllSources(sys)
