@@ -53,7 +53,7 @@ func GetDomainSubdomainsPassive(ctx context.Context, config dnsfern.DiscoverDnsS
 	if runAmass {
 		amassSubs, amassErr := subutils.GetSubdomainsPassiveWithAmass(ctx, *config.Passive)
 		if amassErr != nil {
-			log.Warn("Passive subdomain discovery (amass v5) encountered errors",
+			log.Warn("Passive subdomain discovery (amass v4) encountered errors",
 				svc1log.SafeParam("domain", config.Passive.Domain),
 				svc1log.SafeParam("error", amassErr.Error()))
 			errors = append(errors, amassErr.Error())
