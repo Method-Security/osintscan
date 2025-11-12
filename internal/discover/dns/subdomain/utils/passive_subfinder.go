@@ -67,5 +67,3 @@ func GetSubdomainsPassiveWithSubfinder(ctx context.Context, cfg dnsfern.Discover
 
 	return subdomains, nil
 }
-
-
