@@ -281,17 +281,6 @@ func UsableSize(p uintptr) Tsize_t {
 	return heapUsable[p]
 }
 
-type MemAllocatorStat struct {
-	Allocs int
-	Bytes  int
-	Mmaps  int
-}
-
-// MemStat no-op for this build tag
-func MemStat() MemAllocatorStat {
-	return MemAllocatorStat{}
-}
-
 // MemAuditStart locks the memory allocator, initializes and enables memory
 // auditing. Finaly it unlocks the memory allocator.
 //

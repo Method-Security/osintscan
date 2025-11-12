@@ -1,7 +1,3 @@
-// Copyright © by Jeff Foley 2017-2025. All rights reserved.
-// Use of this source code is governed by Apache 2 LICENSE that can be found in the LICENSE file.
-// SPDX-License-Identifier: Apache-2.0
-
 package network
 
 import (
@@ -22,17 +18,12 @@ type IPAddress struct {
 	Type string `json:"type"`
 }
 
-// Key implements the Asset interface.
-func (ip IPAddress) Key() string {
-	return ip.Address.String()
-}
-
-// AssetType implements the Asset interface.
-func (ip IPAddress) AssetType() model.AssetType {
+// AssetType returns the asset type.
+func (i IPAddress) AssetType() model.AssetType {
 	return model.IPAddress
 }
 
-// JSON implements the Asset interface.
-func (ip IPAddress) JSON() ([]byte, error) {
-	return json.Marshal(ip)
+// JSON returns the JSON encoding of the struct.
+func (i IPAddress) JSON() ([]byte, error) {
+	return json.Marshal(i)
 }

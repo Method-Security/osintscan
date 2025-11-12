@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
-	"sync"
 
 	"github.com/jinzhu/inflection"
 	"golang.org/x/text/cases"
@@ -33,8 +32,6 @@ type Relationships struct {
 	Relations map[string]*Relationship
 
 	EmbeddedRelations map[string]*Relationships
-
-	Mux sync.RWMutex
 }
 
 type Relationship struct {
@@ -75,8 +72,10 @@ func (schema *Schema) parseRelation(field *Field) *Relationship {
 		}
 	)
 
-	if relation.FieldSchema, err = getOrParse(fieldValue, schema.cacheStore, schema.namer); err != nil {
-		schema.err = fmt.Errorf("failed to parse field: %s, error: %w", field.Name, err)
+	cacheStore := schema.cacheStore
+
+	if relation.FieldSchema, err = getOrParse(fieldValue, cacheStore, schema.namer); err != nil {
+		schema.err = err
 		return nil
 	}
 
@@ -99,10 +98,9 @@ func (schema *Schema) parseRelation(field *Field) *Relationship {
 	}
 
 	if relation.Type == has {
+		// don't add relations to embedded schema, which might be shared
 		if relation.FieldSchema != relation.Schema && relation.Polymorphic == nil && field.OwnerSchema == nil {
-			relation.FieldSchema.Relationships.Mux.Lock()
 			relation.FieldSchema.Relationships.Relations["_"+relation.Schema.Name+"_"+relation.Name] = relation
-			relation.FieldSchema.Relationships.Mux.Unlock()
 		}
 
 		switch field.IndirectFieldType.Kind() {
@@ -145,9 +143,6 @@ func hasPolymorphicRelation(tagSettings map[string]string) bool {
 }
 
 func (schema *Schema) setRelation(relation *Relationship) {
-	schema.Relationships.Mux.Lock()
-	defer schema.Relationships.Mux.Unlock()
-
 	// set non-embedded relation
 	if rel := schema.Relationships.Relations[relation.Name]; rel != nil {
 		if len(rel.Field.BindNames) > 1 {
@@ -591,20 +586,12 @@ func (schema *Schema) guessRelation(relation *Relationship, field *Field, cgl gu
 	// build references
 	for idx, foreignField := range foreignFields {
 		// use same data type for foreign keys
-		schema.Relationships.Mux.Lock()
-		if schema != foreignField.Schema {
-			foreignField.Schema.Relationships.Mux.Lock()
-		}
 		if copyableDataType(primaryFields[idx].DataType) {
 			foreignField.DataType = primaryFields[idx].DataType
 		}
 		foreignField.GORMDataType = primaryFields[idx].GORMDataType
 		if foreignField.Size == 0 {
 			foreignField.Size = primaryFields[idx].Size
-		}
-		schema.Relationships.Mux.Unlock()
-		if schema != foreignField.Schema {
-			foreignField.Schema.Relationships.Mux.Unlock()
 		}
 
 		relation.References = append(relation.References, &Reference{
@@ -672,7 +659,6 @@ func (rel *Relationship) ParseConstraint() *Constraint {
 					if !(rel.References[idx].PrimaryKey == ref.PrimaryKey && rel.References[idx].ForeignKey == ref.ForeignKey &&
 						rel.References[idx].PrimaryValue == ref.PrimaryValue) {
 						matched = false
-						break
 					}
 				}
 
@@ -685,7 +671,7 @@ func (rel *Relationship) ParseConstraint() *Constraint {
 
 	var (
 		name     string
-		idx      = strings.IndexByte(str, ',')
+		idx      = strings.Index(str, ",")
 		settings = ParseTagSetting(str, ",")
 	)
 
@@ -772,9 +758,8 @@ func (rel *Relationship) ToQueryConditions(ctx context.Context, reflectValue ref
 }
 
 func copyableDataType(str DataType) bool {
-	lowerStr := strings.ToLower(string(str))
 	for _, s := range []string{"auto_increment", "primary key"} {
-		if strings.Contains(lowerStr, s) {
+		if strings.Contains(strings.ToLower(string(str)), s) {
 			return false
 		}
 	}

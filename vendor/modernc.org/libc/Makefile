@@ -32,13 +32,13 @@ download:
 	@if [ ! -f $(TAR) ]; then wget $(URL) ; fi
 
 edit:
-	@if [ -f "Session.vim" ]; then gvim -S & else gvim -p Makefile go.mod builder.json & fi
+	@if [ -f "Session.vim" ]; then novim -S & else novim -p Makefile go.mod builder.json & fi
 
 editor:
-	# gofmt -l -s -w *.go
+	gofmt -l -s -w *.go
 	go test -c -o /dev/null
-	go build -o /dev/null -v generator*.go
-	go vet 2>&1 | grep -n 'asm_' || true
+	go install -v
+	go build -o /dev/null generator*.go
 
 generate: download
 	mkdir -p $(DIR) || true

@@ -1,11 +1,6 @@
-// Copyright © by Jeff Foley 2017-2025. All rights reserved.
-// Use of this source code is governed by Apache 2 LICENSE that can be found in the LICENSE file.
-// SPDX-License-Identifier: Apache-2.0
-
 package open_asset_model
 
 type Asset interface {
-	Key() string
 	AssetType() AssetType
 	JSON() ([]byte, error)
 }
@@ -13,31 +8,63 @@ type Asset interface {
 type AssetType string
 
 const (
-	Account          AssetType = "Account"
-	AutnumRecord     AssetType = "AutnumRecord"
-	AutonomousSystem AssetType = "AutonomousSystem"
-	ContactRecord    AssetType = "ContactRecord"
-	DomainRecord     AssetType = "DomainRecord"
-	File             AssetType = "File"
-	FQDN             AssetType = "FQDN"
-	FundsTransfer    AssetType = "FundsTransfer"
-	Identifier       AssetType = "Identifier"
-	IPAddress        AssetType = "IPAddress"
-	IPNetRecord      AssetType = "IPNetRecord"
-	Location         AssetType = "Location"
-	Netblock         AssetType = "Netblock"
-	Organization     AssetType = "Organization"
-	Person           AssetType = "Person"
-	Phone            AssetType = "Phone"
-	Product          AssetType = "Product"
-	ProductRelease   AssetType = "ProductRelease"
-	Service          AssetType = "Service"
-	TLSCertificate   AssetType = "TLSCertificate"
-	URL              AssetType = "URL"
+	IPAddress AssetType = "IPAddress"
+	Netblock  AssetType = "Netblock"
+	ASN       AssetType = "ASN"
+	RIROrg    AssetType = "RIROrg"
+	FQDN      AssetType = "FQDN"
 )
 
-var AssetList = []AssetType{
-	Account, AutnumRecord, AutonomousSystem, ContactRecord, DomainRecord, File, FQDN, FundsTransfer,
-	Identifier, IPAddress, IPNetRecord, Location, Netblock, Organization, Person, Phone, Product,
-	ProductRelease, Service, TLSCertificate, URL,
+var ipRels = map[string][]AssetType{}
+
+var netblockRels = map[string][]AssetType{
+	"contains": {IPAddress},
+}
+
+var asnRels = map[string][]AssetType{
+	"announces":  {Netblock},
+	"managed_by": {RIROrg},
+}
+
+var rirOrgRels = map[string][]AssetType{}
+
+var fqdnRels = map[string][]AssetType{
+	"a_record":     {IPAddress},
+	"aaaa_record":  {IPAddress},
+	"cname_record": {FQDN},
+	"ns_record":    {FQDN},
+	"ptr_record":   {FQDN},
+	"mx_record":    {FQDN},
+	"srv_record":   {FQDN, IPAddress},
+	"node":         {FQDN},
+}
+
+// ValidRelationship returns true if the relation is valid in the taxonomy
+// when outgoing from the source asset type to the destination asset type.
+func ValidRelationship(source AssetType, relation string, destination AssetType) bool {
+	var relations map[string][]AssetType
+
+	switch source {
+	case IPAddress:
+		relations = ipRels
+	case Netblock:
+		relations = netblockRels
+	case ASN:
+		relations = asnRels
+	case RIROrg:
+		relations = rirOrgRels
+	case FQDN:
+		relations = fqdnRels
+	default:
+		return false
+	}
+
+	if atypes, ok := relations[relation]; ok {
+		for _, atype := range atypes {
+			if atype == destination {
+				return true
+			}
+		}
+	}
+	return false
 }

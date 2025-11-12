@@ -139,11 +139,7 @@ func Xremove(t *TLS, pathname uintptr) int32 {
 	if __ccgo_strace {
 		trc("t=%v pathname=%v, (%v:)", t, pathname, origin(2))
 	}
-	if err := os.Remove(GoString(pathname)); err != nil {
-		t.setErrno(err)
-		return -1
-	}
-	return 0
+	panic(todo(""))
 }
 
 // long pathconf(const char *path, int name);
@@ -1296,6 +1292,21 @@ func Xstrftime(tls *TLS, s uintptr, n size_t, f uintptr, tm uintptr) (r size_t) 
 	}
 	return r
 
+}
+
+func Xgmtime_r(tls *TLS, t uintptr, tm uintptr) (r uintptr) {
+	if __ccgo_strace {
+		trc("tls=%v t=%v tm=%v, (%v:)", tls, t, tm, origin(2))
+		defer func() { trc("-> %v", r) }()
+	}
+	if x___secs_to_tm(tls, int64(*(*time_t)(unsafe.Pointer(t))), tm) < 0 {
+		*(*int32)(unsafe.Pointer(X__errno_location(tls))) = int32(errno.EOVERFLOW)
+		return uintptr(0)
+	}
+	(*ctime.Tm)(unsafe.Pointer(tm)).Ftm_isdst = 0
+	(*ctime.Tm)(unsafe.Pointer(tm)).Ftm_gmtoff = 0
+	(*ctime.Tm)(unsafe.Pointer(tm)).Ftm_zone = uintptr(unsafe.Pointer(&x___utc))
+	return tm
 }
 
 func x___secs_to_tm(tls *TLS, t int64, tm uintptr) (r int32) {

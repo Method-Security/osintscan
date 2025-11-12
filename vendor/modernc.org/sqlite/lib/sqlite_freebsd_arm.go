@@ -113799,8 +113799,8 @@ var mu mutex
 func init() { mu.recursive = true }
 
 func Xsqlite3_initialize(tls *libc.TLS) int32 {
-	mutexEnter(tls, uintptr(unsafe.Pointer(&mu)))
-	defer mutexLeave(tls, uintptr(unsafe.Pointer(&mu)))
+	mu.enter(tls.ID)
+	defer mu.leave(tls.ID)
 
 	var pMainMtx uintptr
 	var rc int32

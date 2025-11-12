@@ -42,7 +42,6 @@ type TLS struct {
 	jumpBuffers []uintptr
 	lastError   uint32
 	pthreadData
-	sp    int
 	stack stackHeader
 
 	ID                 int32
@@ -66,11 +65,6 @@ func newTLS(detached bool) *TLS {
 	t.errnop = t.Alloc(int(unsafe.Sizeof(int32(0))))
 	*(*int32)(unsafe.Pointer(t.errnop)) = 0
 	return t
-}
-
-// StackSlots reports the number of tls stack slots currently in use.
-func (tls *TLS) StackSlots() int {
-	return tls.sp
 }
 
 func (t *TLS) alloca(n size_t) (r uintptr) {
@@ -189,7 +183,7 @@ func Xpthread_attr_setstacksize(t *TLS, attr uintptr, stackSize types.Size_t) in
 	if __ccgo_strace {
 		trc("t=%v attr=%v stackSize=%v, (%v:)", t, attr, stackSize, origin(2))
 	}
-	return 0
+	panic(todo(""))
 }
 
 // Go side data of pthread_cond_t.

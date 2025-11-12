@@ -161,7 +161,7 @@ type derivedTypeInfo struct {
 // The result of this call can be passed into RegisterTypes to complete the process.
 func (c *Conn) LoadTypes(ctx context.Context, typeNames []string) ([]*pgtype.Type, error) {
 	m := c.TypeMap()
-	if len(typeNames) == 0 {
+	if typeNames == nil || len(typeNames) == 0 {
 		return nil, fmt.Errorf("No type names were supplied.")
 	}
 
@@ -169,7 +169,13 @@ func (c *Conn) LoadTypes(ctx context.Context, typeNames []string) ([]*pgtype.Typ
 	// the SQL not support recent structures such as multirange
 	serverVersion, _ := serverVersion(c)
 	sql := buildLoadDerivedTypesSQL(serverVersion, typeNames)
-	rows, err := c.Query(ctx, sql, QueryExecModeSimpleProtocol, typeNames)
+	var rows Rows
+	var err error
+	if typeNames == nil {
+		rows, err = c.Query(ctx, sql, QueryExecModeSimpleProtocol)
+	} else {
+		rows, err = c.Query(ctx, sql, QueryExecModeSimpleProtocol, typeNames)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("While generating load types query: %w", err)
 	}
@@ -226,15 +232,15 @@ func (c *Conn) LoadTypes(ctx context.Context, typeNames []string) ([]*pgtype.Typ
 		default:
 			return nil, fmt.Errorf("Unknown typtype %q was found while registering %q", ti.Typtype, ti.TypeName)
 		}
-
-		// the type_ is imposible to be null
-		m.RegisterType(type_)
-		if ti.NspName != "" {
-			nspType := &pgtype.Type{Name: ti.NspName + "." + type_.Name, OID: type_.OID, Codec: type_.Codec}
-			m.RegisterType(nspType)
-			result = append(result, nspType)
+		if type_ != nil {
+			m.RegisterType(type_)
+			if ti.NspName != "" {
+				nspType := &pgtype.Type{Name: ti.NspName + "." + type_.Name, OID: type_.OID, Codec: type_.Codec}
+				m.RegisterType(nspType)
+				result = append(result, nspType)
+			}
+			result = append(result, type_)
 		}
-		result = append(result, type_)
 	}
 	return result, nil
 }

@@ -1,7 +1,4 @@
-// Copyright © by Jeff Foley 2017-2025. All rights reserved.
-// Use of this source code is governed by Apache 2 LICENSE that can be found in the LICENSE file.
-// SPDX-License-Identifier: Apache-2.0
-
+// Package types provides types that represent models in databases but are not tied to a specific database implementation.
 package types
 
 import (
@@ -10,38 +7,22 @@ import (
 	oam "github.com/owasp-amass/open-asset-model"
 )
 
-// Entity represents an entity in the asset database.
-type Entity struct {
-	ID        string
-	CreatedAt time.Time
+// Asset represents an asset in the asset database.
+// It contains an ID and the corresponding oam.Asset.
+type Asset struct {
+	ID        string    // The unique identifier of the asset.
+	CreatedAt time.Time // The creation timestamp of the asset.
 	LastSeen  time.Time
-	Asset     oam.Asset
+	Asset     oam.Asset // The actual asset data.
 }
 
-// EntityTag represents additional metadata added to an entity in the asset database.
-type EntityTag struct {
-	ID        string
+// Relation represents a relationship between two assets in the asset database.
+// It contains an ID, a type describing the relationship, and references to the source and destination assets.
+type Relation struct {
+	ID        string // The unique identifier of the relation.
+	Type      string // The type of the relationship.
 	CreatedAt time.Time
 	LastSeen  time.Time
-	Property  oam.Property
-	Entity    *Entity
-}
-
-// Edge represents a relationship between two entities in the asset database.
-type Edge struct {
-	ID         string
-	CreatedAt  time.Time
-	LastSeen   time.Time
-	Relation   oam.Relation
-	FromEntity *Entity
-	ToEntity   *Entity
-}
-
-// EdgeTag represents additional metadata added to an edge in the asset database.
-type EdgeTag struct {
-	ID        string
-	CreatedAt time.Time
-	LastSeen  time.Time
-	Property  oam.Property
-	Edge      *Edge
+	FromAsset *Asset // The source asset of the relation.
+	ToAsset   *Asset // The destination asset of the relation.
 }
