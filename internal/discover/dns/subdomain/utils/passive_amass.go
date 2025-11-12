@@ -21,9 +21,6 @@ func GetSubdomainsPassiveWithAmass(ctx context.Context, cfg dnsfern.DiscoverDnsS
 
 	log.Info("Configuring amass v4 for passive discovery",
 		svc1log.SafeParam("domain", cfg.Domain),
-		svc1log.SafeParam("threads", cfg.Threads),
-		svc1log.SafeParam("rate_limit", cfg.RequestsPerSecond),
-		svc1log.SafeParam("all_sources", cfg.AllSources),
 	)
 
 	// Build amass v4 config
@@ -168,7 +165,6 @@ func GetSubdomainsPassiveWithAmass(ctx context.Context, cfg dnsfern.DiscoverDnsS
 		if fqdn, ok := asset.Asset.(domain.FQDN); ok {
 			if _, exists := found[fqdn.Name]; !exists {
 				found[fqdn.Name] = struct{}{}
-				log.Info("Found subdomain", svc1log.SafeParam("subdomain", fqdn.Name))
 			}
 		}
 	}
