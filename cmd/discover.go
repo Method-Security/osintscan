@@ -495,7 +495,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 			config := getDiscoverDNSPassiveSubdomainConfig(domain, requestsPerSecond, threads, allSources, moduleEnum)
 
 			// Inject module into passive config extra properties (works without regenerating SDKs)
-			if module != "" && config.Passive != nil {
+			if config.Passive != nil {
 				passiveMap := map[string]interface{}{
 					"domain":            config.Passive.GetDomain(),
 					"requestsPerSecond": config.Passive.GetRequestsPerSecond(),
