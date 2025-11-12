@@ -10,7 +10,7 @@ import (
 	"github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
-// GetDomainSubdomainsPassive queries passive sources (subfinder and/or amass v5) for subdomains of a given domain.
+// GetDomainSubdomainsPassive queries passive sources (subfinder and/or amass v4) for subdomains of a given domain.
 // Returns a report containing all discovered subdomains and any errors encountered.
 func GetDomainSubdomainsPassive(ctx context.Context, config dnsfern.DiscoverDnsSubdomainConfig) (dnsfern.DiscoverDnsSubdomainReport, error) {
 	log := svc1log.FromContext(ctx)
