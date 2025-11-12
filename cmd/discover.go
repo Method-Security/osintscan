@@ -3,10 +3,10 @@ package cmd
 import (
 	// Standard
 	"fmt"
+	"encoding/json"
 	"net"
 	"os"
 	"strings"
-	"encoding/json"
 
 	// Generated
 	common "github.com/Method-Security/osintscan/generated/go/common"
