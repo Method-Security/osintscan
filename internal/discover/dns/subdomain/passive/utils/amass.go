@@ -15,6 +15,31 @@ import (
 	"github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
+// buildAmassConfig creates and configures an Amass v4 config object with optimized performance settings.
+func buildAmassConfig(cfg dnsfern.DiscoverDnsSubdomainPassiveConfig, log svc1log.Logger) *config.Config {
+	amassCfg := config.NewConfig()
+	amassCfg.Passive = true
+	amassCfg.AddDomain(cfg.Domain)
+	amassCfg.Recursive = false
+	amassCfg.Verbose = false
+	amassCfg.AddResolvers(cfg.DnsResolvers...)
+
+	// Configure parallelism and performance
+	// Increase concurrent DNS queries for faster resolution
+	amassCfg.MaxDNSQueries = cfg.MaxDnsQueries // Default is much lower
+
+	// Increase queries per second per resolver for passive mode
+	// Passive mode doesn't do active DNS queries, but this helps with validation
+	amassCfg.ResolversQPS = cfg.MaxResolversQps // Queries per second per resolver
+
+	log.Info("Amass performance settings",
+		svc1log.SafeParam("max_dns_queries", amassCfg.MaxDNSQueries),
+		svc1log.SafeParam("resolvers", len(amassCfg.Resolvers)),
+		svc1log.SafeParam("qps_per_resolver", amassCfg.ResolversQPS))
+
+	return amassCfg
+}
+
 // GetSubdomainsPassiveWithAmass uses the Amass v4 library to enumerate subdomains (passive) via the in-memory graph.
 func GetSubdomainsPassiveWithAmass(ctx context.Context, cfg dnsfern.DiscoverDnsSubdomainPassiveConfig) ([]string, error) {
 	log := svc1log.FromContext(ctx)
@@ -24,35 +49,7 @@ func GetSubdomainsPassiveWithAmass(ctx context.Context, cfg dnsfern.DiscoverDnsS
 	)
 
 	// Build amass v4 config
-	amassCfg := config.NewConfig()
-	amassCfg.Passive = true
-	amassCfg.AddDomain(cfg.Domain)
-	amassCfg.Recursive = false
-	amassCfg.Verbose = false
-
-	// Configure parallelism and performance
-	// Increase concurrent DNS queries for faster resolution
-	amassCfg.MaxDNSQueries = 2000 // Default is much lower
-
-	// Add public resolvers for better parallelism
-	// These are Google, Cloudflare, and Quad9 public DNS servers
-	amassCfg.AddResolvers(
-		"8.8.8.8",         // Google
-		"8.8.4.4",         // Google
-		"1.1.1.1",         // Cloudflare
-		"1.0.0.1",         // Cloudflare
-		"9.9.9.9",         // Quad9
-		"149.112.112.112", // Quad9
-	)
-
-	// Increase queries per second per resolver for passive mode
-	// Passive mode doesn't do active DNS queries, but this helps with validation
-	amassCfg.ResolversQPS = 100 // Queries per second per resolver
-
-	log.Info("Amass performance settings",
-		svc1log.SafeParam("max_dns_queries", amassCfg.MaxDNSQueries),
-		svc1log.SafeParam("resolvers", len(amassCfg.Resolvers)),
-		svc1log.SafeParam("qps_per_resolver", amassCfg.ResolversQPS))
+	amassCfg := buildAmassConfig(cfg, log)
 
 	// Create a local system for Amass v4
 	sys, err := systems.NewLocalSystem(amassCfg)
@@ -94,7 +91,7 @@ func GetSubdomainsPassiveWithAmass(ctx context.Context, cfg dnsfern.DiscoverDnsS
 	progressCtx, cancelProgress := context.WithCancel(ctx)
 	defer cancelProgress()
 	go func() {
-		ticker := time.NewTicker(1 * time.Minute)
+		ticker := time.NewTicker(10 * time.Second)
 		defer ticker.Stop()
 		previousDomains := make(map[string]struct{})
 

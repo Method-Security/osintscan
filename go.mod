@@ -8,6 +8,7 @@ require (
 	github.com/miekg/dns v1.1.68
 	github.com/owasp-amass/amass/v4 v4.2.0
 	github.com/owasp-amass/config v0.1.4
+	github.com/owasp-amass/open-asset-model v0.2.0
 	github.com/palantir/pkg/datetime v1.2.0
 	github.com/palantir/witchcraft-go-logging v1.61.0
 	github.com/projectdiscovery/dnsx v1.2.2
@@ -115,7 +116,6 @@ require (
 	github.com/ncruces/go-strftime v0.1.9 // indirect
 	github.com/nwaples/rardecode/v2 v2.0.0-beta.4.0.20241112120701-034e449c6e78 // indirect
 	github.com/owasp-amass/asset-db v0.3.3 // indirect
-	github.com/owasp-amass/open-asset-model v0.2.0 // indirect
 	github.com/owasp-amass/resolve v0.6.21 // indirect
 	github.com/palantir/pkg v1.1.0 // indirect
 	github.com/palantir/pkg/bytesbuffers v1.2.0 // indirect
