@@ -18,6 +18,7 @@ import (
 	discover "github.com/Method-Security/osintscan/internal/discover"
 	dns "github.com/Method-Security/osintscan/internal/discover/dns"
 	subdomain "github.com/Method-Security/osintscan/internal/discover/dns/subdomain"
+	subdomainpassive "github.com/Method-Security/osintscan/internal/discover/dns/subdomain/passive"
 	ip "github.com/Method-Security/osintscan/internal/discover/ip"
 
 	// External
@@ -478,12 +479,43 @@ func (a *OsintScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
+			modules, err := cmd.Flags().GetStringSlice("modules")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			dnsResolvers, err := cmd.Flags().GetStringSlice("dns-resolvers")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			for _, dnsResolver := range dnsResolvers {
+				err = utils.ValidateDNSServerAddress(dnsResolver)
+				if err != nil {
+					a.OutputSignal.AddError(fmt.Errorf("invalid DNS resolver: %w", err))
+					return
+				}
+			}
+			maxDNSQueries, err := cmd.Flags().GetInt("max-dns-queries")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			maxResolversQPS, err := cmd.Flags().GetInt("max-resolvers-qps")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
 
 			// Create config
-			config := getDiscoverDNSPassiveSubdomainConfig(domain, requestsPerSecond, threads, allSources)
+			config, err := getDiscoverDNSPassiveSubdomainConfig(domain, requestsPerSecond, threads, allSources, modules, dnsResolvers, maxDNSQueries, maxResolversQPS)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
 
 			// Create report
-			report, err := subdomain.GetDomainSubdomainsPassive(cmd.Context(), config)
+			report, err := subdomainpassive.GetDomainSubdomainsPassive(cmd.Context(), config)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -497,6 +529,10 @@ func (a *OsintScan) InitDiscoverCommand() {
 	discoverDNSSubdomainPassiveCmd.Flags().Int("requests-per-second", 0, "Maximum number of requests per second to send to the DNS resolvers")
 	discoverDNSSubdomainPassiveCmd.Flags().Int("threads", 10, "Number of concurrent threads for scanning")
 	discoverDNSSubdomainPassiveCmd.Flags().Bool("all-sources", false, "Use all passive sources (subfinder equivalent of --all)")
+	discoverDNSSubdomainPassiveCmd.Flags().StringSlice("modules", []string{"SUBFINDER"}, "Which passive modules to run: SUBFINDER, AMASS, or ALL")
+	discoverDNSSubdomainPassiveCmd.Flags().StringSlice("dns-resolvers", []string{"1.1.1.1:53"}, "Custom DNS resolver/servers to use for queries (e.g. 1.1.1.1:53)")
+	discoverDNSSubdomainPassiveCmd.Flags().Int("max-dns-queries", 2000, "Maximum number of DNS queries to perform per request")
+	discoverDNSSubdomainPassiveCmd.Flags().Int("max-resolvers-qps", 100, "Maximum number of queries per second per resolver")
 
 	// Mark Required Flags
 	_ = discoverDNSSubdomainPassiveCmd.MarkFlagRequired("domain")
@@ -815,16 +851,31 @@ func getDiscoverDNSCorrelationSubdomainConfig(domains []string, threads int, tim
 }
 
 // getDiscoverDNSPassiveSubdomainConfig creates and returns a configuration for passive subdomain discovery
-func getDiscoverDNSPassiveSubdomainConfig(domain string, requestsPerSecond int, threads int, allSources bool) dnsfern.DiscoverDnsSubdomainConfig {
-	return dnsfern.DiscoverDnsSubdomainConfig{
+func getDiscoverDNSPassiveSubdomainConfig(domain string, requestsPerSecond int, threads int, allSources bool, modules []string, dnsResolvers []string, maxDNSQueries int, maxResolversQPS int) (dnsfern.DiscoverDnsSubdomainConfig, error) {
+
+	var modulesEnum []dnsfern.DiscoverDnsSubdomainModule
+	for _, module := range modules {
+		moduleEnum, err := dnsfern.NewDiscoverDnsSubdomainModuleFromString(strings.ToUpper(module))
+		if err != nil {
+			return dnsfern.DiscoverDnsSubdomainConfig{}, err
+		}
+		modulesEnum = append(modulesEnum, moduleEnum)
+	}
+
+	config := dnsfern.DiscoverDnsSubdomainConfig{
 		DiscoveryType: strings.ToLower(string(dnsfern.DiscoverDnsSubdomainTypePassive)),
 		Passive: &dnsfern.DiscoverDnsSubdomainPassiveConfig{
 			Domain:            domain,
 			RequestsPerSecond: requestsPerSecond,
 			Threads:           threads,
 			AllSources:        allSources,
+			Modules:           modulesEnum,
+			DnsResolvers:      dnsResolvers,
+			MaxDnsQueries:     max(maxDNSQueries, 0),
+			MaxResolversQps:   max(maxResolversQPS, 0),
 		},
 	}
+	return config, nil
 }
 
 // getDiscoverCdnConfig creates and returns a configuration for CDN discovery
