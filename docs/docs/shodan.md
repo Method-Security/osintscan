@@ -19,23 +19,23 @@ osintscan discover shodan [command]
 #### Usage
 
 ```bash
-osintscan discover shodan hostname --hostname example.com
+osintscan discover shodan hostname --query nginx --hostname example.com
 ```
 
 #### Help Text
 
 ```bash
-$ osintscan discover shodan hostname -h
-Query Shodan for a hostname string search
+$ osintscan discover shodan hostname --help
+Query Shodan for information about a specific hostname, filtering results to match the provided hostname suffix.
 
 Usage:
   osintscan discover shodan hostname [flags]
 
 Flags:
-      --apikey string     Shodan API Key (reads from SHODAN_API_KEY env by default)
+      --api-key string    Shodan API Key (defaults to SHODAN_API_KEY environment variable if not provided)
   -h, --help              help for hostname
-      --hostname string   The hostname suffix you want to ensure the Shodan record contains
-      --query string      Query string to search Shodan hostname:{} for
+      --hostname string   The hostname suffix to match in Shodan search results
+      --query string      The search query string to use with Shodan (e.g., 'apache', 'nginx')
 
 Global Flags:
   -o, --output string        Output format (signal, json, yaml). Default value is signal (default "signal")

@@ -8,19 +8,32 @@ osintscan organizes functionality under three primary command groups and their m
 
 ### discover
 
-- [ASN](./dns.md) – ASN information discovery using BGPView API
-- [CDN](./dns.md) – CDN provider detection for IP addresses and domains
-- [DNS](./dns.md) – records, certificates, subdomain enumeration, forward/reverse lookups
-- [IP](./dns.md) – IP address and CIDR information, domain-ASN lookups
-- [Shodan](./shodan.md) – query the Shodan search engine
+- **ASN** – ASN information discovery using BGPView API
+  - `osintscan discover asn` – Get detailed ASN information including CIDRs, country, and metadata
+- **CDN** – CDN provider detection for IP addresses and domains
+  - `osintscan discover cdn` – Check if domains/IPs belong to known CDN providers
+- **DNS** – Comprehensive DNS intelligence gathering
+  - `osintscan discover dns certs` – Retrieve SSL/TLS certificates for domains
+  - `osintscan discover dns records` – Fetch DNS records (A, AAAA, MX, TXT, etc.)
+  - `osintscan discover dns forward` – Perform forward DNS lookups
+  - `osintscan discover dns reverse` – Perform reverse DNS lookups on IPs/CIDRs
+  - `osintscan discover dns subdomain active` – Actively discover subdomains via brute-force
+  - `osintscan discover dns subdomain correlation` – Correlate subdomains across domains
+  - `osintscan discover dns subdomain passive` – Passively discover subdomains from external sources
+- **IP** – IP address and network intelligence
+  - `osintscan discover ip domain-asn` – Perform reverse DNS and ASN lookups
+- **Shodan** – Query the Shodan search engine
+  - `osintscan discover shodan hostname` – Search Shodan for specific hostnames
 
 ### enumerate
 
-- [DNS zone transfer](./dns.md) – attempt AXFR zone transfers
+- **DNS** – Active DNS enumeration techniques
+  - `osintscan enumerate dns zonetransfer` – Attempt AXFR zone transfers
 
 ### pentest
 
-- [DNS takeover](./dns.md) – detect domain takeover vulnerabilities
+- **DNS** – DNS-focused penetration testing
+  - `osintscan pentest dns takeover` – Detect subdomain takeover vulnerabilities
 
 ## Top Level Flags
 
