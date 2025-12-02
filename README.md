@@ -33,26 +33,33 @@ For the full list of available installation options, please see the [Installatio
 ```bash
 # Discover DNS records for a domain
 osintscan discover dns records --domain example.com
-```
 
-```bash
 # Get SSL certificates for a domain
 osintscan discover dns certs --domain example.com
-```
 
-```bash
 # Discover ASN information
 osintscan discover asn --asn AS23028
-```
 
-```bash
 # Actively discover subdomains
 osintscan discover dns subdomain active --domain example.com --wordlist-size small
-```
 
-```bash
+# Passively discover subdomains
+osintscan discover dns subdomain passive --domain example.com
+
 # Check for CDN usage
 osintscan discover cdn --domain example.com
+
+# Perform DNS zone transfer enumeration
+osintscan enumerate dns zonetransfer --domains example.com
+
+# Test for subdomain takeover vulnerabilities
+osintscan pentest dns takeover --targets subdomain.example.com
+
+# Search Shodan for hostname information
+osintscan discover shodan hostname --query nginx --hostname example.com
+
+# Perform reverse DNS and ASN lookup
+osintscan discover ip domain-asn --ip-addresses 8.8.8.8
 ```
 
 ### Developer Setup

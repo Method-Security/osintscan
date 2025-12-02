@@ -59,14 +59,14 @@ func isDNSNotFound(err error) bool {
 	if err == nil {
 		return false
 	}
-	
+
 	// Check for DNS-specific error types
 	if dnsError, ok := err.(*net.DNSError); ok {
 		// NXDOMAIN: domain doesn't exist (safe to continue)
 		// IsNotFound indicates the name does not exist
 		return dnsError.IsNotFound
 	}
-	
+
 	// For non-DNS errors, treat as failure (not NXDOMAIN)
 	return false
 }
