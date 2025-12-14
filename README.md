@@ -131,4 +131,4 @@ Have an idea for a Tool to contribute? Open a Discussion [here](https://github.c
 [license]: https://github.com/Method-Security/osintscan/blob/main/LICENSE
 [license-img]: https://img.shields.io/badge/License-Apache%202.0-blue.svg
 [acceptable-use-policy]: https://github.com/Method-Security/osintscan/blob/main/ACCEPTABLE_USE_POLICY.md
-[acceptable-use-policy-img]: https://img.shields.io/badge/acceptable_use_policy
+[acceptable-use-policy-img]: https://img.shields.io/badge/acceptable_use-policy-blue
