@@ -13,7 +13,7 @@ groups:
   pypi-local:
     generators:
       - name: fernapi/fern-pydantic-model
-        version: 1.11.1
+        version: 1.11.2
         output:
           location: local-file-system
           path: ../generated/python
@@ -21,7 +21,7 @@ groups:
   pypi-test:
     generators:
       - name: fernapi/fern-pydantic-model
-        version: 1.11.1
+        version: 1.11.2
         config:
           package_name: methodosintscan
         output:
@@ -33,7 +33,7 @@ groups:
   pypi:
     generators:
       - name: fernapi/fern-pydantic-model
-        version: 1.11.1
+        version: 1.11.2
         config:
           package_name: methodosintscan
         output:
