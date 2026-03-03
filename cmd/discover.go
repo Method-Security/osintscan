@@ -148,17 +148,20 @@ func (a *OsintScan) InitDiscoverCommand() {
 				return
 			}
 
-			config, err := getDiscoverDNSRecordsConfig(domain, recordTypes)
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
+			var dnsRecordTypes []common.DnsRecordType
+			for _, recordType := range recordTypes {
+				if recordTypeEnum, err := common.NewDnsRecordTypeFromString(recordType); err == nil {
+					dnsRecordTypes = append(dnsRecordTypes, recordTypeEnum)
+				} else {
+					a.OutputSignal.AddError(fmt.Errorf("invalid DNS record type: %s", recordType))
+				}
 			}
 
-			report, err := dns.DiscoverDomainDNSRecords(cmd.Context(), config)
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
+			// Create config
+			config := getDiscoverDNSRecordsConfig(domain, dnsRecordTypes)
+
+			// Create report
+			report := dns.DiscoverDomainDNSRecords(cmd.Context(), config)
 			a.OutputSignal.Content = report
 		},
 	}
@@ -776,26 +779,11 @@ func getDiscoverDNSCertsConfig(domain string) dnsfern.DiscoverDnsCertsConfig {
 }
 
 // getDiscoverDNSRecordsConfig creates and returns a configuration for DNS records discovery
-func getDiscoverDNSRecordsConfig(domain string, recordTypes []string) (dnsfern.DiscoverDnsRecordsConfig, error) {
-	// Convert string slice to DnsRecordType slice
-	var dnsRecordTypes []common.DnsRecordType
-	var invalidTypes []string
-	for _, recordType := range recordTypes {
-		if recordTypeEnum, err := common.NewDnsRecordTypeFromString(recordType); err == nil {
-			dnsRecordTypes = append(dnsRecordTypes, recordTypeEnum)
-		} else {
-			invalidTypes = append(invalidTypes, recordType)
-		}
-	}
-
-	if len(invalidTypes) > 0 {
-		return dnsfern.DiscoverDnsRecordsConfig{}, fmt.Errorf("invalid DNS record type(s): %s", strings.Join(invalidTypes, ", "))
-	}
-
+func getDiscoverDNSRecordsConfig(domain string, recordTypes []common.DnsRecordType) dnsfern.DiscoverDnsRecordsConfig {
 	return dnsfern.DiscoverDnsRecordsConfig{
 		Domain:      domain,
-		RecordTypes: dnsRecordTypes,
-	}, nil
+		RecordTypes: recordTypes,
+	}
 }
 
 // getDiscoverDNSForwardConfig creates and returns a configuration for forward DNS lookup
