@@ -43,8 +43,8 @@ func (a *OsintScan) InitEnumerateCommand() {
 				return
 			}
 
-			if len(domains) == 0 && nameserver == "" {
-				a.OutputSignal.AddError(fmt.Errorf("at least one domain or nameserver must be specified"))
+			if len(domains) == 0 {
+				a.OutputSignal.AddError(fmt.Errorf("at least one domain must be specified via --domains (--nameserver is optional and specifies which server to attempt the transfer against)"))
 				return
 			}
 
@@ -97,10 +97,13 @@ func (a *OsintScan) InitEnumerateCommand() {
 
 // getEnumerateDNSZoneTransferConfig creates and returns a configuration for DNS zone transfer enumeration
 func getEnumerateDNSZoneTransferConfig(domains []string, nameserver string, dnsResolvers []string, timeout int) dnsfern.EnumerateDnsZoneTransferConfig {
-	return dnsfern.EnumerateDnsZoneTransferConfig{
+	config := dnsfern.EnumerateDnsZoneTransferConfig{
 		Domains:      domains,
-		Nameserver:   &nameserver,
 		DnsResolvers: dnsResolvers,
 		Timeout:      timeout,
 	}
+	if nameserver != "" {
+		config.Nameserver = &nameserver
+	}
+	return config
 }

@@ -139,7 +139,7 @@ func getDNSRecords(ctx context.Context, domain string, questionTypes []uint16) (
 
 // DiscoverDomainDNSRecords queries DNS for all records for a given domain.
 // Returns a report containing all records and any non-fatal errors encountered.
-func DiscoverDomainDNSRecords(ctx context.Context, config dnsfern.DiscoverDnsRecordsConfig) (*dnsfern.DiscoverDnsRecordsReport, error) {
+func DiscoverDomainDNSRecords(ctx context.Context, config dnsfern.DiscoverDnsRecordsConfig) *dnsfern.DiscoverDnsRecordsReport {
 	log := svc1log.FromContext(ctx)
 	errors := []string{}
 
@@ -223,5 +223,5 @@ func DiscoverDomainDNSRecords(ctx context.Context, config dnsfern.DiscoverDnsRec
 		svc1log.SafeParam("dkim_records", len(dkimRecords)),
 		svc1log.SafeParam("error_count", len(errors)))
 
-	return &report, nil
+	return &report
 }

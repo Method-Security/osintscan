@@ -60,7 +60,7 @@ func sendAXFRRequest(ns, domain string, timeout int, resolver *net.Resolver, log
 	for response := range conn {
 		if response.Error != nil {
 			errors = append(errors, fmt.Sprintf("error during AXFR transfer: %v", response.Error))
-			return nil, false, errors
+			return records, len(records) > 0, errors
 		}
 		for _, rr := range response.RR {
 			record := convertRecord(rr)

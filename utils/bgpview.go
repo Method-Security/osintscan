@@ -142,7 +142,10 @@ func (c *BGPViewClient) GetASNPrefixes(ctx context.Context, asn string) (*utilsf
 
 	// Check status code
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			return nil, fmt.Errorf("BGPView API returned status %d (failed to read body: %v)", resp.StatusCode, readErr)
+		}
 		return nil, fmt.Errorf("BGPView API returned status %d: %s", resp.StatusCode, string(body))
 	}
 
@@ -361,7 +364,10 @@ func (c *BGPViewClient) GetASNInfo(ctx context.Context, asn string) (*utilsfern.
 
 	// Check status code
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			return nil, fmt.Errorf("BGPView API returned status %d (failed to read body: %v)", resp.StatusCode, readErr)
+		}
 		return nil, fmt.Errorf("BGPView API returned status %d: %s", resp.StatusCode, string(body))
 	}
 
@@ -412,7 +418,10 @@ func (c *BGPViewClient) GetASNPrefixesWithTimeout(ctx context.Context, asn strin
 
 	// Check status code
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			return nil, fmt.Errorf("BGPView API returned status %d (failed to read body: %v)", resp.StatusCode, readErr)
+		}
 		return nil, fmt.Errorf("BGPView API returned status %d: %s", resp.StatusCode, string(body))
 	}
 
@@ -484,7 +493,10 @@ func (c *BGPViewClient) GetASNInfoWithTimeout(ctx context.Context, asn string, t
 
 	// Check status code
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			return nil, fmt.Errorf("BGPView API returned status %d (failed to read body: %v)", resp.StatusCode, readErr)
+		}
 		return nil, fmt.Errorf("BGPView API returned status %d: %s", resp.StatusCode, string(body))
 	}
 

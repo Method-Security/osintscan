@@ -4,7 +4,7 @@ The `osintscan discover shodan` family of commands leverage the [Shodan](https:/
 
 ## Authentication
 
-All the `osintscan discover shodan` commands leverage the Shodan API, which needs an API key in order to authenticate. All commands read from a `SHODAN_API_KEY` environment variable or from a `--apikey` flag where you can include your Shodan API key.
+All the `osintscan discover shodan` commands leverage the Shodan API, which needs an API key in order to authenticate. All commands read from a `SHODAN_API_KEY` environment variable or from a `--api-key` flag where you can include your Shodan API key.
 
 ## Usage
 

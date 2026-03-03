@@ -35,12 +35,15 @@ func QueryShodanHostStrictHostnameMatch(ctx context.Context, apiKey string, quer
 		svc1log.SafeParam("query", query),
 		svc1log.SafeParam("hostname_filter", hostname))
 
-	records, err := queryShodanHost(apiKey, query)
+	records, unmarshalErrors, err := queryShodanHost(apiKey, query)
 	if err != nil {
 		log.Warn("Shodan query failed",
 			svc1log.SafeParam("query", query),
 			svc1log.SafeParam("error", err.Error()))
 		errors = append(errors, err.Error())
+	}
+	if len(unmarshalErrors) > 0 {
+		errors = append(errors, unmarshalErrors...)
 	}
 
 	filteredRecords := filterShodanRecordsByHostname(records, hostname)
