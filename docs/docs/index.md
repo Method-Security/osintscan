@@ -2,38 +2,10 @@
 
 osintscan offers a variety of techniques that allow security teams to leverage open source intelligence (OSINT) capabilities to better understand their internet facing exposure. Each of the below pages offers you an in depth look at a osintscan capability related to a unique technique.
 
-## Top Level Commands
+- [Discover](./discover.md)
+- [Enumerate](./enumerate.md)
+- [Pentest](./pentest.md)
 
-osintscan organizes functionality under three primary command groups and their modules:
-
-### discover
-
-- **ASN** – ASN information discovery using BGPView API
-  - `osintscan discover asn` – Get detailed ASN information including CIDRs, country, and metadata
-- **CDN** – CDN provider detection for IP addresses and domains
-  - `osintscan discover cdn` – Check if domains/IPs belong to known CDN providers
-- **DNS** – Comprehensive DNS intelligence gathering
-  - `osintscan discover dns certs` – Retrieve SSL/TLS certificates for domains
-  - `osintscan discover dns records` – Fetch DNS records (A, AAAA, MX, TXT, etc.)
-  - `osintscan discover dns forward` – Perform forward DNS lookups
-  - `osintscan discover dns reverse` – Perform reverse DNS lookups on IPs/CIDRs
-  - `osintscan discover dns subdomain active` – Actively discover subdomains via brute-force
-  - `osintscan discover dns subdomain correlation` – Correlate subdomains across domains
-  - `osintscan discover dns subdomain passive` – Passively discover subdomains from external sources
-- **IP** – IP address and network intelligence
-  - `osintscan discover ip domain-asn` – Perform reverse DNS and ASN lookups
-- **Shodan** – Query the Shodan search engine
-  - `osintscan discover shodan hostname` – Search Shodan for specific hostnames
-
-### enumerate
-
-- **DNS** – Active DNS enumeration techniques
-  - `osintscan enumerate dns zonetransfer` – Attempt AXFR zone transfers
-
-### pentest
-
-- **DNS** – DNS-focused penetration testing
-  - `osintscan pentest dns takeover` – Detect subdomain takeover vulnerabilities
 
 ## Top Level Flags
 
@@ -47,6 +19,17 @@ Flags:
   -q, --quiet                Suppress output
   -v, --verbose              Verbose output
 ```
+
+## Available Commands
+
+osintscan provides the following main commands:
+
+- **discover**: Perform various discovery scans to gather OSINT data including DNS, ASN, CDN, IP, and Shodan intelligence
+- **enumerate**: Perform various enumeration scans to actively gather information such as DNS zone transfers
+- **pentest**: Perform various pentest scans to identify vulnerabilities such as DNS takeover
+- **completion**: Generate autocompletion scripts for various shells
+- **help**: Get help about any command
+- **version**: Display version information
 
 ## Version Command
 

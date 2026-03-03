@@ -13,13 +13,10 @@ nav:
       - Basic Usage: getting-started/basic-usage.md
   - Docs:
       - Overview: docs/index.md
-      - Discover:
-          - DNS: docs/dns.md
-          - Shodan: docs/shodan.md
-      - Enumerate:
-          - DNS: docs/dns.md
-      - Pentest:
-          - DNS: docs/dns.md
+      - Capabilities:
+        - Discover: docs/discover.md
+        - Enumerate: docs/enumerate.md
+        - Pentest: docs/pentest.md
   - Contributing:
       - How to contribute: community/community.md
       - Development:
