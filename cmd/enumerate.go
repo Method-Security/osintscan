@@ -25,26 +25,13 @@ func (a *OsintScan) InitEnumerateCommand() {
 	enumerateCmd.AddCommand(enumerateDNSCmd)
 
 	enumerateDNSZoneTransferCmd := &cobra.Command{
-		Use:   "zonetransfer [domain...]",
-		Short: "Attempt DNS zone transfers (AXFR) for domains",
-		Long:  "Attempt DNS zone transfers (AXFR) for the specified domains to enumerate all DNS records, if the server allows it. This can reveal all subdomains and records",
-		Args:  cobra.ArbitraryArgs,
+		Use:   "zone-transfer",
+		Short: "Attempt DNS zone transfers (AXFR) for zones",
+		Long:  "For each zone FQDN, discovers authoritative nameservers via NS records, resolves their IPs, and attempts an AXFR against each DNS application to test for unauthorized zone transfers.",
 		Run: func(cmd *cobra.Command, args []string) {
-			// Get domains from both flags and positional arguments
-			domains, err := cmd.Flags().GetStringSlice("domains")
+			zones, err := cmd.Flags().GetStringSlice("zones")
 			if err != nil {
 				a.OutputSignal.AddError(err)
-				return
-			}
-
-			nameserver, err := cmd.Flags().GetString("nameserver")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-
-			if len(domains) == 0 {
-				a.OutputSignal.AddError(fmt.Errorf("at least one domain must be specified via --domains (--nameserver is optional and specifies which server to attempt the transfer against)"))
 				return
 			}
 
@@ -59,19 +46,15 @@ func (a *OsintScan) InitEnumerateCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			if len(dnsResolvers) == 0 {
-				a.OutputSignal.AddError(fmt.Errorf("no DNS resolvers provided"))
-				return
-			}
+
 			for _, dnsResolver := range dnsResolvers {
-				err = utils.ValidateDNSServerAddress(dnsResolver)
-				if err != nil {
-					a.OutputSignal.AddError(fmt.Errorf("invalid DNS resolver: %w", err))
+				if err = utils.ValidateDNSServerAddress(dnsResolver); err != nil {
+					a.OutputSignal.AddError(fmt.Errorf("invalid DNS resolver %s: %w", dnsResolver, err))
 					return
 				}
 			}
 
-			config := getEnumerateDNSZoneTransferConfig(domains, nameserver, dnsResolvers, timeout)
+			config := getEnumerateDNSZoneTransferConfig(zones, dnsResolvers, timeout)
 
 			report, err := zonetransfer.TestZoneTransfer(cmd.Context(), config)
 			if err != nil {
@@ -83,12 +66,13 @@ func (a *OsintScan) InitEnumerateCommand() {
 	}
 
 	// Target Flags
-	enumerateDNSZoneTransferCmd.Flags().StringSlice("domains", []string{}, "A list of domain names to attempt zone transfers on")
-	enumerateDNSZoneTransferCmd.Flags().String("nameserver", "", "Specific nameserver to test zone transfers against (e.g., ns1.example.com or 192.168.1.10)")
+	enumerateDNSZoneTransferCmd.Flags().StringSlice("zones", []string{}, "Zone FQDNs to test for unauthorized zone transfers (e.g. example.com)")
 
 	// Config Flags
 	enumerateDNSZoneTransferCmd.Flags().Int("timeout", 30, "Timeout in seconds for each zone transfer request")
-	enumerateDNSZoneTransferCmd.Flags().StringSlice("dns-resolvers", []string{"1.1.1.1:53"}, "Custom DNS resolver/servers to use for queries (e.g. 1.1.1.1:53)")
+	enumerateDNSZoneTransferCmd.Flags().StringSlice("dns-resolvers", []string{"1.1.1.1:53"}, "DNS resolvers to use for NS lookups and hostname resolution (e.g. 1.1.1.1:53)")
+
+	_ = enumerateDNSZoneTransferCmd.MarkFlagRequired("zones")
 
 	enumerateDNSCmd.AddCommand(enumerateDNSZoneTransferCmd)
 
@@ -96,14 +80,10 @@ func (a *OsintScan) InitEnumerateCommand() {
 }
 
 // getEnumerateDNSZoneTransferConfig creates and returns a configuration for DNS zone transfer enumeration
-func getEnumerateDNSZoneTransferConfig(domains []string, nameserver string, dnsResolvers []string, timeout int) dnsfern.EnumerateDnsZoneTransferConfig {
-	config := dnsfern.EnumerateDnsZoneTransferConfig{
-		Domains:      domains,
+func getEnumerateDNSZoneTransferConfig(zones []string, dnsResolvers []string, timeout int) dnsfern.EnumerateDnsZoneTransferConfig {
+	return dnsfern.EnumerateDnsZoneTransferConfig{
+		Zones:        zones,
 		DnsResolvers: dnsResolvers,
 		Timeout:      timeout,
 	}
-	if nameserver != "" {
-		config.Nameserver = &nameserver
-	}
-	return config
 }
