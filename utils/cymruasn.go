@@ -126,6 +126,16 @@ func IPASNLookupDetailed(ctx context.Context, ip string) (*utilsfern.CymruAsnRes
 		return nil, fmt.Errorf("no valid ASNs found for %s", queryDomain)
 	}
 
+	// If all records failed structured parsing but ASNs were extracted from raw fields,
+	// create a minimal result with just the ASNs
+	if firstRecord == nil {
+		asnSlice := make([]string, 0, len(allASNs))
+		for asn := range allASNs {
+			asnSlice = append(asnSlice, asn)
+		}
+		return &utilsfern.CymruAsnResult{Asns: asnSlice}, nil
+	}
+
 	// Create result with first ASN and metadata from first record
 	result := firstRecord
 	return result, nil

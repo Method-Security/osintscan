@@ -32,16 +32,17 @@ func DiscoverDomainCerts(ctx context.Context, config dnsfern.DiscoverDnsCertsCon
 			svc1log.SafeParam("domain", config.Domain),
 			svc1log.SafeParam("error", err.Error()))
 		errors = append(errors, err.Error())
+		return &dnsfern.DiscoverDnsCertsReport{
+			Config: &config,
+			Result: &dnsfern.DiscoverDnsCertsResult{},
+			Errors: errors,
+		}, nil
 	}
-	defer func() {
-		// Capture and log any error from Close
-		if cerr := resp.Body.Close(); cerr != nil {
-			errors = append(errors, cerr.Error())
-		}
-	}()
-
 	// Read the response body
 	body, err := io.ReadAll(resp.Body)
+	if cerr := resp.Body.Close(); cerr != nil {
+		errors = append(errors, cerr.Error())
+	}
 	if err != nil {
 		errors = append(errors, err.Error())
 	}

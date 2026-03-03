@@ -148,7 +148,11 @@ func (a *OsintScan) InitDiscoverCommand() {
 				return
 			}
 
-			config := getDiscoverDNSRecordsConfig(domain, recordTypes)
+			config, err := getDiscoverDNSRecordsConfig(domain, recordTypes)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
 
 			report, err := dns.DiscoverDomainDNSRecords(cmd.Context(), config)
 			if err != nil {
@@ -558,46 +562,35 @@ func (a *OsintScan) InitDiscoverCommand() {
 		Long:  `Query Shodan for information about a specific hostname, filtering results to match the provided hostname suffix.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			var apiKey string
-			var err error
 			if os.Getenv("SHODAN_API_KEY") != "" {
 				apiKey = os.Getenv("SHODAN_API_KEY")
 			} else {
-				apiKeyFlag, err := cmd.Flags().GetString("apikey")
+				apiKeyFlag, err := cmd.Flags().GetString("api-key")
 				if err != nil {
-					errorMessage := err.Error()
-					a.OutputSignal.ErrorMessage = &errorMessage
-					a.OutputSignal.Status = 1
+					a.OutputSignal.AddError(err)
 					return
 				}
 				apiKey = apiKeyFlag
 			}
 			if apiKey == "" {
-				err = fmt.Errorf("either SHODAN_API_KEY environment variable or --apikey must be set")
-				errorMessage := err.Error()
-				a.OutputSignal.ErrorMessage = &errorMessage
-				a.OutputSignal.Status = 1
+				a.OutputSignal.AddError(fmt.Errorf("either SHODAN_API_KEY environment variable or --api-key must be set"))
 				return
 			}
 
 			query, err := cmd.Flags().GetString("query")
 			if err != nil {
-				errorMessage := err.Error()
-				a.OutputSignal.ErrorMessage = &errorMessage
-				a.OutputSignal.Status = 1
+				a.OutputSignal.AddError(err)
 				return
 			}
 			hostname, err := cmd.Flags().GetString("hostname")
 			if err != nil {
-				errorMessage := err.Error()
-				a.OutputSignal.ErrorMessage = &errorMessage
-				a.OutputSignal.Status = 1
+				a.OutputSignal.AddError(err)
 				return
 			}
 			report, err := shodan.QueryShodanHostStrictHostnameMatch(cmd.Context(), apiKey, query, hostname)
 			if err != nil {
-				errorMessage := err.Error()
-				a.OutputSignal.ErrorMessage = &errorMessage
-				a.OutputSignal.Status = 1
+				a.OutputSignal.AddError(err)
+				return
 			}
 			a.OutputSignal.Content = report
 		},
@@ -783,19 +776,26 @@ func getDiscoverDNSCertsConfig(domain string) dnsfern.DiscoverDnsCertsConfig {
 }
 
 // getDiscoverDNSRecordsConfig creates and returns a configuration for DNS records discovery
-func getDiscoverDNSRecordsConfig(domain string, recordTypes []string) dnsfern.DiscoverDnsRecordsConfig {
+func getDiscoverDNSRecordsConfig(domain string, recordTypes []string) (dnsfern.DiscoverDnsRecordsConfig, error) {
 	// Convert string slice to DnsRecordType slice
 	var dnsRecordTypes []common.DnsRecordType
+	var invalidTypes []string
 	for _, recordType := range recordTypes {
 		if recordTypeEnum, err := common.NewDnsRecordTypeFromString(recordType); err == nil {
 			dnsRecordTypes = append(dnsRecordTypes, recordTypeEnum)
+		} else {
+			invalidTypes = append(invalidTypes, recordType)
 		}
+	}
+
+	if len(invalidTypes) > 0 {
+		return dnsfern.DiscoverDnsRecordsConfig{}, fmt.Errorf("invalid DNS record type(s): %s", strings.Join(invalidTypes, ", "))
 	}
 
 	return dnsfern.DiscoverDnsRecordsConfig{
 		Domain:      domain,
 		RecordTypes: dnsRecordTypes,
-	}
+	}, nil
 }
 
 // getDiscoverDNSForwardConfig creates and returns a configuration for forward DNS lookup
