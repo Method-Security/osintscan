@@ -1,7 +1,6 @@
 package zonetransfer
 
 import (
-	"context"
 	"fmt"
 	"net"
 	"strings"
@@ -12,41 +11,30 @@ import (
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
-// sendAXFRRequest attempts a DNS zone transfer (AXFR) from the given nameserver for the specified domain.
-// Returns the records, whether the transfer was successful, and any errors encountered.
-func sendAXFRRequest(ns, domain string, timeout int, resolver *net.Resolver, log svc1log.Logger) ([]*common.DnsRecord, bool, []string) {
+// sendAXFRRequest attempts a DNS zone transfer (AXFR) against the given nameserver (ip:port or ip)
+// for the specified zone. Returns the records, whether the transfer was successful, and any errors.
+func sendAXFRRequest(ns, zone string, timeout int, log svc1log.Logger) ([]*common.DnsRecord, bool, []string) {
 	errors := []string{}
 
-	// Check if ns is already an IP
-	if net.ParseIP(ns) == nil {
-		// It's a hostname, resolve it
-		addrs, err := resolver.LookupHost(context.Background(), ns)
-		if err != nil {
-			errors = append(errors, fmt.Sprintf("failed to resolve nameserver %s: %v", ns, err))
-			return nil, false, errors
-		}
-		if len(addrs) == 0 {
-			errors = append(errors, fmt.Sprintf("no addresses found for nameserver %s", ns))
-			return nil, false, errors
-		}
-		ns = addrs[0] // Use first resolved IP
+	// If ns has no port, default to 53
+	addr := ns
+	if _, _, err := net.SplitHostPort(ns); err != nil {
+		addr = fmt.Sprintf("%s:53", ns)
 	}
 
-	addr := fmt.Sprintf("%s:53", ns)
-	log.Info("[Debug] Attempting AXFR transfer from", svc1log.SafeParam("addr", addr))
+	log.Info("Attempting AXFR transfer", svc1log.SafeParam("addr", addr), svc1log.SafeParam("zone", zone))
 
-	fullDomain := domain
-	if !strings.HasSuffix(fullDomain, ".") {
-		fullDomain += "."
+	fullZone := zone
+	if !strings.HasSuffix(fullZone, ".") {
+		fullZone += "."
 	}
 
 	msg := new(dns.Msg)
-	msg.SetAxfr(fullDomain)
+	msg.SetAxfr(fullZone)
 
 	transfer := new(dns.Transfer)
 	transfer.DialTimeout = time.Duration(timeout) * time.Second
 
-	// Initiate the AXFR transfer
 	conn, err := transfer.In(msg, addr)
 	if err != nil {
 		errors = append(errors, fmt.Sprintf("failed to initiate AXFR transfer: %v", err))
@@ -56,7 +44,6 @@ func sendAXFRRequest(ns, domain string, timeout int, resolver *net.Resolver, log
 	var records []*common.DnsRecord
 	axfrSuccessful := false
 
-	// Read all responses from the transfer
 	for response := range conn {
 		if response.Error != nil {
 			errors = append(errors, fmt.Sprintf("error during AXFR transfer: %v", response.Error))
@@ -72,7 +59,7 @@ func sendAXFRRequest(ns, domain string, timeout int, resolver *net.Resolver, log
 	}
 
 	if axfrSuccessful {
-		log.Info("[Debug] Zone transfer successful from", svc1log.SafeParam("ns", ns), svc1log.SafeParam("records", len(records)))
+		log.Info("Zone transfer successful", svc1log.SafeParam("addr", addr), svc1log.SafeParam("records", len(records)))
 		return records, true, errors
 	}
 
@@ -80,7 +67,7 @@ func sendAXFRRequest(ns, domain string, timeout int, resolver *net.Resolver, log
 	return records, false, errors
 }
 
-// convertRecord converts a DNS resource record to a DnsZoneTransferRecord, if supported.
+// convertRecord converts a DNS resource record to a DnsRecord, if supported.
 func convertRecord(rr dns.RR) *common.DnsRecord {
 	switch r := rr.(type) {
 	case *dns.A:
