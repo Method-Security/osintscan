@@ -74,7 +74,7 @@ func testZone(ctx context.Context, zone string, timeout int, resolver *net.Resol
 		}
 
 		for _, addr := range addrs {
-			dnsServer := fmt.Sprintf("%s:53", addr)
+			dnsServer := net.JoinHostPort(addr, "53")
 
 			log.Info("Attempting zone transfer",
 				svc1log.SafeParam("zone", zone),

@@ -16,9 +16,9 @@ import (
 func ValidateDNSServerAddress(address string) error {
 	host, port, err := net.SplitHostPort(address)
 	if err != nil {
-		// If no port specified, provide helpful error
-		if !strings.Contains(address, ":") {
-			return fmt.Errorf("DNS server address must include port (e.g., %s:53)", address)
+		// If the address is a valid IP without a port, provide a helpful error
+		if ip := net.ParseIP(address); ip != nil {
+			return fmt.Errorf("DNS server address must include port (e.g., %s)", net.JoinHostPort(address, "53"))
 		}
 		return fmt.Errorf("invalid DNS server address format: %v", err)
 	}
