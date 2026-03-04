@@ -157,8 +157,18 @@ func DiscoverDomainDNSRecords(ctx context.Context, config dnsfern.DiscoverDnsRec
 		errors = append(errors, err.Error())
 	}
 
+	recordTypes := []common.DnsRecordType{}
+	for _, recordType := range config.RecordTypes {
+		recordTypeEnum, err := common.NewDnsRecordTypeFromString(recordType)
+		// SHould never happen since we early exit in cmd file
+		if err != nil {
+			errors = append(errors, err.Error())
+		}
+		recordTypes = append(recordTypes, recordTypeEnum)
+	}
+
 	// Filter DNS records based on requested types
-	dnsRecords := filterDNSRecordsByType(allDNSRecords, config.RecordTypes)
+	dnsRecords := filterDNSRecordsByType(allDNSRecords, recordTypes)
 	log.Debug("Filtered DNS records",
 		svc1log.SafeParam("domain", config.Domain),
 		svc1log.SafeParam("total_records", len(allDNSRecords)),
