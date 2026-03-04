@@ -198,7 +198,7 @@ func (c *WhoisClient) rawQueryWithOptions(ctx context.Context, query, server str
 		Timeout: c.timeout,
 	}
 
-	conn, err := dialer.DialContext(ctx, "tcp", server+":43")
+	conn, err := dialer.DialContext(ctx, "tcp", net.JoinHostPort(server, "43"))
 	if err != nil {
 		return "", fmt.Errorf("failed to connect to WHOIS server %s: %w", server, err)
 	}

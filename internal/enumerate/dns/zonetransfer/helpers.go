@@ -19,7 +19,7 @@ func sendAXFRRequest(ns, zone string, timeout int, log svc1log.Logger) ([]*commo
 	// If ns has no port, default to 53
 	addr := ns
 	if _, _, err := net.SplitHostPort(ns); err != nil {
-		addr = fmt.Sprintf("%s:53", ns)
+		addr = net.JoinHostPort(ns, "53")
 	}
 
 	log.Info("Attempting AXFR transfer", svc1log.SafeParam("addr", addr), svc1log.SafeParam("zone", zone))
@@ -50,7 +50,12 @@ func sendAXFRRequest(ns, zone string, timeout int, log svc1log.Logger) ([]*commo
 			return records, len(records) > 0, errors
 		}
 		for _, rr := range response.RR {
-			record := convertRecord(rr)
+			record, err := convertRecord(rr)
+			if err != nil {
+				errors = append(errors, *err)
+				continue
+			}
+
 			if record != nil {
 				records = append(records, record)
 				axfrSuccessful = true
@@ -68,23 +73,30 @@ func sendAXFRRequest(ns, zone string, timeout int, log svc1log.Logger) ([]*commo
 }
 
 // convertRecord converts a DNS resource record to a DnsRecord, if supported.
-func convertRecord(rr dns.RR) *common.DnsRecord {
+func convertRecord(rr dns.RR) (*common.DnsRecord, *string) {
 	switch r := rr.(type) {
 	case *dns.A:
-		return &common.DnsRecord{Name: r.Hdr.Name, Ttl: int(r.Hdr.Ttl), Type: common.DnsRecordTypeA, Value: r.A.String()}
+		return &common.DnsRecord{Name: r.Hdr.Name, Ttl: int(r.Hdr.Ttl), Type: common.DnsRecordTypeA, Value: r.A.String()}, nil
 	case *dns.AAAA:
-		return &common.DnsRecord{Name: r.Hdr.Name, Ttl: int(r.Hdr.Ttl), Type: common.DnsRecordTypeAaaa, Value: r.AAAA.String()}
+		return &common.DnsRecord{Name: r.Hdr.Name, Ttl: int(r.Hdr.Ttl), Type: common.DnsRecordTypeAaaa, Value: r.AAAA.String()}, nil
 	case *dns.CNAME:
-		return &common.DnsRecord{Name: r.Hdr.Name, Ttl: int(r.Hdr.Ttl), Type: common.DnsRecordTypeCname, Value: r.Target}
+		return &common.DnsRecord{Name: r.Hdr.Name, Ttl: int(r.Hdr.Ttl), Type: common.DnsRecordTypeCname, Value: r.Target}, nil
 	case *dns.MX:
-		return &common.DnsRecord{Name: r.Hdr.Name, Ttl: int(r.Hdr.Ttl), Type: common.DnsRecordTypeMx, Value: fmt.Sprintf("%d %s", r.Preference, r.Mx)}
+		return &common.DnsRecord{Name: r.Hdr.Name, Ttl: int(r.Hdr.Ttl), Type: common.DnsRecordTypeMx, Value: fmt.Sprintf("%d %s", r.Preference, r.Mx)}, nil
 	case *dns.NS:
-		return &common.DnsRecord{Name: r.Hdr.Name, Ttl: int(r.Hdr.Ttl), Type: common.DnsRecordTypeNs, Value: r.Ns}
-	case *dns.SOA:
-		return &common.DnsRecord{Name: r.Hdr.Name, Ttl: int(r.Hdr.Ttl), Type: common.DnsRecordTypeSoa, Value: fmt.Sprintf("%s %s %d", r.Ns, r.Mbox, r.Serial)}
+		return &common.DnsRecord{Name: r.Hdr.Name, Ttl: int(r.Hdr.Ttl), Type: common.DnsRecordTypeNs, Value: r.Ns}, nil
+	case *dns.PTR:
+		return &common.DnsRecord{Name: r.Hdr.Name, Ttl: int(r.Hdr.Ttl), Type: common.DnsRecordTypePtr, Value: r.Ptr}, nil
+	case *dns.SRV:
+		return &common.DnsRecord{Name: r.Hdr.Name, Ttl: int(r.Hdr.Ttl), Type: common.DnsRecordTypeSrv, Value: fmt.Sprintf("%d %d %d %s", r.Priority, r.Weight, r.Port, r.Target)}, nil
 	case *dns.TXT:
-		return &common.DnsRecord{Name: r.Hdr.Name, Ttl: int(r.Hdr.Ttl), Type: common.DnsRecordTypeTxt, Value: fmt.Sprintf("%s", r.Txt)}
+		return &common.DnsRecord{Name: r.Hdr.Name, Ttl: int(r.Hdr.Ttl), Type: common.DnsRecordTypeTxt, Value: strings.Join(r.Txt, " ")}, nil
+	case *dns.SOA:
+		return &common.DnsRecord{Name: r.Hdr.Name, Ttl: int(r.Hdr.Ttl), Type: common.DnsRecordTypeSoa, Value: fmt.Sprintf("%s %s %d", r.Ns, r.Mbox, r.Serial)}, nil
+	case *dns.CAA:
+		return &common.DnsRecord{Name: r.Hdr.Name, Ttl: int(r.Hdr.Ttl), Type: common.DnsRecordTypeCaa, Value: fmt.Sprintf("%d %s %s", r.Flag, r.Tag, r.Value)}, nil
 	default:
-		return nil
+		err := fmt.Sprintf("unsupported record type: %d", rr.Header().Rrtype)
+		return nil, &err
 	}
 }
