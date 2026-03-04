@@ -162,7 +162,12 @@ func DiscoverDomainDNSRecords(ctx context.Context, config dnsfern.DiscoverDnsRec
 		recordTypeEnum, err := common.NewDnsRecordTypeFromString(recordType)
 		// SHould never happen since we early exit in cmd file
 		if err != nil {
+			log.Error("Invalid DNS record type",
+				svc1log.SafeParam("domain", config.Domain),
+				svc1log.SafeParam("record_type", recordType),
+				svc1log.SafeParam("error", err.Error()))
 			errors = append(errors, err.Error())
+			continue
 		}
 		recordTypes = append(recordTypes, recordTypeEnum)
 	}

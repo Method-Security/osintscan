@@ -148,9 +148,10 @@ func (a *OsintScan) InitDiscoverCommand() {
 				return
 			}
 			for _, recordType := range recordTypes {
-				if _, err := common.NewDnsRecordTypeFromString(recordType); err == nil {
-				} else {
+				_, err := common.NewDnsRecordTypeFromString(recordType)
+				if err != nil {
 					a.OutputSignal.AddError(fmt.Errorf("invalid DNS record type: %s", recordType))
+					return
 				}
 			}
 
