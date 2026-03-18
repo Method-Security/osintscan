@@ -57,21 +57,33 @@ func ValidateDNSServerAddress(address string) error {
 // GetResolver returns a new resolver with the given DNS server address.
 // If the DNS server address is empty, the system default resolver is used.
 // If the DNS server address is provided, the resolver is configured to use the given DNS server address.
+// If no port is specified, port 53 is assumed.
 func GetResolver(dnsServerAddress string, log svc1log.Logger) *net.Resolver {
 	var resolver *net.Resolver
 	if dnsServerAddress == "" {
 		log.Info("Using system default DNS resolver")
 		resolver = &net.Resolver{}
 	} else {
+		addr := NormalizeDNSAddress(dnsServerAddress)
 		resolver = &net.Resolver{
 			PreferGo: true,
 			Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
 				d := net.Dialer{
 					Timeout: time.Second * 10,
 				}
-				return d.DialContext(ctx, "udp", dnsServerAddress)
+				return d.DialContext(ctx, "udp", addr)
 			},
 		}
 	}
 	return resolver
+}
+
+// NormalizeDNSAddress ensures a DNS server address includes a port.
+// If no port is specified, it defaults to port 53.
+func NormalizeDNSAddress(address string) string {
+	_, _, err := net.SplitHostPort(address)
+	if err != nil {
+		return net.JoinHostPort(address, "53")
+	}
+	return address
 }
