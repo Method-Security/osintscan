@@ -118,8 +118,8 @@ func performSingleLookup(ctx context.Context, ip string, resolver *net.Resolver)
 	}
 
 	// Perform reverse DNS lookup
-	if domain := performReverseDNSLookup(ctx, ip, resolver); domain != "" {
-		lookup.Domain = &domain
+	if domains := performReverseDNSLookup(ctx, ip, resolver); len(domains) > 0 {
+		lookup.Domains = domains
 	}
 
 	// Perform ASN lookup using Cymru DNS service and WHOIS
@@ -130,14 +130,13 @@ func performSingleLookup(ctx context.Context, ip string, resolver *net.Resolver)
 	return lookup
 }
 
-// performReverseDNSLookup performs reverse DNS lookup for an IP
-func performReverseDNSLookup(ctx context.Context, ip string, resolver *net.Resolver) string {
+// performReverseDNSLookup performs reverse DNS lookup for an IP, returning all PTR records
+func performReverseDNSLookup(ctx context.Context, ip string, resolver *net.Resolver) []string {
 	names, err := resolver.LookupAddr(ctx, ip)
 	if err != nil || len(names) == 0 {
-		return ""
+		return nil
 	}
-	// Return the first hostname found
-	return names[0]
+	return names
 }
 
 // performASNLookup performs comprehensive ASN lookup using multiple sources (Cymru and WHOIS) with deduplication

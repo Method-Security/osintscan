@@ -9,7 +9,7 @@ types:
   LookupDetails:
     properties:
       ipAddress: string
-      domain: optional<string>
+      domains: optional<list<string>>
       asns: optional<list<string>>
       geoLocation: optional<string>
   DiscoverIPDomainASNResult:

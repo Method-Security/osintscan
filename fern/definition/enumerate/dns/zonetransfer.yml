@@ -4,19 +4,22 @@ types:
 # Config Struct
   EnumerateDnsZoneTransferConfig:
     properties:
-      domains: list<string>
-      nameserver: optional<string>
-      dnsResolvers: optional<list<string>>
+      zones: list<string>
+      dnsResolvers: list<string>
       timeout: integer
 # Report Structs
+  DnsZoneTransferApplication:
+    properties:
+      nameserver: string
+      dnsServer: string
+      dnsRecords: list<dns.DnsRecord>
   DnsZoneTransferDetails:
     properties:
-      domain: string
-      dnsRecords: optional<list<dns.DnsRecord>>
-      success: optional<boolean>
+      zone: string
+      applications: list<DnsZoneTransferApplication>
   EnumerateDnsZoneTransferResult:
     properties:
-      zoneTransfer: list<DnsZoneTransferDetails>
+      zoneTransfers: optional<list<DnsZoneTransferDetails>>
   EnumerateDnsZoneTransferReport:
     properties:
       config: EnumerateDnsZoneTransferConfig

@@ -1,10 +1,10 @@
 imports:
   dns: ../../common/dns.yml
-
 types:
   DiscoverDnsRecordsConfig:
     properties:
       domain: string
+      recordTypes: list<string>
   DiscoverDnsRecordsResult:
     properties:
       dnsRecords: optional<list<dns.DnsRecord>>

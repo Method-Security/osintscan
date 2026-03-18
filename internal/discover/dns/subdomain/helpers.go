@@ -27,8 +27,14 @@ func detectWildcardDNS(ctx context.Context, domain string, resolver *net.Resolve
 		return &wildcardDomain, nil
 	}
 
-	// If the error, domain didnt resolve so wildcard is NOT present
-	return nil, nil
+	// Check if it's specifically NXDOMAIN (domain doesn't exist)
+	if isDNSNotFound(err) {
+		// NXDOMAIN = no wildcard, safe to continue
+		return nil, nil
+	}
+
+	// Any other DNS error = fail fast, don't continue with potentially unreliable results
+	return nil, fmt.Errorf("DNS resolution failed during wildcard detection for %s: %v", randomSubdomain, err)
 }
 
 // generateRandomSubdomain generates a high-entropy subdomain with only letters (16 characters).
@@ -45,4 +51,22 @@ func generateRandomSubdomain(domain string) (string, error) {
 	}
 
 	return fmt.Sprintf("%s.%s", string(randomString), domain), nil
+}
+
+// isDNSNotFound checks if the error is specifically an NXDOMAIN (domain not found) error
+// using proper DNS error type checking instead of fragile string matching
+func isDNSNotFound(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	// Check for DNS-specific error types
+	if dnsError, ok := err.(*net.DNSError); ok {
+		// NXDOMAIN: domain doesn't exist (safe to continue)
+		// IsNotFound indicates the name does not exist
+		return dnsError.IsNotFound
+	}
+
+	// For non-DNS errors, treat as failure (not NXDOMAIN)
+	return false
 }
