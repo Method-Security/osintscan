@@ -23,6 +23,8 @@ import (
 	shodan "github.com/Method-Security/osintscan/internal/discover/shodan"
 	"github.com/spf13/cobra"
 
+	// Configs
+	"github.com/Method-Security/osintscan/configs"
 	// Utils
 	"github.com/Method-Security/osintscan/utils"
 )
@@ -256,9 +258,9 @@ func (a *OsintScan) InitDiscoverCommand() {
 				}
 				wordlistSizeEnum = &wordlistSizeEnumValue
 
-				filePath := subdomain.GetDiscoverDNSSubdomainActiveWordlistPath(wordlistSize)
-				if filePath != "" {
-					wordlistSubdomains, err = utils.GetEntriesFromFiles([]string{filePath})
+				embeddedPath := subdomain.GetDiscoverDNSSubdomainActiveWordlistEmbeddedPath(wordlistSize)
+				if embeddedPath != "" {
+					wordlistSubdomains, err = configs.ReadLines(embeddedPath)
 					if err != nil {
 						a.OutputSignal.AddError(err)
 						return
