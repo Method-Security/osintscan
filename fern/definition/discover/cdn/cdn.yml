@@ -21,7 +21,7 @@ types:
       domain: string
       ipAddresses: optional<list<string>>
       dnsResolvers: optional<list<string>>
-      fingerprintsFile: string
+      fingerprintsFile: optional<string>
 # Report Structs
   CdnMatch:
     properties:
