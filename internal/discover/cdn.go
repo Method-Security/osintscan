@@ -74,16 +74,19 @@ func RunDiscoverCdns(ctx context.Context, config cdnfern.DiscoverCdnConfig) *cdn
 	return report
 }
 
+// defaultCdnFingerprintsPath is the container default for the CDN fingerprints file.
+const defaultCdnFingerprintsPath = "/opt/method/osintscan/var/conf/discover/cdn/providers.json"
+
 // loadCdnDictFromPath reads and parses the CDN configuration.
-// Tries the filesystem path first (for containers and user overrides), then falls back to embedded config.
+// Falls back to embedded config only when the path is the default container path.
 func loadCdnDictFromPath(fingerprintsFile string) (*cdnfern.CdnProviders, error) {
 	data, err := os.ReadFile(fingerprintsFile)
-	if err != nil {
-		// Fall back to embedded config (compiled binary without container mounts)
+	if err != nil && fingerprintsFile == defaultCdnFingerprintsPath {
+		// Fall back to embedded config only for the default container path
 		data, err = configs.ReadFile("discover/cdn/providers.json")
-		if err != nil {
-			return nil, fmt.Errorf("failed to read CDN config from filesystem or embedded: %w", err)
-		}
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to read CDN config file %q: %w", fingerprintsFile, err)
 	}
 
 	var cfg cdnfern.CdnProviders
