@@ -3,6 +3,8 @@ package shodan
 import (
 	"context"
 	"strings"
+
+	"github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
 // filterShodanRecordsByHostname filters Shodan records to only those with a hostname ending in endString.
@@ -26,11 +28,22 @@ func filterShodanRecordsByHostname(records []Record, endString string) []Record 
 // QueryShodanHostStrictHostnameMatch queries Shodan for a given query string and filters results to hostnames ending with the given string.
 // Returns a report containing the filtered records and any errors encountered.
 func QueryShodanHostStrictHostnameMatch(ctx context.Context, apiKey string, query string, hostname string) (Report, error) {
+	log := svc1log.FromContext(ctx)
 	errors := []string{}
 
-	records, err := queryShodanHost(apiKey, query)
+	log.Info("Starting Shodan hostname query",
+		svc1log.SafeParam("query", query),
+		svc1log.SafeParam("hostname_filter", hostname))
+
+	records, unmarshalErrors, err := queryShodanHost(apiKey, query)
 	if err != nil {
+		log.Warn("Shodan query failed",
+			svc1log.SafeParam("query", query),
+			svc1log.SafeParam("error", err.Error()))
 		errors = append(errors, err.Error())
+	}
+	if len(unmarshalErrors) > 0 {
+		errors = append(errors, unmarshalErrors...)
 	}
 
 	filteredRecords := filterShodanRecordsByHostname(records, hostname)
@@ -41,5 +54,12 @@ func QueryShodanHostStrictHostnameMatch(ctx context.Context, apiKey string, quer
 		ShodanRecords: filteredRecords,
 		Errors:        errors,
 	}
+
+	log.Info("Completed Shodan hostname query",
+		svc1log.SafeParam("query", query),
+		svc1log.SafeParam("total_records", len(records)),
+		svc1log.SafeParam("filtered_records", len(filteredRecords)),
+		svc1log.SafeParam("error_count", len(errors)))
+
 	return report, nil
 }

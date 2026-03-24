@@ -9,17 +9,19 @@ groups:
         output:
           location: local-file-system
           path: ../generated/go
+        smart-casing: false
   pypi-local:
     generators:
       - name: fernapi/fern-pydantic-model
-        version: 1.4.7
+        version: 1.11.2
         output:
           location: local-file-system
           path: ../generated/python
+        smart-casing: false
   pypi-test:
     generators:
       - name: fernapi/fern-pydantic-model
-        version: 1.4.7
+        version: 1.11.2
         config:
           package_name: methodosintscan
         output:
@@ -27,13 +29,15 @@ groups:
           package-name: methodosintscan
           token: ${TEST_PYPI_TOKEN}
           url: https://test.pypi.org/legacy/
+        smart-casing: false
   pypi:
     generators:
       - name: fernapi/fern-pydantic-model
-        version: 1.4.7
+        version: 1.11.2
         config:
           package_name: methodosintscan
         output:
           location: pypi
           package-name: methodosintscan
           token: ${PYPI_TOKEN}
+        smart-casing: false

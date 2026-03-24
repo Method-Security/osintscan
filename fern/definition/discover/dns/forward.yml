@@ -1,0 +1,20 @@
+types:
+# Config Struct
+  DiscoverDnsForwardConfig:
+    properties:
+      domain: string
+      dnsResolvers: optional<list<string>>
+# Result Structs
+  LookupDetails:
+    properties:
+      domain: string
+      ipAddress: optional<string>
+  DiscoverDnsForwardResult:
+    properties:
+      lookups: optional<list<LookupDetails>>
+# Report Struct
+  DiscoverDnsForwardReport:
+    properties:
+      config: DiscoverDnsForwardConfig
+      result: DiscoverDnsForwardResult
+      errors: optional<list<string>>

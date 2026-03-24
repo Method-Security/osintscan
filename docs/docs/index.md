@@ -2,22 +2,10 @@
 
 osintscan offers a variety of techniques that allow security teams to leverage open source intelligence (OSINT) capabilities to better understand their internet facing exposure. Each of the below pages offers you an in depth look at a osintscan capability related to a unique technique.
 
-## Top Level Commands
+- [Discover](./discover.md)
+- [Enumerate](./enumerate.md)
+- [Pentest](./pentest.md)
 
-osintscan organizes functionality under three primary command groups and their modules:
-
-### discover
-
-- [DNS](./dns.md) – records, certificates, subdomain enumeration, reverse lookups
-- [Shodan](./shodan.md) – query the Shodan search engine
-
-### enumerate
-
-- [DNS zone transfer](./dns.md) – attempt AXFR zone transfers
-
-### pentest
-
-- [DNS takeover](./dns.md) – detect domain takeover vulnerabilities
 
 ## Top Level Flags
 
@@ -31,6 +19,17 @@ Flags:
   -q, --quiet                Suppress output
   -v, --verbose              Verbose output
 ```
+
+## Available Commands
+
+osintscan provides the following main commands:
+
+- **discover**: Perform various discovery scans to gather OSINT data including DNS, ASN, CDN, IP, and Shodan intelligence
+- **enumerate**: Perform various enumeration scans to actively gather information such as DNS zone transfers
+- **pentest**: Perform various pentest scans to identify vulnerabilities such as DNS takeover
+- **completion**: Generate autocompletion scripts for various shells
+- **help**: Get help about any command
+- **version**: Display version information
 
 ## Version Command
 

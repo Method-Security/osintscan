@@ -5,6 +5,11 @@ types:
       - ACTIVE
       - CORRELATION
       - PASSIVE
+  DiscoverDnsSubdomainModule:
+    enum:
+      - SUBFINDER
+      - AMASS
+      - ALL
   WordlistSize:
     enum:
       - TINY
@@ -21,6 +26,7 @@ types:
       threads: integer
       maxDepth: integer
       timeout: integer
+      sleep: integer
       dnsResolvers: optional<list<string>>
   DiscoverDnsSubdomainCorrelationConfig:
     properties:
@@ -33,6 +39,11 @@ types:
       domain: string
       requestsPerSecond: integer
       threads: integer
+      allSources: boolean
+      modules: list<DiscoverDnsSubdomainModule>
+      dnsResolvers: optional<list<string>>
+      MaxDNSQueries: integer
+      MaxResolversQps: integer
 # Reports
   DiscoverDnsSubdomainConfig:
     discriminant: discoveryType

@@ -48,6 +48,7 @@ func (s *Source) Run(ctx context.Context, domain string, session *subscraping.Se
 		})
 		if err != nil {
 			results <- subscraping.Result{Source: s.Name(), Type: subscraping.Error, Error: err}
+			s.errors++
 			session.DiscardHTTPResponse(resp)
 			return
 		}
@@ -57,11 +58,12 @@ func (s *Source) Run(ctx context.Context, domain string, session *subscraping.Se
 		err = jsoniter.NewDecoder(resp.Body).Decode(&response)
 		if err != nil {
 			results <- subscraping.Result{Source: s.Name(), Type: subscraping.Error, Error: err}
-			resp.Body.Close()
+			s.errors++
+			session.DiscardHTTPResponse(resp)
 			return
 		}
 
-		resp.Body.Close()
+		session.DiscardHTTPResponse(resp)
 
 		if len(response.Subdomains) > 0 {
 			subdomains = response.Subdomains
@@ -69,6 +71,7 @@ func (s *Source) Run(ctx context.Context, domain string, session *subscraping.Se
 
 		for _, subdomain := range subdomains {
 			results <- subscraping.Result{Source: s.Name(), Type: subscraping.Subdomain, Value: subdomain}
+			s.results++
 		}
 
 	}()

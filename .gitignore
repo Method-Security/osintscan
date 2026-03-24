@@ -8,6 +8,10 @@
 *.so
 *.dylib
 
+# Things we don't want to commit
+.gitkeep
+unit_tests/*
+
 # Test binary, built with `go test -c`
 *.test
 

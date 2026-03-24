@@ -10,12 +10,16 @@ import (
 	"net/url"
 
 	dnsfern "github.com/Method-Security/osintscan/generated/go/discover/dns"
+	"github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
 // DiscoverDomainCerts queries crt.sh for all certificates for a given domain.
 // Returns a report containing all certificates and any errors encountered.
 func DiscoverDomainCerts(ctx context.Context, config dnsfern.DiscoverDnsCertsConfig) (*dnsfern.DiscoverDnsCertsReport, error) {
+	log := svc1log.FromContext(ctx)
 	errors := []string{}
+
+	log.Info("Starting certificate discovery", svc1log.SafeParam("domain", config.Domain))
 
 	baseURL := "https://crt.sh/?q=%s&output=json"
 	escapedDomain := url.QueryEscape(config.Domain) // Properly escape the domain in the URL
@@ -24,17 +28,21 @@ func DiscoverDomainCerts(ctx context.Context, config dnsfern.DiscoverDnsCertsCon
 	// Make the HTTP request to crt.sh API
 	resp, err := http.Get(apiURL)
 	if err != nil {
+		log.Warn("Failed to query crt.sh API",
+			svc1log.SafeParam("domain", config.Domain),
+			svc1log.SafeParam("error", err.Error()))
 		errors = append(errors, err.Error())
+		return &dnsfern.DiscoverDnsCertsReport{
+			Config: &config,
+			Result: &dnsfern.DiscoverDnsCertsResult{},
+			Errors: errors,
+		}, nil
 	}
-	defer func() {
-		// Capture and log any error from Close
-		if cerr := resp.Body.Close(); cerr != nil {
-			errors = append(errors, cerr.Error())
-		}
-	}()
-
 	// Read the response body
 	body, err := io.ReadAll(resp.Body)
+	if cerr := resp.Body.Close(); cerr != nil {
+		errors = append(errors, cerr.Error())
+	}
 	if err != nil {
 		errors = append(errors, err.Error())
 	}
@@ -71,6 +79,11 @@ func DiscoverDomainCerts(ctx context.Context, config dnsfern.DiscoverDnsCertsCon
 		},
 		Errors: errors,
 	}
+
+	log.Info("Completed certificate discovery",
+		svc1log.SafeParam("domain", config.Domain),
+		svc1log.SafeParam("certificates_found", len(records)),
+		svc1log.SafeParam("error_count", len(errors)))
 
 	return report, nil
 }

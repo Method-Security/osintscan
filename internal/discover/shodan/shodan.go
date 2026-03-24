@@ -22,12 +22,12 @@ func (ct *shodanTime) UnmarshalJSON(b []byte) (err error) {
 }
 
 // queryShodanHost queries the Shodan API for hosts matching the given query string.
-// Returns a slice of Record structs or an error.
-func queryShodanHost(apiKey string, query string) ([]Record, error) {
+// Returns a slice of Record structs, any per-record unmarshal warnings, or a fatal error.
+func queryShodanHost(apiKey string, query string) ([]Record, []string, error) {
 	url := fmt.Sprintf("https://api.shodan.io/shodan/host/search?key=%s&query=%s", apiKey, query)
 	resp, err := http.Get(url)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer func() {
 		// Capture and log any error from Close
@@ -37,31 +37,32 @@ func queryShodanHost(apiKey string, query string) ([]Record, error) {
 	}()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to query Shodan API: status code %d", resp.StatusCode)
+		return nil, nil, fmt.Errorf("failed to query Shodan API: status code %d", resp.StatusCode)
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	var shodanResponse Response
 	err = json.Unmarshal(body, &shodanResponse)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	var records []Record
+	var unmarshalErrors []string
 	// Unmarshal each record in the response
-	for _, rawMessage := range shodanResponse.Matches {
+	for i, rawMessage := range shodanResponse.Matches {
 		var record Record
 		err = json.Unmarshal(rawMessage, &record)
 		if err != nil {
-			fmt.Printf("Error unmarshaling record: %v\n", err)
+			unmarshalErrors = append(unmarshalErrors, fmt.Sprintf("failed to unmarshal Shodan record %d: %v", i, err))
 		} else {
 			records = append(records, record)
 		}
 	}
 
-	return records, nil
+	return records, unmarshalErrors, nil
 }

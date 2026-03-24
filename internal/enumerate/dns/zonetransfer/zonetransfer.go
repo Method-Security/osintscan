@@ -6,187 +6,104 @@ import (
 	"net"
 	"strings"
 
-	common "github.com/Method-Security/osintscan/generated/go/common"
 	dnsfern "github.com/Method-Security/osintscan/generated/go/enumerate/dns"
 	"github.com/Method-Security/osintscan/utils"
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
-// TestZoneTransfer performs DNS zone transfer tests on the specified domains.
-// If nameserver is provided, it tests directly against that server.
-// Otherwise, it discovers nameservers via NS record lookups.
+// TestZoneTransfer discovers authoritative nameservers for each zone via NS records,
+// resolves each NS hostname to an IP, then attempts an AXFR against each resolved DNS application.
 func TestZoneTransfer(ctx context.Context, config dnsfern.EnumerateDnsZoneTransferConfig) (*dnsfern.EnumerateDnsZoneTransferReport, error) {
 	log := svc1log.FromContext(ctx)
-
-	customResolvers := []*net.Resolver{}
-	for _, dnsResolver := range config.DnsResolvers {
-		customResolvers = append(customResolvers, utils.GetResolver(dnsResolver, log))
-	}
-
-	// Direct nameserver mode
-	if config.Nameserver != nil && *config.Nameserver != "" {
-		log.Info("Using direct nameserver mode", svc1log.SafeParam("nameserver", *config.Nameserver))
-		return testDirectNameserver(ctx, config, customResolvers)
-	}
-
-	// NS lookup mode
-	log.Info("Using NS lookup mode")
-	return testViaNSLookup(ctx, config, customResolvers)
-}
-
-// testDirectNameserver tests zone transfers directly against a specified nameserver
-func testDirectNameserver(ctx context.Context, config dnsfern.EnumerateDnsZoneTransferConfig, customResolvers []*net.Resolver) (*dnsfern.EnumerateDnsZoneTransferReport, error) {
-	log := svc1log.FromContext(ctx)
 	errors := []string{}
-	zoneTransferDetails := []*dnsfern.DnsZoneTransferDetails{}
+	details := []*dnsfern.DnsZoneTransferDetails{}
 
-	// Normalize nameserver address
-	ns := normalizeNameserver(*config.Nameserver)
-
-	roundRobinResolver := 0
-	for _, domain := range config.Domains {
-		log.Info("Testing zone transfer",
-			svc1log.SafeParam("domain", domain),
-			svc1log.SafeParam("nameserver", ns))
-
-		// Attempt zone transfer
-		records, success, errs := sendAXFRRequest(ns, domain, config.Timeout, customResolvers[roundRobinResolver%len(customResolvers)], log)
-		if len(errs) > 0 {
-			for _, err := range errs {
-				errors = append(errors, fmt.Sprintf("%s@%s: %s", domain, ns, err))
-			}
-		}
-
-		zoneTransferDetails = append(zoneTransferDetails, &dnsfern.DnsZoneTransferDetails{
-			Domain:     domain,
-			DnsRecords: records,
-			Success:    &success,
-		})
-
-		if success {
-			log.Info("Zone transfer successful",
-				svc1log.SafeParam("domain", domain),
-				svc1log.SafeParam("records", len(records)))
-		}
-		roundRobinResolver++
+	resolver := net.DefaultResolver
+	if len(config.DnsResolvers) > 0 {
+		resolver = utils.GetResolver(config.DnsResolvers[0], log)
 	}
-	report := &dnsfern.EnumerateDnsZoneTransferReport{
+
+	for _, zone := range config.Zones {
+		zoneDetails := testZone(ctx, zone, config.Timeout, resolver, log, &errors)
+		if len(zoneDetails.Applications) > 0 {
+			details = append(details, zoneDetails)
+		}
+	}
+
+	return &dnsfern.EnumerateDnsZoneTransferReport{
 		Config: &config,
 		Result: &dnsfern.EnumerateDnsZoneTransferResult{
-			ZoneTransfer: zoneTransferDetails,
+			ZoneTransfers: details,
 		},
 		Errors: errors,
-	}
-	return report, nil
+	}, nil
 }
 
-// testViaNSLookup discovers nameservers and tests zone transfers on each
-func testViaNSLookup(ctx context.Context, config dnsfern.EnumerateDnsZoneTransferConfig, customResolvers []*net.Resolver) (*dnsfern.EnumerateDnsZoneTransferReport, error) {
-	log := svc1log.FromContext(ctx)
-	errors := []string{}
-	zoneTransferDetails := []*dnsfern.DnsZoneTransferDetails{}
+// testZone looks up NS records for the zone, resolves each NS hostname to an IP,
+// and attempts an AXFR against each resolved DNS application.
+func testZone(ctx context.Context, zone string, timeout int, resolver *net.Resolver, log svc1log.Logger, errors *[]string) *dnsfern.DnsZoneTransferDetails {
+	applications := []*dnsfern.DnsZoneTransferApplication{}
 
-	roundRobinResolver := 0
-	for _, domain := range config.Domains {
-		details := testDomainViaLookup(ctx, domain, config.Timeout, customResolvers[roundRobinResolver%len(customResolvers)], log, &errors)
-		zoneTransferDetails = append(zoneTransferDetails, details)
-		roundRobinResolver++
-	}
+	log.Info("Looking up NS records", svc1log.SafeParam("zone", zone))
 
-	report := &dnsfern.EnumerateDnsZoneTransferReport{
-		Config: &config,
-		Result: &dnsfern.EnumerateDnsZoneTransferResult{
-			ZoneTransfer: zoneTransferDetails,
-		},
-		Errors: errors,
-	}
-	return report, nil
-}
-
-// testDomainViaLookup tests a single domain by looking up its NS records
-func testDomainViaLookup(ctx context.Context, domain string, timeout int, resolver *net.Resolver, log svc1log.Logger, errors *[]string) *dnsfern.DnsZoneTransferDetails {
-	axfrSuccessful := false
-	dnsRecords := []*common.DnsRecord{}
-
-	log.Info("Looking up NS records", svc1log.SafeParam("domain", domain))
-
-	// Lookup NS records
-	nsRecords, err := resolver.LookupNS(ctx, domain)
+	nsRecords, err := resolver.LookupNS(ctx, zone)
 	if err != nil {
-		log.Error("NS lookup failed",
-			svc1log.SafeParam("domain", domain),
-			svc1log.SafeParam("error", err))
-		*errors = append(*errors, fmt.Sprintf("NS lookup failed for %s: %v", domain, err))
-
+		*errors = append(*errors, fmt.Sprintf("NS lookup failed for %s: %v", zone, err))
 		return &dnsfern.DnsZoneTransferDetails{
-			Domain:     domain,
-			DnsRecords: dnsRecords,
-			Success:    &axfrSuccessful,
+			Zone:         zone,
+			Applications: applications,
 		}
 	}
 
-	log.Info("Found NS records",
-		svc1log.SafeParam("domain", domain),
-		svc1log.SafeParam("count", len(nsRecords)))
+	log.Info("Found NS records", svc1log.SafeParam("zone", zone), svc1log.SafeParam("count", len(nsRecords)))
 
-	// Track which nameservers we've successfully tested
-	testedServers := make(map[string]bool)
-
-	// Try zone transfer on each unique nameserver
+	seen := make(map[string]bool)
 	for _, ns := range nsRecords {
 		nsHost := strings.TrimSuffix(ns.Host, ".")
-
-		// Skip if we've already tested this server
-		if testedServers[nsHost] {
+		if seen[nsHost] {
 			continue
 		}
-		testedServers[nsHost] = true
+		seen[nsHost] = true
 
-		log.Info("Testing nameserver",
-			svc1log.SafeParam("nameserver", nsHost),
-			svc1log.SafeParam("domain", domain))
+		log.Info("Resolving NS hostname", svc1log.SafeParam("nameserver", nsHost))
 
-		// Attempt zone transfer
-		records, success, errs := sendAXFRRequest(nsHost, domain, timeout, resolver, log)
-
-		if len(errs) > 0 {
-			for _, err := range errs {
-				*errors = append(*errors, fmt.Sprintf("%s@%s: %s", domain, nsHost, err))
-			}
+		addrs, err := resolver.LookupHost(ctx, nsHost)
+		if err != nil {
+			*errors = append(*errors, fmt.Sprintf("failed to resolve NS %s for zone %s: %v", nsHost, zone, err))
+			continue
 		}
 
-		if success {
-			log.Info("Zone transfer successful",
+		for _, addr := range addrs {
+			dnsServer := net.JoinHostPort(addr, "53")
+
+			log.Info("Attempting zone transfer",
+				svc1log.SafeParam("zone", zone),
 				svc1log.SafeParam("nameserver", nsHost),
-				svc1log.SafeParam("records", len(records)))
-			axfrSuccessful = true
-			dnsRecords = append(dnsRecords, records...)
-			// Continue testing other nameservers to find all vulnerable ones
+				svc1log.SafeParam("dnsServer", dnsServer))
+
+			records, success, errs := sendAXFRRequest(dnsServer, zone, timeout, log)
+			for _, e := range errs {
+				*errors = append(*errors, fmt.Sprintf("%s@%s(%s): %s", zone, nsHost, dnsServer, e))
+			}
+
+			if success {
+				log.Info("Zone transfer succeeded",
+					svc1log.SafeParam("zone", zone),
+					svc1log.SafeParam("nameserver", nsHost),
+					svc1log.SafeParam("dnsServer", dnsServer),
+					svc1log.SafeParam("records", len(records)))
+
+				applications = append(applications, &dnsfern.DnsZoneTransferApplication{
+					Nameserver: nsHost,
+					DnsServer:  dnsServer,
+					DnsRecords: records,
+				})
+			}
 		}
 	}
 
 	return &dnsfern.DnsZoneTransferDetails{
-		Domain:     domain,
-		DnsRecords: dnsRecords,
-		Success:    &axfrSuccessful,
+		Zone:         zone,
+		Applications: applications,
 	}
-}
-
-// normalizeNameserver ensures the nameserver address is properly formatted
-func normalizeNameserver(nameserver string) string {
-	// Remove any trailing dots
-	ns := strings.TrimSuffix(nameserver, ".")
-
-	// If it's an IP address, return as-is
-	if net.ParseIP(ns) != nil {
-		return ns
-	}
-
-	// If it already has a port, return as-is
-	if strings.Contains(ns, ":") {
-		return ns
-	}
-
-	// Otherwise, it's a hostname without port
-	return ns
 }

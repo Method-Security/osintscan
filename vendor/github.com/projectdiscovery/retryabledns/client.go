@@ -85,6 +85,20 @@ func NewWithOptions(options Options) (*Client, error) {
 		doh.WithProxy(options.Proxy), // no-op if empty
 	)
 
+	// If proxy is specified, force TCP for all resolvers
+	if options.Proxy != "" {
+		for i, resolver := range parsedBaseResolvers {
+			if networkResolver, ok := resolver.(*NetworkResolver); ok && networkResolver.Protocol == UDP {
+				// Convert UDP resolvers to TCP when proxy is specified
+				parsedBaseResolvers[i] = &NetworkResolver{
+					Protocol: TCP,
+					Host:     networkResolver.Host,
+					Port:     networkResolver.Port,
+				}
+			}
+		}
+	}
+
 	udpDialer := &net.Dialer{LocalAddr: options.GetLocalAddr(UDP)}
 	tcpDialer := &net.Dialer{LocalAddr: options.GetLocalAddr(TCP)}
 	dotDialer := &net.Dialer{LocalAddr: options.GetLocalAddr(TCP)}
@@ -352,8 +366,20 @@ func (c *Client) queryMultiple(host string, requestTypes []uint16, resolver Reso
 			for _, ip := range ips {
 				if iputil.IsIPv4(ip) {
 					dnsdata.A = append(dnsdata.A, ip)
+					if CheckInternalIPs && internalRangeCheckerInstance != nil {
+						if parsedIP := net.ParseIP(ip); parsedIP != nil && internalRangeCheckerInstance.ContainsIPv4(parsedIP) {
+							dnsdata.HasInternalIPs = true
+							dnsdata.InternalIPs = append(dnsdata.InternalIPs, ip)
+						}
+					}
 				} else if iputil.IsIPv6(ip) {
 					dnsdata.AAAA = append(dnsdata.AAAA, ip)
+					if CheckInternalIPs && internalRangeCheckerInstance != nil {
+						if parsedIP := net.ParseIP(ip); parsedIP != nil && internalRangeCheckerInstance.ContainsIPv6(parsedIP) {
+							dnsdata.HasInternalIPs = true
+							dnsdata.InternalIPs = append(dnsdata.InternalIPs, ip)
+						}
+					}
 				}
 			}
 		}
@@ -426,7 +452,17 @@ func (c *Client) queryMultiple(host string, requestTypes []uint16, resolver Reso
 				} else {
 					switch r.Protocol {
 					case TCP:
-						resp, _, err = c.tcpClient.Exchange(msg, resolver.String())
+						if c.tcpProxy != nil {
+							var tcpConn *dns.Conn
+							tcpConn, err = c.dialWithProxy(c.tcpProxy, "tcp", resolver.String())
+							if err != nil {
+								break
+							}
+							defer tcpConn.Close()
+							resp, _, err = c.tcpClient.ExchangeWithConn(msg, tcpConn)
+						} else {
+							resp, _, err = c.tcpClient.Exchange(msg, resolver.String())
+						}
 					case UDP:
 						if c.options.ConnectionPoolThreads > 1 {
 							if udpConnPool, ok := c.udpConnPool.Get(resolver.String()); ok {

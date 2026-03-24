@@ -23,7 +23,7 @@ func GetDomainSubdomainsActive(ctx context.Context, config dnsfern.DiscoverDnsSu
 	errors := []string{}
 
 	// Run the active subdomain discovery
-	subdomains, err := getSubdomainsActive(ctx, activeConfig.Domain, activeConfig.Subdomains, activeConfig.Threads, activeConfig.MaxDepth, activeConfig.Timeout, activeConfig.DnsResolvers)
+	subdomains, err := getSubdomainsActive(ctx, activeConfig.Domain, activeConfig.Subdomains, activeConfig.Threads, activeConfig.MaxDepth, activeConfig.Timeout, activeConfig.Sleep, activeConfig.DnsResolvers)
 	if err != nil {
 		errors = append(errors, err.Error())
 	}
@@ -42,7 +42,7 @@ func GetDomainSubdomainsActive(ctx context.Context, config dnsfern.DiscoverDnsSu
 }
 
 // getSubdomainsActive performs recursive bruteforce subdomain enumeration with concurrency and wildcard detection.
-func getSubdomainsActive(ctx context.Context, domain string, subdomainList []string, parallelThreads int, recursiveDepth int, timeout int, dnsServerAddresses []string) ([]string, error) {
+func getSubdomainsActive(ctx context.Context, domain string, subdomainList []string, parallelThreads int, recursiveDepth int, timeout int, sleep int, dnsServerAddresses []string) ([]string, error) {
 	log := svc1log.FromContext(ctx)
 	subdomains := []string{}
 	subdomainsSet := make(map[string]struct{}) // To track unique valid subdomains
@@ -74,7 +74,7 @@ func getSubdomainsActive(ctx context.Context, domain string, subdomainList []str
 
 	log.Info("Generating base permutations", svc1log.SafeParam("domain", domain))
 	basePermutations := generatePermutations([]string{domain}, subdomainList)
-	validBaseSubdomains := testPermutations(ctx, basePermutations, resolvers, semaphore, &wg, subdomainsMutex, subdomainsSet, &subdomains, 1, recursiveDepth)
+	validBaseSubdomains := testPermutations(ctx, basePermutations, resolvers, semaphore, &wg, subdomainsMutex, subdomainsSet, &subdomains, 1, recursiveDepth, sleep)
 
 	// For each subsequent depth, only build on valid subdomains from previous iteration
 	log.Info("Starting subdomain discovery", svc1log.SafeParam("base_subdomain count", len(validBaseSubdomains)))
@@ -108,7 +108,7 @@ func getSubdomainsActive(ctx context.Context, domain string, subdomainList []str
 		}
 
 		newPermutations := generatePermutations(validSubdomains, subdomainList)
-		currentDepthSubdomains = testPermutations(ctx, newPermutations, resolvers, semaphore, &wg, subdomainsMutex, subdomainsSet, &subdomains, depth, recursiveDepth)
+		currentDepthSubdomains = testPermutations(ctx, newPermutations, resolvers, semaphore, &wg, subdomainsMutex, subdomainsSet, &subdomains, depth, recursiveDepth, sleep)
 	}
 
 	return subdomains, nil
@@ -116,7 +116,7 @@ func getSubdomainsActive(ctx context.Context, domain string, subdomainList []str
 
 // testPermutations concurrently tests a list of subdomain permutations for DNS resolution.
 // Uses a semaphore to limit concurrency and mutexes to protect shared state.
-func testPermutations(ctx context.Context, permutations []string, resolvers []*net.Resolver, semaphore chan struct{}, wg *sync.WaitGroup, subdomainsMutex *sync.Mutex, subdomainsSet map[string]struct{}, subdomains *[]string, depth int, maxDepth int) []string {
+func testPermutations(ctx context.Context, permutations []string, resolvers []*net.Resolver, semaphore chan struct{}, wg *sync.WaitGroup, subdomainsMutex *sync.Mutex, subdomainsSet map[string]struct{}, subdomains *[]string, depth int, maxDepth int, sleep int) []string {
 	log := svc1log.FromContext(ctx)
 	var validSubdomains []string
 	validSubdomainsMutex := &sync.Mutex{}
@@ -148,6 +148,12 @@ func testPermutations(ctx context.Context, permutations []string, resolvers []*n
 			start := time.Now()
 			_, err := resolver.LookupHost(ctx, testSubdomain)
 			duration := time.Since(start)
+
+			// Apply sleep delay if configured (in milliseconds)
+			if sleep > 0 {
+				time.Sleep(time.Duration(sleep) * time.Millisecond)
+			}
+
 			completed := atomic.AddInt64(&completedCount, 1)
 
 			if duration.Milliseconds() < 1000 {

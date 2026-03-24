@@ -5,6 +5,7 @@
 [![Verify][verify-img]][verify]
 [![Go Report Card][go-report-img]][go-report]
 [![License: Apache-2.0][license-img]][license]
+[![Acceptable Use Policy][acceptable-use-policy-img]][acceptable-use-policy]
 
 [![GitHub Downloads][github-downloads-img]][release]
 [![Docker Pulls][docker-pulls-img]][docker-pull]
@@ -21,21 +22,46 @@ To learn more about osintscan, please see the [Documentation site](https://metho
 
 ### Get osintscan
 
-For the full list of available installation options, please see the [Installation](./getting-started/installation.md) page. For convenience, here are some of the most commonly used options:
+For the full list of available installation options, please see the [Installation](./docs/getting-started/installation.md) page. For convenience, here are some of the most commonly used options:
 
 - `docker run methodsecurity/osintscan`
 - `docker run ghcr.io/method-security/osintscan`
 - Download the latest binary from the [Github Releases](https://github.com/Method-Security/osintscan/releases/latest) page
-- [Installation documentation](./getting-started/installation.md)
+- [Installation documentation](./docs/getting-started/installation.md)
 
 #### Examples
 
 ```bash
+# Discover DNS records for a domain
 osintscan discover dns records --domain example.com
-```
 
-```bash
+# Get SSL certificates for a domain
 osintscan discover dns certs --domain example.com
+
+# Discover ASN information
+osintscan discover asn --asn AS23028
+
+# Actively discover subdomains
+osintscan discover dns subdomain active --domain example.com --wordlist-size small
+
+# Passively discover subdomains
+osintscan discover dns subdomain passive --domain example.com
+
+# Check for CDN usage
+osintscan discover cdn --domain example.com
+
+# Perform DNS zone transfer enumeration
+osintscan enumerate dns zonetransfer --domains example.com
+
+# Test for subdomain takeover vulnerabilities
+osintscan pentest dns takeover --targets subdomain.example.com
+
+# Search Shodan for hostname information
+osintscan discover shodan hostname --query nginx --hostname example.com
+
+# Perform reverse DNS and ASN lookup
+osintscan discover ip domain-asn --ip-addresses 8.8.8.8
+```
 
 ### Developer Setup
 
@@ -49,7 +75,7 @@ osintscan discover dns certs --domain example.com
 fern generate --group local
 ```
 
-3. Ensure depedencies are installed and tested with:
+3. Ensure dependencies are installed and tested with:
 
 ```bash
 ./godelw verify
@@ -72,8 +98,7 @@ fern generate --group local
 
 
 ### Note:
-This tool runs on a headless-shell base image to support chrome/chromium browser automation. The dockerfile uses debian-based install tools. 
-```
+This tool runs on a headless-shell base image to support chrome/chromium browser automation. The dockerfile uses debian-based install tools.
 
 ## Contributing
 
@@ -105,3 +130,5 @@ Have an idea for a Tool to contribute? Open a Discussion [here](https://github.c
 [docker-pull]: https://hub.docker.com/r/methodsecurity/osintscan
 [license]: https://github.com/Method-Security/osintscan/blob/main/LICENSE
 [license-img]: https://img.shields.io/badge/License-Apache%202.0-blue.svg
+[acceptable-use-policy]: https://github.com/Method-Security/osintscan/blob/main/ACCEPTABLE_USE_POLICY.md
+[acceptable-use-policy-img]: https://img.shields.io/badge/acceptable_use-policy-blue
