@@ -10,12 +10,10 @@ RUN \
   mkdir -p /opt/method/${CLI_NAME}/ && \
   mkdir -p /opt/method/${CLI_NAME}/var/data && \
   mkdir -p /opt/method/${CLI_NAME}/var/data/tmp && \
-  mkdir -p /opt/method/${CLI_NAME}/var/conf && \
   mkdir -p /opt/method/${CLI_NAME}/var/log && \
   mkdir -p /opt/method/${CLI_NAME}/service/bin && \
   mkdir -p /mnt/output
   
-COPY configs/                                /opt/method/${CLI_NAME}/var/conf/ 
 COPY ${CLI_NAME}                             /opt/method/${CLI_NAME}/service/bin/${CLI_NAME}
 
 RUN \
