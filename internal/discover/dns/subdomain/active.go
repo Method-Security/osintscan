@@ -201,13 +201,14 @@ func generatePermutations(validSubdomains []string, subdomainList []string) []st
 	return results
 }
 
-// GetDiscoverDNSSubdomainActiveWordlistPath returns the file path for a given wordlist size
-func GetDiscoverDNSSubdomainActiveWordlistPath(wordlistSize string) string {
+// GetDiscoverDNSSubdomainActiveWordlistEmbeddedPath returns the embedded config path for a given wordlist size.
+// The returned path is relative to the configs/ directory and should be read via configs.ReadLines().
+func GetDiscoverDNSSubdomainActiveWordlistEmbeddedPath(wordlistSize string) string {
 	wordlistPaths := map[string]string{
-		"TINY":   "/opt/method/osintscan/var/conf/discover/dns/subdomain/wordlist-500.txt",
-		"SMALL":  "/opt/method/osintscan/var/conf/discover/dns/subdomain/wordlist-5000.txt",
-		"MEDIUM": "/opt/method/osintscan/var/conf/discover/dns/subdomain/wordlist-20000.txt",
-		"LARGE":  "/opt/method/osintscan/var/conf/discover/dns/subdomain/wordlist-110000.txt",
+		"TINY":   "discover/dns/subdomain/wordlist-500.txt",
+		"SMALL":  "discover/dns/subdomain/wordlist-5000.txt",
+		"MEDIUM": "discover/dns/subdomain/wordlist-20000.txt",
+		"LARGE":  "discover/dns/subdomain/wordlist-110000.txt",
 	}
 
 	return wordlistPaths[wordlistSize]

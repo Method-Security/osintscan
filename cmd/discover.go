@@ -25,6 +25,8 @@ import (
 	shodan "github.com/Method-Security/osintscan/internal/discover/shodan"
 	"github.com/spf13/cobra"
 
+	// Configs
+	"github.com/Method-Security/osintscan/configs"
 	// Utils
 	"github.com/Method-Security/osintscan/utils"
 )
@@ -323,9 +325,9 @@ func (a *OsintScan) InitDiscoverCommand() {
 				}
 				wordlistSizeEnum = &wordlistSizeEnumValue
 
-				filePath := subdomain.GetDiscoverDNSSubdomainActiveWordlistPath(wordlistSize)
-				if filePath != "" {
-					wordlistSubdomains, err = utils.GetEntriesFromFiles([]string{filePath})
+				embeddedPath := subdomain.GetDiscoverDNSSubdomainActiveWordlistEmbeddedPath(wordlistSize)
+				if embeddedPath != "" {
+					wordlistSubdomains, err = configs.ReadLines(embeddedPath)
 					if err != nil {
 						a.OutputSignal.AddError(err)
 						return
@@ -661,7 +663,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 	discoverCdnCmd.Flags().String("domain", "", "The domain name to check against CDN provider ranges")
 	discoverCdnCmd.Flags().StringSlice("ip-addresses", []string{}, "The IP addresses to check against CDN provider ranges")
 	discoverCdnCmd.Flags().StringSlice("dns-resolvers", []string{"1.1.1.1:53"}, "Custom DNS resolver/servers to use for queries (e.g. 1.1.1.1:53)")
-	discoverCdnCmd.Flags().String("fingerprints-file", "/opt/method/osintscan/var/conf/discover/cdn/providers.json", "The path to the CDN fingerprints file")
+	discoverCdnCmd.Flags().String("fingerprints-file", "", "The path to the CDN fingerprints file")
 
 	// Mark Required Flags
 	_ = discoverCdnCmd.MarkFlagRequired("domain")
@@ -867,9 +869,11 @@ func getDiscoverDNSPassiveSubdomainConfig(domain string, requestsPerSecond int, 
 // getDiscoverCdnConfig creates and returns a configuration for CDN discovery
 func getDiscoverCdnConfig(domain string, ipAddresses []string, dnsResolvers []string, fingerprintsFile string) cdnfern.DiscoverCdnConfig {
 	config := cdnfern.DiscoverCdnConfig{
-		Domain:           domain,
-		DnsResolvers:     dnsResolvers,
-		FingerprintsFile: fingerprintsFile,
+		Domain:       domain,
+		DnsResolvers: dnsResolvers,
+	}
+	if fingerprintsFile != "" {
+		config.FingerprintsFile = &fingerprintsFile
 	}
 	if len(ipAddresses) > 0 {
 		config.IpAddresses = ipAddresses

@@ -11,6 +11,8 @@ import (
 	"strings"
 	"sync/atomic"
 
+	// Configs
+	"github.com/Method-Security/osintscan/configs"
 	// Generated
 	cdnfern "github.com/Method-Security/osintscan/generated/go/discover/cdn"
 	// Utils
@@ -35,8 +37,12 @@ func RunDiscoverCdns(ctx context.Context, config cdnfern.DiscoverCdnConfig) *cdn
 		Result: result,
 	}
 
-	// Load CDN provider configuration from specified file path
-	cdnFingerprints, err := loadCdnDictFromPath(config.FingerprintsFile)
+	// Load CDN provider configuration from specified file path (or embedded default)
+	var fingerprintsFile string
+	if config.FingerprintsFile != nil {
+		fingerprintsFile = *config.FingerprintsFile
+	}
+	cdnFingerprints, err := loadCdnDictFromPath(fingerprintsFile)
 	if err != nil {
 		report.Errors = []string{err.Error()}
 		return report
@@ -72,19 +78,24 @@ func RunDiscoverCdns(ctx context.Context, config cdnfern.DiscoverCdnConfig) *cdn
 	return report
 }
 
-// loadCdnDictFromPath reads and parses the CDN configuration file
-// Returns parsed CDN provider data structure or error if file cannot be read/parsed
+// loadCdnDictFromPath reads and parses the CDN configuration.
+// When fingerprintsFile is empty, loads from embedded configs directly.
+// Otherwise reads from the filesystem path (user override).
 func loadCdnDictFromPath(fingerprintsFile string) (*cdnfern.CdnProviders, error) {
-	// Read the entire configuration file into memory
-	data, err := os.ReadFile(fingerprintsFile)
+	var data []byte
+	var err error
+	if fingerprintsFile == "" {
+		data, err = configs.ReadFile("discover/cdn/providers.json")
+	} else {
+		data, err = os.ReadFile(fingerprintsFile)
+	}
 	if err != nil {
-		return nil, fmt.Errorf("failed to read CDN config file %q: %w", fingerprintsFile, err)
+		return nil, fmt.Errorf("failed to read CDN config file: %w", err)
 	}
 
-	// Parse JSON data into CDN providers structure
 	var cfg cdnfern.CdnProviders
 	if err := json.Unmarshal(data, &cfg); err != nil {
-		return nil, fmt.Errorf("failed to parse CDN config file %q: %w", fingerprintsFile, err)
+		return nil, fmt.Errorf("failed to parse CDN config: %w", err)
 	}
 
 	return &cfg, nil
