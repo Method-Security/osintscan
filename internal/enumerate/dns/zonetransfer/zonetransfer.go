@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"time"
 
 	dnsfern "github.com/Method-Security/osintscan/generated/go/enumerate/dns"
 	"github.com/Method-Security/osintscan/utils"
@@ -23,7 +24,17 @@ func TestZoneTransfer(ctx context.Context, config dnsfern.EnumerateDnsZoneTransf
 		resolver = utils.GetResolver(config.DnsResolvers[0], log)
 	}
 
-	for _, zone := range config.Zones {
+	for i, zone := range config.Zones {
+		if i > 0 {
+			delay := utils.CalculateStealthDelay(config.Sleep, config.Jitter)
+			if delay > 0 {
+				select {
+				case <-ctx.Done():
+					return nil, ctx.Err()
+				case <-time.After(delay):
+				}
+			}
+		}
 		zoneDetails := testZone(ctx, zone, config.Timeout, resolver, log, &errors)
 		if len(zoneDetails.Applications) > 0 {
 			details = append(details, zoneDetails)

@@ -27,12 +27,15 @@ types:
       maxDepth: integer
       timeout: integer
       sleep: integer
+      jitter: integer
       dnsResolvers: optional<list<string>>
   DiscoverDnsSubdomainCorrelationConfig:
     properties:
       domains: list<string>
       threads: integer
       timeout: integer
+      sleep: optional<integer>
+      jitter: optional<integer>
       dnsResolvers: optional<list<string>>
   DiscoverDnsSubdomainPassiveConfig:
     properties:
@@ -44,6 +47,8 @@ types:
       dnsResolvers: optional<list<string>>
       MaxDNSQueries: integer
       MaxResolversQps: integer
+      sleep: optional<integer>
+      jitter: optional<integer>
 # Reports
   DiscoverDnsSubdomainConfig:
     discriminant: discoveryType

@@ -3,6 +3,7 @@ package subdomain
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -23,7 +24,7 @@ func GetDomainSubdomainsActive(ctx context.Context, config dnsfern.DiscoverDnsSu
 	errors := []string{}
 
 	// Run the active subdomain discovery
-	subdomains, err := getSubdomainsActive(ctx, activeConfig.Domain, activeConfig.Subdomains, activeConfig.Threads, activeConfig.MaxDepth, activeConfig.Timeout, activeConfig.Sleep, activeConfig.DnsResolvers)
+	subdomains, err := getSubdomainsActive(ctx, activeConfig.Domain, activeConfig.Subdomains, activeConfig.Threads, activeConfig.MaxDepth, activeConfig.Timeout, activeConfig.Sleep, activeConfig.Jitter, activeConfig.DnsResolvers)
 	if err != nil {
 		errors = append(errors, err.Error())
 	}
@@ -42,7 +43,7 @@ func GetDomainSubdomainsActive(ctx context.Context, config dnsfern.DiscoverDnsSu
 }
 
 // getSubdomainsActive performs recursive bruteforce subdomain enumeration with concurrency and wildcard detection.
-func getSubdomainsActive(ctx context.Context, domain string, subdomainList []string, parallelThreads int, recursiveDepth int, timeout int, sleep int, dnsServerAddresses []string) ([]string, error) {
+func getSubdomainsActive(ctx context.Context, domain string, subdomainList []string, parallelThreads int, recursiveDepth int, timeout int, sleep int, jitter int, dnsServerAddresses []string) ([]string, error) {
 	log := svc1log.FromContext(ctx)
 	subdomains := []string{}
 	subdomainsSet := make(map[string]struct{}) // To track unique valid subdomains
@@ -74,7 +75,7 @@ func getSubdomainsActive(ctx context.Context, domain string, subdomainList []str
 
 	log.Info("Generating base permutations", svc1log.SafeParam("domain", domain))
 	basePermutations := generatePermutations([]string{domain}, subdomainList)
-	validBaseSubdomains := testPermutations(ctx, basePermutations, resolvers, semaphore, &wg, subdomainsMutex, subdomainsSet, &subdomains, 1, recursiveDepth, sleep)
+	validBaseSubdomains := testPermutations(ctx, basePermutations, resolvers, semaphore, &wg, subdomainsMutex, subdomainsSet, &subdomains, 1, recursiveDepth, sleep, jitter)
 
 	// For each subsequent depth, only build on valid subdomains from previous iteration
 	log.Info("Starting subdomain discovery", svc1log.SafeParam("base_subdomain count", len(validBaseSubdomains)))
@@ -108,7 +109,7 @@ func getSubdomainsActive(ctx context.Context, domain string, subdomainList []str
 		}
 
 		newPermutations := generatePermutations(validSubdomains, subdomainList)
-		currentDepthSubdomains = testPermutations(ctx, newPermutations, resolvers, semaphore, &wg, subdomainsMutex, subdomainsSet, &subdomains, depth, recursiveDepth, sleep)
+		currentDepthSubdomains = testPermutations(ctx, newPermutations, resolvers, semaphore, &wg, subdomainsMutex, subdomainsSet, &subdomains, depth, recursiveDepth, sleep, jitter)
 	}
 
 	return subdomains, nil
@@ -116,7 +117,7 @@ func getSubdomainsActive(ctx context.Context, domain string, subdomainList []str
 
 // testPermutations concurrently tests a list of subdomain permutations for DNS resolution.
 // Uses a semaphore to limit concurrency and mutexes to protect shared state.
-func testPermutations(ctx context.Context, permutations []string, resolvers []*net.Resolver, semaphore chan struct{}, wg *sync.WaitGroup, subdomainsMutex *sync.Mutex, subdomainsSet map[string]struct{}, subdomains *[]string, depth int, maxDepth int, sleep int) []string {
+func testPermutations(ctx context.Context, permutations []string, resolvers []*net.Resolver, semaphore chan struct{}, wg *sync.WaitGroup, subdomainsMutex *sync.Mutex, subdomainsSet map[string]struct{}, subdomains *[]string, depth int, maxDepth int, sleep int, jitter int) []string {
 	log := svc1log.FromContext(ctx)
 	var validSubdomains []string
 	validSubdomainsMutex := &sync.Mutex{}
@@ -149,9 +150,19 @@ func testPermutations(ctx context.Context, permutations []string, resolvers []*n
 			_, err := resolver.LookupHost(ctx, testSubdomain)
 			duration := time.Since(start)
 
-			// Apply sleep delay if configured (in milliseconds)
+			// Apply sleep delay if configured (in milliseconds) with optional jitter
 			if sleep > 0 {
-				time.Sleep(time.Duration(sleep) * time.Millisecond)
+				baseDuration := time.Duration(sleep) * time.Millisecond
+				if jitter > 0 && jitter <= 100 {
+					jitterAmount := float64(baseDuration.Nanoseconds()) * (float64(jitter) / 100.0)
+					randomJitter := (rand.Float64()*2 - 1) * jitterAmount
+					finalDelay := time.Duration(float64(baseDuration.Nanoseconds()) + randomJitter)
+					if finalDelay < 0 {
+						finalDelay = 0
+					}
+					baseDuration = finalDelay
+				}
+				time.Sleep(baseDuration)
 			}
 
 			completed := atomic.AddInt64(&completedCount, 1)

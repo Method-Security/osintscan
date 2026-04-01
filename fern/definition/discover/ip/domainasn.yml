@@ -5,6 +5,8 @@ types:
       ipAddresses: optional<list<string>>
       cidr: optional<string>
       dnsResolvers: optional<list<string>>
+      sleep: optional<integer>
+      jitter: optional<integer>
 # Result Structs
   LookupDetails:
     properties:

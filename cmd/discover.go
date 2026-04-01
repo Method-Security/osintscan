@@ -61,7 +61,12 @@ func (a *OsintScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			config := getDiscoverASNConfig(asnFlag, timeout)
+			sleep, jitter, err := getStealthFlags(cmd)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			config := getDiscoverASNConfig(asnFlag, timeout, sleep, jitter)
 			report, err := discover.GetASNInfo(cmd.Context(), config)
 			if err != nil {
 				a.OutputSignal.AddError(err)
@@ -74,6 +79,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 	// Target Flags
 	discoverASNCmd.Flags().String("asn", "", "The ASN number to lookup (e.g., AS23028 or 23028)")
 	discoverASNCmd.Flags().Int("timeout", 120, "The timeout in seconds for the ASN lookup")
+	addStealthFlags(discoverASNCmd)
 
 	// Mark Required Flags
 	_ = discoverASNCmd.MarkFlagRequired("asn")
@@ -111,8 +117,13 @@ func (a *OsintScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
+			sleep, jitter, err := getStealthFlags(cmd)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
 
-			config := getDiscoverDNSCertsConfig(domain)
+			config := getDiscoverDNSCertsConfig(domain, sleep, jitter)
 
 			report, err := dns.DiscoverDomainCerts(cmd.Context(), config)
 			if err != nil {
@@ -125,6 +136,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 
 	// Target Flags
 	discoverDNSCertsCmd.Flags().String("domain", "", "The domain name to retrieve SSL/TLS certificates for")
+	addStealthFlags(discoverDNSCertsCmd)
 
 	// Mark Required Flags
 	_ = discoverDNSCertsCmd.MarkFlagRequired("domain")
@@ -157,8 +169,14 @@ func (a *OsintScan) InitDiscoverCommand() {
 				}
 			}
 
+			sleep, jitter, err := getStealthFlags(cmd)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
 			// Create config
-			config := getDiscoverDNSRecordsConfig(domain, recordTypes)
+			config := getDiscoverDNSRecordsConfig(domain, recordTypes, sleep, jitter)
 
 			// Create report
 			report := dns.DiscoverDomainDNSRecords(cmd.Context(), config)
@@ -169,6 +187,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 	// Target Flags
 	discoverDNSRecordsCmd.Flags().String("domain", "", "The domain name to query for DNS records")
 	discoverDNSRecordsCmd.Flags().StringSlice("record-types", []string{"ALL"}, "Comma-separated list of DNS record types to query (A, AAAA, CNAME, MX, NS, SOA, TXT, PTR, SRV, ALL)")
+	addStealthFlags(discoverDNSRecordsCmd)
 
 	// Mark Required Flags
 	_ = discoverDNSRecordsCmd.MarkFlagRequired("domain")
@@ -194,7 +213,13 @@ func (a *OsintScan) InitDiscoverCommand() {
 				return
 			}
 
-			config := getDiscoverDNSForwardConfig(domain, dnsResolvers)
+			sleep, jitter, err := getStealthFlags(cmd)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			config := getDiscoverDNSForwardConfig(domain, dnsResolvers, sleep, jitter)
 
 			report := dns.GetForwardDNSLookup(cmd.Context(), config)
 			a.OutputSignal.Content = report
@@ -204,6 +229,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 	// Target Flags
 	discoverDNSForwardCmd.Flags().String("domain", "", "The domain name to perform forward lookups on")
 	discoverDNSForwardCmd.Flags().StringSlice("dns-resolvers", []string{"1.1.1.1:53"}, "Custom DNS resolver/servers to use for queries (e.g. 1.1.1.1:53)")
+	addStealthFlags(discoverDNSForwardCmd)
 
 	// Mark Required Flags
 	_ = discoverDNSForwardCmd.MarkFlagRequired("domain")
@@ -245,8 +271,14 @@ func (a *OsintScan) InitDiscoverCommand() {
 				return
 			}
 
+			sleep, jitter, err := getStealthFlags(cmd)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
 			// Create config
-			config := getDiscoverDNSReverseConfig(ips, cidr, dnsResolvers, threads)
+			config := getDiscoverDNSReverseConfig(ips, cidr, dnsResolvers, threads, sleep, jitter)
 
 			// Create report
 			report := dns.GetReverseLookup(cmd.Context(), config)
@@ -259,6 +291,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 	discoverDNSReverseCmd.Flags().String("cidr", "", "The CIDR range to perform reverse DNS lookup on")
 	discoverDNSReverseCmd.Flags().StringSlice("dns-resolvers", []string{"1.1.1.1:53"}, "Custom DNS resolver/servers to use for queries (e.g. 1.1.1.1:53)")
 	discoverDNSReverseCmd.Flags().Int("threads", 0, "Number of concurrent threads for scanning (Default is number of CPUS on machine)")
+	addStealthFlags(discoverDNSReverseCmd)
 
 	// Add command to 'dns' command
 	discoverDNSCmd.AddCommand(discoverDNSReverseCmd)
@@ -361,6 +394,19 @@ func (a *OsintScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
+			jitter, err := cmd.Flags().GetInt("jitter")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			if jitter < 0 || jitter > 100 {
+				a.OutputSignal.AddError(fmt.Errorf("--jitter must be between 0 and 100, got %d", jitter))
+				return
+			}
+			if jitter > 0 && sleep <= 0 {
+				a.OutputSignal.AddError(fmt.Errorf("--jitter requires --sleep to be greater than 0"))
+				return
+			}
 			dnsResolvers, err := cmd.Flags().GetStringSlice("dns-resolvers")
 			if err != nil {
 				a.OutputSignal.AddError(err)
@@ -373,7 +419,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 					return
 				}
 			}
-			config := getDiscoverDNSActiveSubdomainConfig(domain, allSubdomains, wordlistSizeEnum, &wordlistFile, threads, maxDepth, timeout, sleep, dnsResolvers)
+			config := getDiscoverDNSActiveSubdomainConfig(domain, allSubdomains, wordlistSizeEnum, &wordlistFile, threads, maxDepth, timeout, sleep, jitter, dnsResolvers)
 
 			report, err := subdomain.GetDomainSubdomainsActive(cmd.Context(), config)
 			if err != nil {
@@ -395,6 +441,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 	discoverDNSSubdomainActiveCmd.Flags().Int("max-depth", 2, "Maximum recursion depth for subdomain discovery")
 	discoverDNSSubdomainActiveCmd.Flags().Int("timeout", 0, "Maximum time (in minutes) to spend on subdomain discovery")
 	discoverDNSSubdomainActiveCmd.Flags().Int("sleep", 0, "Sleep time in milliseconds between requests to avoid rate limiting")
+	discoverDNSSubdomainActiveCmd.Flags().Int("jitter", 0, "Jitter percentage (0-100) to randomize sleep delay")
 	discoverDNSSubdomainActiveCmd.Flags().StringSlice("dns-resolvers", []string{}, "Custom DNS resolver/servers to use for queries (e.g. 1.1.1.1:53)")
 
 	// Mark Required Flags
@@ -432,8 +479,14 @@ func (a *OsintScan) InitDiscoverCommand() {
 				return
 			}
 
+			sleep, jitter, err := getStealthFlags(cmd)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
 			// Create config
-			config := getDiscoverDNSCorrelationSubdomainConfig(domains, threads, timeout, dnsResolvers)
+			config := getDiscoverDNSCorrelationSubdomainConfig(domains, threads, timeout, sleep, jitter, dnsResolvers)
 
 			// Create report
 			report, err := subdomain.GetDomainSubdomainsCorrelation(cmd.Context(), config)
@@ -449,6 +502,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 	discoverDNSSubdomainCorrelationCmd.Flags().StringSlice("domains", []string{}, "The domains to test")
 	discoverDNSSubdomainCorrelationCmd.Flags().Int("threads", 10, "Number of parallel threads to use for testing")
 	discoverDNSSubdomainCorrelationCmd.Flags().Int("timeout", 0, "Maximum time (in seconds) to spend on each lookup")
+	addStealthFlags(discoverDNSSubdomainCorrelationCmd)
 	discoverDNSSubdomainCorrelationCmd.Flags().StringSlice("dns-resolvers", []string{}, "Custom DNS resolver/servers to use for queries (e.g. 1.1.1.1:53)")
 
 	// Mark Required Flags
@@ -514,8 +568,14 @@ func (a *OsintScan) InitDiscoverCommand() {
 				return
 			}
 
+			sleep, jitter, err := getStealthFlags(cmd)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
 			// Create config
-			config, err := getDiscoverDNSPassiveSubdomainConfig(domain, requestsPerSecond, threads, allSources, modules, dnsResolvers, maxDNSQueries, maxResolversQPS)
+			config, err := getDiscoverDNSPassiveSubdomainConfig(domain, requestsPerSecond, threads, allSources, modules, dnsResolvers, maxDNSQueries, maxResolversQPS, sleep, jitter)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -537,6 +597,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 	discoverDNSSubdomainPassiveCmd.Flags().Int("threads", 10, "Number of concurrent threads for scanning")
 	discoverDNSSubdomainPassiveCmd.Flags().Bool("all-sources", false, "Use all passive sources (subfinder equivalent of --all)")
 	discoverDNSSubdomainPassiveCmd.Flags().StringSlice("modules", []string{"SUBFINDER"}, "Which passive modules to run: SUBFINDER, AMASS, or ALL")
+	addStealthFlags(discoverDNSSubdomainPassiveCmd)
 	discoverDNSSubdomainPassiveCmd.Flags().StringSlice("dns-resolvers", []string{"1.1.1.1:53"}, "Custom DNS resolver/servers to use for queries (e.g. 1.1.1.1:53)")
 	discoverDNSSubdomainPassiveCmd.Flags().Int("max-dns-queries", 2000, "Maximum number of DNS queries to perform per request")
 	discoverDNSSubdomainPassiveCmd.Flags().Int("max-resolvers-qps", 100, "Maximum number of queries per second per resolver")
@@ -603,6 +664,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 	discoverShodanHostnameCmd.Flags().String("api-key", "", "Shodan API Key (defaults to SHODAN_API_KEY environment variable if not provided)")
 	discoverShodanHostnameCmd.Flags().String("query", "", "The search query string to use with Shodan (e.g., 'apache', 'nginx')")
 	discoverShodanHostnameCmd.Flags().String("hostname", "", "The hostname suffix to match in Shodan search results")
+	// Note: Shodan API is a single request per command invocation, so sleep/jitter is not applicable here
 
 	// Mark Required Flags
 	_ = discoverShodanHostnameCmd.MarkFlagRequired("query")
@@ -650,8 +712,14 @@ func (a *OsintScan) InitDiscoverCommand() {
 				}
 			}
 
+			sleep, jitter, err := getStealthFlags(cmd)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
 			// Create config
-			config := getDiscoverCdnConfig(domain, ipAddresses, dnsResolvers, fingerprintsFile)
+			config := getDiscoverCdnConfig(domain, ipAddresses, dnsResolvers, fingerprintsFile, sleep, jitter)
 
 			// Create report
 			report := discover.RunDiscoverCdns(cmd.Context(), config)
@@ -664,6 +732,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 	discoverCdnCmd.Flags().StringSlice("ip-addresses", []string{}, "The IP addresses to check against CDN provider ranges")
 	discoverCdnCmd.Flags().StringSlice("dns-resolvers", []string{"1.1.1.1:53"}, "Custom DNS resolver/servers to use for queries (e.g. 1.1.1.1:53)")
 	discoverCdnCmd.Flags().String("fingerprints-file", "", "The path to the CDN fingerprints file")
+	addStealthFlags(discoverCdnCmd)
 
 	// Mark Required Flags
 	_ = discoverCdnCmd.MarkFlagRequired("domain")
@@ -744,8 +813,14 @@ func (a *OsintScan) InitDiscoverCommand() {
 				}
 			}
 
+			sleep, jitter, err := getStealthFlags(cmd)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
 			// Generate the report
-			config := getDiscoverIPDomainASNConfig(ips, cidr, dnsResolvers)
+			config := getDiscoverIPDomainASNConfig(ips, cidr, dnsResolvers, sleep, jitter)
 			report := ip.GetDomainASNLookup(cmd.Context(), config)
 			a.OutputSignal.Content = report
 		},
@@ -755,6 +830,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 	discoverIPDomainASNCmd.Flags().StringSlice("ip-addresses", []string{}, "The IP addresses to perform reverse DNS and ASN lookup on")
 	discoverIPDomainASNCmd.Flags().String("cidr", "", "The CIDR range to perform reverse DNS and ASN lookup on")
 	discoverIPDomainASNCmd.Flags().StringSlice("dns-resolvers", []string{"1.1.1.1:53"}, "Custom DNS resolver/servers to use for queries (e.g. 1.1.1.1:53)")
+	addStealthFlags(discoverIPDomainASNCmd)
 
 	// Add command to 'ip' command
 	discoverIPCmd.AddCommand(discoverIPDomainASNCmd)
@@ -764,42 +840,52 @@ func (a *OsintScan) InitDiscoverCommand() {
 }
 
 // getDiscoverASNConfig creates and returns a configuration for ASN discovery
-func getDiscoverASNConfig(asn string, timeout int) *asnfern.DiscoverAsnConfig {
+func getDiscoverASNConfig(asn string, timeout int, sleep int, jitter int) *asnfern.DiscoverAsnConfig {
 	return &asnfern.DiscoverAsnConfig{
 		Asn:     asn,
 		Timeout: &timeout,
+		Sleep:   intPtr(sleep),
+		Jitter:  intPtr(jitter),
 	}
 }
 
 // getDiscoverDNSCertsConfig creates and returns a configuration for DNS certificate discovery
-func getDiscoverDNSCertsConfig(domain string) dnsfern.DiscoverDnsCertsConfig {
+func getDiscoverDNSCertsConfig(domain string, sleep int, jitter int) dnsfern.DiscoverDnsCertsConfig {
 	return dnsfern.DiscoverDnsCertsConfig{
 		Domain: domain,
+		Sleep:  intPtr(sleep),
+		Jitter: intPtr(jitter),
 	}
 }
 
 // getDiscoverDNSRecordsConfig creates and returns a configuration for DNS records discovery
-func getDiscoverDNSRecordsConfig(domain string, recordTypes []string) dnsfern.DiscoverDnsRecordsConfig {
+func getDiscoverDNSRecordsConfig(domain string, recordTypes []string, sleep int, jitter int) dnsfern.DiscoverDnsRecordsConfig {
 	return dnsfern.DiscoverDnsRecordsConfig{
 		Domain:      domain,
 		RecordTypes: recordTypes,
+		Sleep:       intPtr(sleep),
+		Jitter:      intPtr(jitter),
 	}
 }
 
 // getDiscoverDNSForwardConfig creates and returns a configuration for forward DNS lookup
-func getDiscoverDNSForwardConfig(domain string, dnsResolvers []string) dnsfern.DiscoverDnsForwardConfig {
+func getDiscoverDNSForwardConfig(domain string, dnsResolvers []string, sleep int, jitter int) dnsfern.DiscoverDnsForwardConfig {
 	return dnsfern.DiscoverDnsForwardConfig{
 		Domain:       domain,
 		DnsResolvers: dnsResolvers,
+		Sleep:        intPtr(sleep),
+		Jitter:       intPtr(jitter),
 	}
 }
 
 // getDiscoverDNSReverseConfig creates and returns a configuration for DNS reverse lookup
-func getDiscoverDNSReverseConfig(ips []string, cidr string, dnsResolvers []string, threads int) *dnsfern.DiscoverDnsReverseConfig {
+func getDiscoverDNSReverseConfig(ips []string, cidr string, dnsResolvers []string, threads int, sleep int, jitter int) *dnsfern.DiscoverDnsReverseConfig {
 	config := &dnsfern.DiscoverDnsReverseConfig{
 		IpAddresses:  ips,
 		DnsResolvers: dnsResolvers,
 		Threads:      max(threads, 0),
+		Sleep:        intPtr(sleep),
+		Jitter:       intPtr(jitter),
 	}
 	if cidr != "" {
 		config.Cidr = &cidr
@@ -808,7 +894,7 @@ func getDiscoverDNSReverseConfig(ips []string, cidr string, dnsResolvers []strin
 }
 
 // getDiscoverDNSActiveSubdomainConfig creates and returns a configuration for active subdomain discovery
-func getDiscoverDNSActiveSubdomainConfig(domain string, subdomains []string, wordlistSize *dnsfern.WordlistSize, wordlistFile *string, threads, maxDepth, timeout, sleep int, dnsResolvers []string) dnsfern.DiscoverDnsSubdomainConfig {
+func getDiscoverDNSActiveSubdomainConfig(domain string, subdomains []string, wordlistSize *dnsfern.WordlistSize, wordlistFile *string, threads, maxDepth, timeout, sleep, jitter int, dnsResolvers []string) dnsfern.DiscoverDnsSubdomainConfig {
 	return dnsfern.DiscoverDnsSubdomainConfig{
 		DiscoveryType: strings.ToLower(string(dnsfern.DiscoverDnsSubdomainTypeActive)),
 		Active: &dnsfern.DiscoverDnsSubdomainActiveConfig{
@@ -820,26 +906,29 @@ func getDiscoverDNSActiveSubdomainConfig(domain string, subdomains []string, wor
 			MaxDepth:     maxDepth,
 			Timeout:      timeout,
 			Sleep:        sleep,
+			Jitter:       jitter,
 			DnsResolvers: dnsResolvers,
 		},
 	}
 }
 
 // getDiscoverDNSCorrelationSubdomainConfig creates and returns a configuration for correlation subdomain discovery
-func getDiscoverDNSCorrelationSubdomainConfig(domains []string, threads int, timeout int, dnsResolvers []string) dnsfern.DiscoverDnsSubdomainConfig {
+func getDiscoverDNSCorrelationSubdomainConfig(domains []string, threads int, timeout int, sleep int, jitter int, dnsResolvers []string) dnsfern.DiscoverDnsSubdomainConfig {
 	return dnsfern.DiscoverDnsSubdomainConfig{
 		DiscoveryType: strings.ToLower(string(dnsfern.DiscoverDnsSubdomainTypeCorrelation)),
 		Correlation: &dnsfern.DiscoverDnsSubdomainCorrelationConfig{
 			Domains:      domains,
 			Threads:      threads,
 			Timeout:      timeout,
+			Sleep:        intPtr(sleep),
+			Jitter:       intPtr(jitter),
 			DnsResolvers: dnsResolvers,
 		},
 	}
 }
 
 // getDiscoverDNSPassiveSubdomainConfig creates and returns a configuration for passive subdomain discovery
-func getDiscoverDNSPassiveSubdomainConfig(domain string, requestsPerSecond int, threads int, allSources bool, modules []string, dnsResolvers []string, maxDNSQueries int, maxResolversQPS int) (dnsfern.DiscoverDnsSubdomainConfig, error) {
+func getDiscoverDNSPassiveSubdomainConfig(domain string, requestsPerSecond int, threads int, allSources bool, modules []string, dnsResolvers []string, maxDNSQueries int, maxResolversQPS int, sleep int, jitter int) (dnsfern.DiscoverDnsSubdomainConfig, error) {
 
 	var modulesEnum []dnsfern.DiscoverDnsSubdomainModule
 	for _, module := range modules {
@@ -861,16 +950,20 @@ func getDiscoverDNSPassiveSubdomainConfig(domain string, requestsPerSecond int, 
 			DnsResolvers:      dnsResolvers,
 			MaxDnsQueries:     max(maxDNSQueries, 0),
 			MaxResolversQps:   max(maxResolversQPS, 0),
+			Sleep:             intPtr(sleep),
+			Jitter:            intPtr(jitter),
 		},
 	}
 	return config, nil
 }
 
 // getDiscoverCdnConfig creates and returns a configuration for CDN discovery
-func getDiscoverCdnConfig(domain string, ipAddresses []string, dnsResolvers []string, fingerprintsFile string) cdnfern.DiscoverCdnConfig {
+func getDiscoverCdnConfig(domain string, ipAddresses []string, dnsResolvers []string, fingerprintsFile string, sleep int, jitter int) cdnfern.DiscoverCdnConfig {
 	config := cdnfern.DiscoverCdnConfig{
 		Domain:       domain,
 		DnsResolvers: dnsResolvers,
+		Sleep:        intPtr(sleep),
+		Jitter:       intPtr(jitter),
 	}
 	if fingerprintsFile != "" {
 		config.FingerprintsFile = &fingerprintsFile
@@ -882,10 +975,12 @@ func getDiscoverCdnConfig(domain string, ipAddresses []string, dnsResolvers []st
 }
 
 // getDiscoverIPDomainASNConfig creates and returns a configuration for IP domain ASN discovery
-func getDiscoverIPDomainASNConfig(ips []string, cidr string, dnsResolvers []string) *ipfern.DiscoverIpDomainAsnConfig {
+func getDiscoverIPDomainASNConfig(ips []string, cidr string, dnsResolvers []string, sleep int, jitter int) *ipfern.DiscoverIpDomainAsnConfig {
 	config := &ipfern.DiscoverIpDomainAsnConfig{
 		IpAddresses:  ips,
 		DnsResolvers: dnsResolvers,
+		Sleep:        intPtr(sleep),
+		Jitter:       intPtr(jitter),
 	}
 
 	// Only set CIDR if it's not empty

@@ -7,6 +7,8 @@ types:
       zones: list<string>
       dnsResolvers: list<string>
       timeout: integer
+      sleep: optional<integer>
+      jitter: optional<integer>
 # Report Structs
   DnsZoneTransferApplication:
     properties:

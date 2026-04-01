@@ -4,6 +4,8 @@ types:
     properties:
       domain: string
       dnsResolvers: optional<list<string>>
+      sleep: optional<integer>
+      jitter: optional<integer>
 # Result Structs
   LookupDetails:
     properties:

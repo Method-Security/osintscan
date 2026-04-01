@@ -23,6 +23,8 @@ types:
       ipAddresses: optional<list<string>>
       dnsResolvers: optional<list<string>>
       fingerprintsFile: optional<string>
+      sleep: optional<integer>
+      jitter: optional<integer>
 # Report Structs
   CdnMatch:
     properties:

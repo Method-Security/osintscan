@@ -54,7 +54,13 @@ func (a *OsintScan) InitEnumerateCommand() {
 				}
 			}
 
-			config := getEnumerateDNSZoneTransferConfig(zones, dnsResolvers, timeout)
+			sleep, jitter, err := getStealthFlags(cmd)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			config := getEnumerateDNSZoneTransferConfig(zones, dnsResolvers, timeout, sleep, jitter)
 
 			report, err := zonetransfer.TestZoneTransfer(cmd.Context(), config)
 			if err != nil {
@@ -71,6 +77,7 @@ func (a *OsintScan) InitEnumerateCommand() {
 	// Config Flags
 	enumerateDNSZoneTransferCmd.Flags().Int("timeout", 30, "Timeout in seconds for each zone transfer request")
 	enumerateDNSZoneTransferCmd.Flags().StringSlice("dns-resolvers", []string{"1.1.1.1:53"}, "DNS resolvers to use for NS lookups and hostname resolution (e.g. 1.1.1.1:53)")
+	addStealthFlags(enumerateDNSZoneTransferCmd)
 
 	_ = enumerateDNSZoneTransferCmd.MarkFlagRequired("zones")
 
@@ -80,10 +87,12 @@ func (a *OsintScan) InitEnumerateCommand() {
 }
 
 // getEnumerateDNSZoneTransferConfig creates and returns a configuration for DNS zone transfer enumeration
-func getEnumerateDNSZoneTransferConfig(zones []string, dnsResolvers []string, timeout int) dnsfern.EnumerateDnsZoneTransferConfig {
+func getEnumerateDNSZoneTransferConfig(zones []string, dnsResolvers []string, timeout int, sleep int, jitter int) dnsfern.EnumerateDnsZoneTransferConfig {
 	return dnsfern.EnumerateDnsZoneTransferConfig{
 		Zones:        zones,
 		DnsResolvers: dnsResolvers,
 		Timeout:      timeout,
+		Sleep:        intPtr(sleep),
+		Jitter:       intPtr(jitter),
 	}
 }

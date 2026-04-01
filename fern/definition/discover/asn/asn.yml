@@ -4,6 +4,8 @@ types:
     properties:
       asn: string
       timeout: optional<integer>
+      sleep: optional<integer>
+      jitter: optional<integer>
   DiscoverASNLookup:
     properties:
       asn: string

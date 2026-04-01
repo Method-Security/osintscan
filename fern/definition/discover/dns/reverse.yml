@@ -6,6 +6,8 @@ types:
       cidr: optional<string>
       dnsResolvers: optional<list<string>>
       threads: integer
+      sleep: optional<integer>
+      jitter: optional<integer>
 # Result Structs
   ReverseDetails:
     properties:
