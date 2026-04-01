@@ -179,45 +179,61 @@ func DiscoverDomainDNSRecords(ctx context.Context, config dnsfern.DiscoverDnsRec
 		svc1log.SafeParam("total_records", len(allDNSRecords)),
 		svc1log.SafeParam("filtered_records", len(dnsRecords)))
 
+	// DMARC and DKIM are TXT-based records; only query them when TXT or ALL is
+	// requested, or when no type filter is applied (meaning return everything).
+	wantTXT := len(recordTypes) == 0
+	for _, rt := range recordTypes {
+		if rt == common.DnsRecordTypeAll || rt == common.DnsRecordTypeTxt {
+			wantTXT = true
+			break
+		}
+	}
+
 	// The DMARC record is always in the _dmarc subdomain (RFC-7489)
-	dmarcDomain := "_dmarc." + config.Domain
-	log.Debug("Querying DMARC records", svc1log.SafeParam("dmarc_domain", dmarcDomain))
-	dmarcRecords, err := getDNSRecords(ctx, dmarcDomain, []uint16{dns.TypeTXT})
-	if err != nil {
-		log.Warn("Failed to get DMARC records",
-			svc1log.SafeParam("dmarc_domain", dmarcDomain),
-			svc1log.SafeParam("error", err.Error()))
-		errors = append(errors, err.Error())
-	} else {
-		log.Debug("Retrieved DMARC records",
-			svc1log.SafeParam("dmarc_domain", dmarcDomain),
-			svc1log.SafeParam("dmarc_record_count", len(dmarcRecords)))
+	dmarcRecords := []*common.DnsRecord{}
+	if wantTXT {
+		dmarcDomain := "_dmarc." + config.Domain
+		log.Debug("Querying DMARC records", svc1log.SafeParam("dmarc_domain", dmarcDomain))
+		var dmarcErr error
+		dmarcRecords, dmarcErr = getDNSRecords(ctx, dmarcDomain, []uint16{dns.TypeTXT})
+		if dmarcErr != nil {
+			log.Warn("Failed to get DMARC records",
+				svc1log.SafeParam("dmarc_domain", dmarcDomain),
+				svc1log.SafeParam("error", dmarcErr.Error()))
+			errors = append(errors, dmarcErr.Error())
+		} else {
+			log.Debug("Retrieved DMARC records",
+				svc1log.SafeParam("dmarc_domain", dmarcDomain),
+				svc1log.SafeParam("dmarc_record_count", len(dmarcRecords)))
+		}
 	}
 
 	// The DKIM record is always in the _domainkey subdomain (RFC-6376),
 	// but the selector is not known in advance, so check common selectors.
 	dkimRecords := []*common.DnsRecord{}
-	var selectors []string = []string{"default", "selector1", "selector2", "google", "amazonses", "microsoft"}
-	log.Debug("Querying DKIM records",
-		svc1log.SafeParam("domain", config.Domain),
-		svc1log.SafeParam("selector_count", len(selectors)))
+	if wantTXT {
+		var selectors []string = []string{"default", "selector1", "selector2", "google", "amazonses", "microsoft"}
+		log.Debug("Querying DKIM records",
+			svc1log.SafeParam("domain", config.Domain),
+			svc1log.SafeParam("selector_count", len(selectors)))
 
-	for _, selector := range selectors {
-		dkimDomain := selector + "._domainkey." + config.Domain
-		dkimRecordForSelector, err := getDNSRecords(ctx, dkimDomain, []uint16{dns.TypeTXT})
-		if err != nil {
-			log.Debug("Failed to get DKIM records for selector",
-				svc1log.SafeParam("selector", selector),
-				svc1log.SafeParam("dkim_domain", dkimDomain),
-				svc1log.SafeParam("error", err.Error()))
-			errors = append(errors, err.Error())
-		} else if len(dkimRecordForSelector) > 0 {
-			log.Debug("Retrieved DKIM records for selector",
-				svc1log.SafeParam("selector", selector),
-				svc1log.SafeParam("dkim_domain", dkimDomain),
-				svc1log.SafeParam("dkim_record_count", len(dkimRecordForSelector)))
+		for _, selector := range selectors {
+			dkimDomain := selector + "._domainkey." + config.Domain
+			dkimRecordForSelector, dkimErr := getDNSRecords(ctx, dkimDomain, []uint16{dns.TypeTXT})
+			if dkimErr != nil {
+				log.Debug("Failed to get DKIM records for selector",
+					svc1log.SafeParam("selector", selector),
+					svc1log.SafeParam("dkim_domain", dkimDomain),
+					svc1log.SafeParam("error", dkimErr.Error()))
+				errors = append(errors, dkimErr.Error())
+			} else if len(dkimRecordForSelector) > 0 {
+				log.Debug("Retrieved DKIM records for selector",
+					svc1log.SafeParam("selector", selector),
+					svc1log.SafeParam("dkim_domain", dkimDomain),
+					svc1log.SafeParam("dkim_record_count", len(dkimRecordForSelector)))
+			}
+			dkimRecords = append(dkimRecords, dkimRecordForSelector...)
 		}
-		dkimRecords = append(dkimRecords, dkimRecordForSelector...)
 	}
 
 	// Create the report
