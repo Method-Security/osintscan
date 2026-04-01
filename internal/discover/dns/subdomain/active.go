@@ -3,7 +3,6 @@ package subdomain
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -152,17 +151,7 @@ func testPermutations(ctx context.Context, permutations []string, resolvers []*n
 
 			// Apply sleep delay if configured (in milliseconds) with optional jitter
 			if sleep > 0 {
-				baseDuration := time.Duration(sleep) * time.Millisecond
-				if jitter > 0 && jitter <= 100 {
-					jitterAmount := float64(baseDuration.Nanoseconds()) * (float64(jitter) / 100.0)
-					randomJitter := (rand.Float64()*2 - 1) * jitterAmount
-					finalDelay := time.Duration(float64(baseDuration.Nanoseconds()) + randomJitter)
-					if finalDelay < 0 {
-						finalDelay = 0
-					}
-					baseDuration = finalDelay
-				}
-				time.Sleep(baseDuration)
+				time.Sleep(utils.CalculateDelayWithJitterDuration(time.Duration(sleep)*time.Millisecond, jitter))
 			}
 
 			completed := atomic.AddInt64(&completedCount, 1)

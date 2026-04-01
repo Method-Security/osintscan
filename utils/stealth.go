@@ -13,25 +13,21 @@ func CalculateDelayWithJitter(baseDelaySeconds int, jitterPercent int) time.Dura
 	if baseDelaySeconds <= 0 {
 		return 0
 	}
+	return CalculateDelayWithJitterDuration(time.Duration(baseDelaySeconds)*time.Second, jitterPercent)
+}
 
-	baseDelay := time.Duration(baseDelaySeconds) * time.Second
+func CalculateDelayWithJitterDuration(baseDelay time.Duration, jitterPercent int) time.Duration {
+	if baseDelay <= 0 {
+		return 0
+	}
 
-	// Apply jitter if specified and valid
 	if jitterPercent > 0 && jitterPercent <= 100 {
-		// Calculate jitter amount (percentage of base delay)
 		jitterAmount := float64(baseDelay.Nanoseconds()) * (float64(jitterPercent) / 100.0)
-
-		// Generate random jitter between -jitterAmount and +jitterAmount
 		randomJitter := (rand.Float64()*2 - 1) * jitterAmount
-
-		// Apply jitter to base delay
 		finalDelay := time.Duration(float64(baseDelay.Nanoseconds()) + randomJitter)
-
-		// Ensure delay is not negative
 		if finalDelay < 0 {
 			finalDelay = 0
 		}
-
 		return finalDelay
 	}
 
