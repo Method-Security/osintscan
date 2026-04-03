@@ -3,7 +3,9 @@ package dns
 import (
 	"context"
 	"fmt"
+	"net"
 	"slices"
+	"strings"
 
 	common "github.com/Method-Security/osintscan/generated/go/common"
 	dnsfern "github.com/Method-Security/osintscan/generated/go/discover/dns"
@@ -11,6 +13,27 @@ import (
 	"github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 	"github.com/projectdiscovery/dnsx/libs/dnsx"
 )
+
+// normalizeDnsxResolvers converts resolver addresses (e.g. "1.1.1.1:53") to the
+// format expected by the dnsx library ("udp:1.1.1.1:53").
+func normalizeDnsxResolvers(resolvers []string) []string {
+	if len(resolvers) == 0 {
+		return nil
+	}
+	normalized := make([]string, 0, len(resolvers))
+	for _, r := range resolvers {
+		if strings.HasPrefix(r, "udp:") || strings.HasPrefix(r, "tcp:") {
+			normalized = append(normalized, r)
+			continue
+		}
+		// Add default port if missing
+		if _, _, err := net.SplitHostPort(r); err != nil {
+			r = net.JoinHostPort(r, "53")
+		}
+		normalized = append(normalized, "udp:"+r)
+	}
+	return normalized
+}
 
 // filterDNSRecordsByType filters DNS records based on the requested record types
 func filterDNSRecordsByType(records []*common.DnsRecord, recordTypes []common.DnsRecordType) []*common.DnsRecord {
@@ -44,7 +67,7 @@ func filterDNSRecordsByType(records []*common.DnsRecord, recordTypes []common.Dn
 }
 
 // getDNSRecords queries DNS for the specified record types for a domain and returns a DnsRecords struct.
-func getDNSRecords(ctx context.Context, domain string, questionTypes []uint16) ([]*common.DnsRecord, error) {
+func getDNSRecords(ctx context.Context, domain string, questionTypes []uint16, dnsResolvers []string) ([]*common.DnsRecord, error) {
 	log := svc1log.FromContext(ctx)
 
 	log.Debug("Querying DNS records",
@@ -53,6 +76,9 @@ func getDNSRecords(ctx context.Context, domain string, questionTypes []uint16) (
 
 	options := dnsx.DefaultOptions
 	options.QuestionTypes = questionTypes
+	if len(dnsResolvers) > 0 {
+		options.BaseResolvers = dnsResolvers
+	}
 	client, err := dnsx.New(options)
 	if err != nil {
 		log.Warn("Failed to create DNS client",
@@ -147,9 +173,12 @@ func DiscoverDomainDNSRecords(ctx context.Context, config dnsfern.DiscoverDnsRec
 		svc1log.SafeParam("domain", config.Domain),
 		svc1log.SafeParam("requested_record_types", len(config.RecordTypes)))
 
+	// Normalize resolver format for dnsx (requires "udp:host:port" prefix)
+	resolvers := normalizeDnsxResolvers(config.DnsResolvers)
+
 	// Get all the DNS records (query all types, then filter)
 	questionTypes := []uint16{dns.TypeA, dns.TypeAAAA, dns.TypeCAA, dns.TypeCNAME, dns.TypeMX, dns.TypeNS, dns.TypePTR, dns.TypeSOA, dns.TypeSRV, dns.TypeTXT}
-	allDNSRecords, err := getDNSRecords(ctx, config.Domain, questionTypes)
+	allDNSRecords, err := getDNSRecords(ctx, config.Domain, questionTypes, resolvers)
 	if err != nil {
 		log.Warn("Failed to get DNS records",
 			svc1log.SafeParam("domain", config.Domain),
@@ -195,7 +224,7 @@ func DiscoverDomainDNSRecords(ctx context.Context, config dnsfern.DiscoverDnsRec
 		dmarcDomain := "_dmarc." + config.Domain
 		log.Debug("Querying DMARC records", svc1log.SafeParam("dmarc_domain", dmarcDomain))
 		var dmarcErr error
-		dmarcRecords, dmarcErr = getDNSRecords(ctx, dmarcDomain, []uint16{dns.TypeTXT})
+		dmarcRecords, dmarcErr = getDNSRecords(ctx, dmarcDomain, []uint16{dns.TypeTXT}, resolvers)
 		if dmarcErr != nil {
 			log.Warn("Failed to get DMARC records",
 				svc1log.SafeParam("dmarc_domain", dmarcDomain),
@@ -219,7 +248,7 @@ func DiscoverDomainDNSRecords(ctx context.Context, config dnsfern.DiscoverDnsRec
 
 		for _, selector := range selectors {
 			dkimDomain := selector + "._domainkey." + config.Domain
-			dkimRecordForSelector, dkimErr := getDNSRecords(ctx, dkimDomain, []uint16{dns.TypeTXT})
+			dkimRecordForSelector, dkimErr := getDNSRecords(ctx, dkimDomain, []uint16{dns.TypeTXT}, resolvers)
 			if dkimErr != nil {
 				log.Debug("Failed to get DKIM records for selector",
 					svc1log.SafeParam("selector", selector),

@@ -54,7 +54,20 @@ func (a *OsintScan) InitEnumerateCommand() {
 				}
 			}
 
-			config := getEnumerateDNSZoneTransferConfig(zones, dnsResolvers, timeout)
+			targetNameservers, err := cmd.Flags().GetStringSlice("target-nameservers")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			for _, ns := range targetNameservers {
+				if err = utils.ValidateDNSServerAddress(ns); err != nil {
+					a.OutputSignal.AddError(fmt.Errorf("invalid target nameserver %s: %w", ns, err))
+					return
+				}
+			}
+
+			config := getEnumerateDNSZoneTransferConfig(zones, dnsResolvers, targetNameservers, timeout)
 
 			report, err := zonetransfer.TestZoneTransfer(cmd.Context(), config)
 			if err != nil {
@@ -71,6 +84,7 @@ func (a *OsintScan) InitEnumerateCommand() {
 	// Config Flags
 	enumerateDNSZoneTransferCmd.Flags().Int("timeout", 30, "Timeout in seconds for each zone transfer request")
 	enumerateDNSZoneTransferCmd.Flags().StringSlice("dns-resolvers", []string{"1.1.1.1:53"}, "DNS resolvers to use for NS lookups and hostname resolution (e.g. 1.1.1.1:53)")
+	enumerateDNSZoneTransferCmd.Flags().StringSlice("target-nameservers", []string{}, "Nameserver IPs to attempt AXFR against directly, bypassing NS record lookup (e.g. 10.0.0.1:53)")
 
 	_ = enumerateDNSZoneTransferCmd.MarkFlagRequired("zones")
 
@@ -80,10 +94,11 @@ func (a *OsintScan) InitEnumerateCommand() {
 }
 
 // getEnumerateDNSZoneTransferConfig creates and returns a configuration for DNS zone transfer enumeration
-func getEnumerateDNSZoneTransferConfig(zones []string, dnsResolvers []string, timeout int) dnsfern.EnumerateDnsZoneTransferConfig {
+func getEnumerateDNSZoneTransferConfig(zones []string, dnsResolvers []string, targetNameservers []string, timeout int) dnsfern.EnumerateDnsZoneTransferConfig {
 	return dnsfern.EnumerateDnsZoneTransferConfig{
-		Zones:        zones,
-		DnsResolvers: dnsResolvers,
-		Timeout:      timeout,
+		Zones:             zones,
+		DnsResolvers:      dnsResolvers,
+		TargetNameservers: targetNameservers,
+		Timeout:           timeout,
 	}
 }

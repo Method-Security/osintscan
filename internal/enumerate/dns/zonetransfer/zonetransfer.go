@@ -24,7 +24,12 @@ func TestZoneTransfer(ctx context.Context, config dnsfern.EnumerateDnsZoneTransf
 	}
 
 	for _, zone := range config.Zones {
-		zoneDetails := testZone(ctx, zone, config.Timeout, resolver, log, &errors)
+		var zoneDetails *dnsfern.DnsZoneTransferDetails
+		if len(config.TargetNameservers) > 0 {
+			zoneDetails = testZoneDirect(ctx, zone, config.TargetNameservers, config.Timeout, log, &errors)
+		} else {
+			zoneDetails = testZone(ctx, zone, config.Timeout, resolver, log, &errors)
+		}
 		if len(zoneDetails.Applications) > 0 {
 			details = append(details, zoneDetails)
 		}
@@ -37,6 +42,49 @@ func TestZoneTransfer(ctx context.Context, config dnsfern.EnumerateDnsZoneTransf
 		},
 		Errors: errors,
 	}, nil
+}
+
+// testZoneDirect attempts AXFR against explicitly provided nameserver IPs,
+// bypassing NS record lookup. Useful for internal DNS servers or when you know
+// the nameserver IP directly.
+func testZoneDirect(ctx context.Context, zone string, targetNameservers []string, timeout int, log svc1log.Logger, errors *[]string) *dnsfern.DnsZoneTransferDetails {
+	applications := []*dnsfern.DnsZoneTransferApplication{}
+
+	for _, ns := range targetNameservers {
+		dnsServer := ns
+		if _, _, err := net.SplitHostPort(ns); err != nil {
+			dnsServer = net.JoinHostPort(ns, "53")
+		}
+
+		log.Info("Attempting direct zone transfer",
+			svc1log.SafeParam("zone", zone),
+			svc1log.SafeParam("dnsServer", dnsServer))
+
+		records, success, errs := sendAXFRRequest(dnsServer, zone, timeout, log)
+		for _, e := range errs {
+			*errors = append(*errors, fmt.Sprintf("%s@%s: %s", zone, dnsServer, e))
+		}
+
+		if success {
+			log.Info("Zone transfer succeeded",
+				svc1log.SafeParam("zone", zone),
+				svc1log.SafeParam("dnsServer", dnsServer),
+				svc1log.SafeParam("records", len(records)))
+
+			// Use the IP as the nameserver label since we don't have a hostname
+			host, _, _ := net.SplitHostPort(dnsServer)
+			applications = append(applications, &dnsfern.DnsZoneTransferApplication{
+				Nameserver: host,
+				DnsServer:  dnsServer,
+				DnsRecords: records,
+			})
+		}
+	}
+
+	return &dnsfern.DnsZoneTransferDetails{
+		Zone:         zone,
+		Applications: applications,
+	}
 }
 
 // testZone looks up NS records for the zone, resolves each NS hostname to an IP,

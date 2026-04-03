@@ -6,6 +6,7 @@ types:
     properties:
       zones: list<string>
       dnsResolvers: list<string>
+      targetNameservers: optional<list<string>>
       timeout: integer
 # Report Structs
   DnsZoneTransferApplication:

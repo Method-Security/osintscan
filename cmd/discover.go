@@ -157,8 +157,14 @@ func (a *OsintScan) InitDiscoverCommand() {
 				}
 			}
 
+			dnsResolvers, err := cmd.Flags().GetStringSlice("dns-resolvers")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
 			// Create config
-			config := getDiscoverDNSRecordsConfig(domain, recordTypes)
+			config := getDiscoverDNSRecordsConfig(domain, recordTypes, dnsResolvers)
 
 			// Create report
 			report := dns.DiscoverDomainDNSRecords(cmd.Context(), config)
@@ -169,6 +175,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 	// Target Flags
 	discoverDNSRecordsCmd.Flags().String("domain", "", "The domain name to query for DNS records")
 	discoverDNSRecordsCmd.Flags().StringSlice("record-types", []string{"ALL"}, "Comma-separated list of DNS record types to query (A, AAAA, CNAME, MX, NS, SOA, TXT, PTR, SRV, ALL)")
+	discoverDNSRecordsCmd.Flags().StringSlice("dns-resolvers", []string{}, "DNS resolvers to use for record lookups (e.g. 10.0.0.1:53). Uses public resolvers if not set.")
 
 	// Mark Required Flags
 	_ = discoverDNSRecordsCmd.MarkFlagRequired("domain")
@@ -779,10 +786,11 @@ func getDiscoverDNSCertsConfig(domain string) dnsfern.DiscoverDnsCertsConfig {
 }
 
 // getDiscoverDNSRecordsConfig creates and returns a configuration for DNS records discovery
-func getDiscoverDNSRecordsConfig(domain string, recordTypes []string) dnsfern.DiscoverDnsRecordsConfig {
+func getDiscoverDNSRecordsConfig(domain string, recordTypes []string, dnsResolvers []string) dnsfern.DiscoverDnsRecordsConfig {
 	return dnsfern.DiscoverDnsRecordsConfig{
-		Domain:      domain,
-		RecordTypes: recordTypes,
+		Domain:       domain,
+		RecordTypes:  recordTypes,
+		DnsResolvers: dnsResolvers,
 	}
 }
 
