@@ -4,9 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"regexp"
 	"strconv"
-	"strings"
 	"time"
 
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
@@ -15,51 +13,26 @@ import (
 // ValidateDNSServerAddress checks if the DNS server address is valid.
 // Accepts IP, IP:PORT, HOSTNAME, or HOSTNAME:PORT formats. Port 53 is assumed when omitted.
 func ValidateDNSServerAddress(address string) error {
-	host, port, err := net.SplitHostPort(address)
+	// Normalize to host:port so we can validate uniformly
+	normalized := NormalizeDNSAddress(address)
+	host, port, err := net.SplitHostPort(normalized)
 	if err != nil {
-		// No port specified — that's fine, we'll default to 53.
-		// Validate the bare address as an IP or hostname.
-		if ip := net.ParseIP(address); ip != nil {
-			return nil // Valid bare IP
-		}
-		// Try as hostname (no port)
-		host = strings.TrimSuffix(address, ".")
-		if len(host) == 0 || len(host) > 253 {
-			return fmt.Errorf("invalid hostname length: %s", host)
-		}
-		validHostname := regexp.MustCompile(`^([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)*[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?$`)
-		if !validHostname.MatchString(host) {
-			return fmt.Errorf("invalid DNS server address format: %s", address)
-		}
-		return nil
+		return fmt.Errorf("invalid DNS server address format: %s", address)
 	}
 
-	// Validate port number
 	portNum, err := strconv.Atoi(port)
 	if err != nil || portNum < 1 || portNum > 65535 {
 		return fmt.Errorf("invalid port number in DNS server address: %s", port)
 	}
 
-	// Check if it's an IP address
-	if ip := net.ParseIP(host); ip != nil {
-		return nil // Valid IP
+	// Valid if it's an IP
+	if net.ParseIP(host) != nil {
+		return nil
 	}
 
-	// Not an IP, try to validate as hostname
-	// Quick validation: check basic hostname rules
+	// Otherwise validate as hostname via net.LookupHost-compatible check
 	if len(host) == 0 || len(host) > 253 {
-		return fmt.Errorf("invalid hostname length: %s", host)
-	}
-
-	// Check for valid hostname characters and structure
-	// This regex allows alphanumeric, dots, and hyphens in valid positions
-	validHostname := regexp.MustCompile(`^([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)*[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?$`)
-
-	// Remove trailing dot if present (valid in FQDN)
-	host = strings.TrimSuffix(host, ".")
-
-	if !validHostname.MatchString(host) {
-		return fmt.Errorf("invalid hostname format: %s", host)
+		return fmt.Errorf("invalid DNS server address: %s", address)
 	}
 
 	return nil
