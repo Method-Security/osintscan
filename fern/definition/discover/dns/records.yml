@@ -5,6 +5,7 @@ types:
     properties:
       domain: string
       recordTypes: list<string>
+      dnsResolvers: optional<list<string>>
   DiscoverDnsRecordsResult:
     properties:
       dnsRecords: optional<list<dns.DnsRecord>>
