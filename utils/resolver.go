@@ -12,15 +12,30 @@ import (
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
-// ValidateDNSServerAddress checks if the DNS server address is in the correct format (IP:PORT or HOSTNAME:PORT)
+// ValidateDNSServerAddress checks if the DNS server address is valid.
+// Accepts IP, IP:PORT, HOSTNAME, or HOSTNAME:PORT formats. Port 53 is assumed when omitted.
 func ValidateDNSServerAddress(address string) error {
 	host, port, err := net.SplitHostPort(address)
 	if err != nil {
-		// If the address is a valid IP without a port, provide a helpful error
+		// No port specified — that's fine, we'll default to 53.
+		// Validate the bare address as an IP or hostname.
 		if ip := net.ParseIP(address); ip != nil {
-			return fmt.Errorf("DNS server address must include port (e.g., %s)", net.JoinHostPort(address, "53"))
+			return nil // Valid bare IP
 		}
-		return fmt.Errorf("invalid DNS server address format: %v", err)
+		// Try as hostname (no port)
+		host = address
+		port = "53"
+		_ = port // port is only used for format validation below when SplitHostPort succeeds
+		// Fall through to hostname validation
+		host = strings.TrimSuffix(host, ".")
+		if len(host) == 0 || len(host) > 253 {
+			return fmt.Errorf("invalid hostname length: %s", host)
+		}
+		validHostname := regexp.MustCompile(`^([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)*[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?$`)
+		if !validHostname.MatchString(host) {
+			return fmt.Errorf("invalid DNS server address format: %s", address)
+		}
+		return nil
 	}
 
 	// Validate port number
@@ -76,6 +91,20 @@ func GetResolver(dnsServerAddress string, log svc1log.Logger) *net.Resolver {
 		}
 	}
 	return resolver
+}
+
+// GetResolvers creates a list of resolvers from the given addresses.
+// If the list is empty, returns a single system default resolver.
+func GetResolvers(dnsServerAddresses []string, log svc1log.Logger) []*net.Resolver {
+	if len(dnsServerAddresses) == 0 {
+		log.Info("No DNS resolvers specified, using system default")
+		return []*net.Resolver{{}}
+	}
+	resolvers := make([]*net.Resolver, len(dnsServerAddresses))
+	for i, addr := range dnsServerAddresses {
+		resolvers[i] = GetResolver(addr, log)
+	}
+	return resolvers
 }
 
 // NormalizeDNSAddress ensures a DNS server address includes a port.

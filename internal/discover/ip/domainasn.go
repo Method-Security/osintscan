@@ -68,10 +68,7 @@ func performConcurrentLookups(ctx context.Context, ips []string, dnsResolvers []
 	var resolverIndex int64
 
 	// Create resolvers
-	resolvers := make([]*net.Resolver, len(dnsResolvers))
-	for i, dnsResolver := range dnsResolvers {
-		resolvers[i] = utils.GetResolver(dnsResolver, log)
-	}
+	resolvers := utils.GetResolvers(dnsResolvers, log)
 
 	for _, ip := range ips {
 		wg.Add(1)

@@ -51,10 +51,7 @@ func RunDiscoverCdns(ctx context.Context, config cdnfern.DiscoverCdnConfig) *cdn
 	// If no IP addresses are provided, resolve the domain to IP addresses else check the provided IP addresses
 	if config.IpAddresses == nil {
 		// Create resolvers for each provided DNS server
-		resolvers := []*net.Resolver{}
-		for _, dnsServerAddress := range config.DnsResolvers {
-			resolvers = append(resolvers, utils.GetResolver(dnsServerAddress, log))
-		}
+		resolvers := utils.GetResolvers(config.DnsResolvers, log)
 
 		// Iterate through each domain provided in the config
 		log.Info("Resolving domain", svc1log.SafeParam("domain", config.Domain))

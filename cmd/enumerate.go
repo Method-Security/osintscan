@@ -83,8 +83,8 @@ func (a *OsintScan) InitEnumerateCommand() {
 
 	// Config Flags
 	enumerateDNSZoneTransferCmd.Flags().Int("timeout", 30, "Timeout in seconds for each zone transfer request")
-	enumerateDNSZoneTransferCmd.Flags().StringSlice("dns-resolvers", []string{"1.1.1.1:53"}, "DNS resolvers to use for NS lookups and hostname resolution (e.g. 1.1.1.1:53)")
-	enumerateDNSZoneTransferCmd.Flags().StringSlice("target-nameservers", []string{}, "Nameserver IPs to attempt AXFR against directly, bypassing NS record lookup (e.g. 10.0.0.1:53)")
+	enumerateDNSZoneTransferCmd.Flags().StringSlice("dns-resolvers", []string{}, "DNS resolvers for NS lookups (e.g. 10.0.0.1). Uses system resolver if not set.")
+	enumerateDNSZoneTransferCmd.Flags().StringSlice("target-nameservers", []string{}, "Nameserver IPs to attempt AXFR against directly, bypassing NS record lookup (e.g. 10.0.0.1)")
 
 	_ = enumerateDNSZoneTransferCmd.MarkFlagRequired("zones")
 
