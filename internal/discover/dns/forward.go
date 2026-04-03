@@ -50,21 +50,18 @@ func getLookups(ctx context.Context, domain string, dnsResolvers []string) ([]*d
 	log := svc1log.FromContext(ctx)
 	errors := []string{}
 
-	// Pick a random resolver from the list
-	resolverIndex := rand.Intn(len(dnsResolvers))
-	resolverAddress := dnsResolvers[resolverIndex]
-	resolver := utils.GetResolver(resolverAddress, log)
+	resolvers := utils.GetResolvers(dnsResolvers, log)
+	resolverIndex := rand.Intn(len(resolvers))
+	resolver := resolvers[resolverIndex]
 
 	log.Debug("Performing DNS lookup",
-		svc1log.SafeParam("domain", domain),
-		svc1log.SafeParam("resolver", resolverAddress))
+		svc1log.SafeParam("domain", domain))
 
 	// Resolve the IP addresses for the given FQDN (forward lookup)
 	ips, err := resolver.LookupHost(ctx, domain)
 	if err != nil {
 		log.Warn("DNS lookup failed",
 			svc1log.SafeParam("domain", domain),
-			svc1log.SafeParam("resolver", resolverAddress),
 			svc1log.SafeParam("error", err.Error()))
 		errors = append(errors, err.Error())
 		return []*dnsfern.LookupDetails{}, errors

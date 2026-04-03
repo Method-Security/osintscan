@@ -47,15 +47,7 @@ func validateFQDNsWithCorrelation(ctx context.Context, fqdns []string, threads i
 	log := svc1log.FromContext(ctx)
 
 	// Setup DNS resolvers
-	resolvers := []*net.Resolver{}
-	if len(dnsResolvers) == 0 {
-		// Use default resolver
-		resolvers = append(resolvers, &net.Resolver{})
-	} else {
-		for _, dnsServerAddress := range dnsResolvers {
-			resolvers = append(resolvers, utils.GetResolver(dnsServerAddress, log))
-		}
-	}
+	resolvers := utils.GetResolvers(dnsResolvers, log)
 
 	// Process FQDNs concurrently
 	validDomains := []string{}

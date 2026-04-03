@@ -4,51 +4,35 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"regexp"
 	"strconv"
-	"strings"
 	"time"
 
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
-// ValidateDNSServerAddress checks if the DNS server address is in the correct format (IP:PORT or HOSTNAME:PORT)
+// ValidateDNSServerAddress checks if the DNS server address is valid.
+// Accepts IP, IP:PORT, HOSTNAME, or HOSTNAME:PORT formats. Port 53 is assumed when omitted.
 func ValidateDNSServerAddress(address string) error {
-	host, port, err := net.SplitHostPort(address)
+	// Normalize to host:port so we can validate uniformly
+	normalized := NormalizeDNSAddress(address)
+	host, port, err := net.SplitHostPort(normalized)
 	if err != nil {
-		// If the address is a valid IP without a port, provide a helpful error
-		if ip := net.ParseIP(address); ip != nil {
-			return fmt.Errorf("DNS server address must include port (e.g., %s)", net.JoinHostPort(address, "53"))
-		}
-		return fmt.Errorf("invalid DNS server address format: %v", err)
+		return fmt.Errorf("invalid DNS server address format: %s", address)
 	}
 
-	// Validate port number
 	portNum, err := strconv.Atoi(port)
 	if err != nil || portNum < 1 || portNum > 65535 {
 		return fmt.Errorf("invalid port number in DNS server address: %s", port)
 	}
 
-	// Check if it's an IP address
-	if ip := net.ParseIP(host); ip != nil {
-		return nil // Valid IP
+	// Valid if it's an IP
+	if net.ParseIP(host) != nil {
+		return nil
 	}
 
-	// Not an IP, try to validate as hostname
-	// Quick validation: check basic hostname rules
+	// Otherwise validate as hostname via net.LookupHost-compatible check
 	if len(host) == 0 || len(host) > 253 {
-		return fmt.Errorf("invalid hostname length: %s", host)
-	}
-
-	// Check for valid hostname characters and structure
-	// This regex allows alphanumeric, dots, and hyphens in valid positions
-	validHostname := regexp.MustCompile(`^([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)*[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?$`)
-
-	// Remove trailing dot if present (valid in FQDN)
-	host = strings.TrimSuffix(host, ".")
-
-	if !validHostname.MatchString(host) {
-		return fmt.Errorf("invalid hostname format: %s", host)
+		return fmt.Errorf("invalid DNS server address: %s", address)
 	}
 
 	return nil
@@ -76,6 +60,20 @@ func GetResolver(dnsServerAddress string, log svc1log.Logger) *net.Resolver {
 		}
 	}
 	return resolver
+}
+
+// GetResolvers creates a list of resolvers from the given addresses.
+// If the list is empty, returns a single system default resolver.
+func GetResolvers(dnsServerAddresses []string, log svc1log.Logger) []*net.Resolver {
+	if len(dnsServerAddresses) == 0 {
+		log.Info("No DNS resolvers specified, using system default")
+		return []*net.Resolver{{}}
+	}
+	resolvers := make([]*net.Resolver, len(dnsServerAddresses))
+	for i, addr := range dnsServerAddresses {
+		resolvers[i] = GetResolver(addr, log)
+	}
+	return resolvers
 }
 
 // NormalizeDNSAddress ensures a DNS server address includes a port.

@@ -5,7 +5,7 @@ types:
   EnumerateDnsZoneTransferConfig:
     properties:
       zones: list<string>
-      dnsResolvers: list<string>
+      dnsResolvers: optional<list<string>>
       targetNameservers: optional<list<string>>
       timeout: integer
 # Report Structs

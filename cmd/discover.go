@@ -210,7 +210,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 
 	// Target Flags
 	discoverDNSForwardCmd.Flags().String("domain", "", "The domain name to perform forward lookups on")
-	discoverDNSForwardCmd.Flags().StringSlice("dns-resolvers", []string{"1.1.1.1:53"}, "Custom DNS resolver/servers to use for queries (e.g. 1.1.1.1:53)")
+	discoverDNSForwardCmd.Flags().StringSlice("dns-resolvers", []string{}, "Custom DNS resolvers (e.g. 10.0.0.1). Uses system resolver if not set.")
 
 	// Mark Required Flags
 	_ = discoverDNSForwardCmd.MarkFlagRequired("domain")
@@ -264,7 +264,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 	// Target Flags
 	discoverDNSReverseCmd.Flags().StringSlice("ip-addresses", []string{}, "The IP addresses to perform reverse DNS lookup on")
 	discoverDNSReverseCmd.Flags().String("cidr", "", "The CIDR range to perform reverse DNS lookup on")
-	discoverDNSReverseCmd.Flags().StringSlice("dns-resolvers", []string{"1.1.1.1:53"}, "Custom DNS resolver/servers to use for queries (e.g. 1.1.1.1:53)")
+	discoverDNSReverseCmd.Flags().StringSlice("dns-resolvers", []string{}, "Custom DNS resolvers (e.g. 10.0.0.1). Uses system resolver if not set.")
 	discoverDNSReverseCmd.Flags().Int("threads", 0, "Number of concurrent threads for scanning (Default is number of CPUS on machine)")
 
 	// Add command to 'dns' command
@@ -402,7 +402,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 	discoverDNSSubdomainActiveCmd.Flags().Int("max-depth", 2, "Maximum recursion depth for subdomain discovery")
 	discoverDNSSubdomainActiveCmd.Flags().Int("timeout", 0, "Maximum time (in minutes) to spend on subdomain discovery")
 	discoverDNSSubdomainActiveCmd.Flags().Int("sleep", 0, "Sleep time in milliseconds between requests to avoid rate limiting")
-	discoverDNSSubdomainActiveCmd.Flags().StringSlice("dns-resolvers", []string{}, "Custom DNS resolver/servers to use for queries (e.g. 1.1.1.1:53)")
+	discoverDNSSubdomainActiveCmd.Flags().StringSlice("dns-resolvers", []string{}, "Custom DNS resolvers (e.g. 10.0.0.1). Uses system resolver if not set.")
 
 	// Mark Required Flags
 	_ = discoverDNSSubdomainActiveCmd.MarkFlagRequired("domain")
@@ -456,7 +456,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 	discoverDNSSubdomainCorrelationCmd.Flags().StringSlice("domains", []string{}, "The domains to test")
 	discoverDNSSubdomainCorrelationCmd.Flags().Int("threads", 10, "Number of parallel threads to use for testing")
 	discoverDNSSubdomainCorrelationCmd.Flags().Int("timeout", 0, "Maximum time (in seconds) to spend on each lookup")
-	discoverDNSSubdomainCorrelationCmd.Flags().StringSlice("dns-resolvers", []string{}, "Custom DNS resolver/servers to use for queries (e.g. 1.1.1.1:53)")
+	discoverDNSSubdomainCorrelationCmd.Flags().StringSlice("dns-resolvers", []string{}, "Custom DNS resolvers (e.g. 10.0.0.1). Uses system resolver if not set.")
 
 	// Mark Required Flags
 	_ = discoverDNSSubdomainCorrelationCmd.MarkFlagRequired("domains")
@@ -544,7 +544,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 	discoverDNSSubdomainPassiveCmd.Flags().Int("threads", 10, "Number of concurrent threads for scanning")
 	discoverDNSSubdomainPassiveCmd.Flags().Bool("all-sources", false, "Use all passive sources (subfinder equivalent of --all)")
 	discoverDNSSubdomainPassiveCmd.Flags().StringSlice("modules", []string{"SUBFINDER"}, "Which passive modules to run: SUBFINDER, AMASS, or ALL")
-	discoverDNSSubdomainPassiveCmd.Flags().StringSlice("dns-resolvers", []string{"1.1.1.1:53"}, "Custom DNS resolver/servers to use for queries (e.g. 1.1.1.1:53)")
+	discoverDNSSubdomainPassiveCmd.Flags().StringSlice("dns-resolvers", []string{}, "Custom DNS resolvers (e.g. 10.0.0.1). Uses system resolver if not set.")
 	discoverDNSSubdomainPassiveCmd.Flags().Int("max-dns-queries", 2000, "Maximum number of DNS queries to perform per request")
 	discoverDNSSubdomainPassiveCmd.Flags().Int("max-resolvers-qps", 100, "Maximum number of queries per second per resolver")
 
@@ -645,10 +645,6 @@ func (a *OsintScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			if len(dnsResolvers) == 0 {
-				a.OutputSignal.AddError(fmt.Errorf("no DNS resolvers provided"))
-				return
-			}
 			for _, dnsResolver := range dnsResolvers {
 				err = utils.ValidateDNSServerAddress(dnsResolver)
 				if err != nil {
@@ -669,7 +665,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 	// Target Flags
 	discoverCdnCmd.Flags().String("domain", "", "The domain name to check against CDN provider ranges")
 	discoverCdnCmd.Flags().StringSlice("ip-addresses", []string{}, "The IP addresses to check against CDN provider ranges")
-	discoverCdnCmd.Flags().StringSlice("dns-resolvers", []string{"1.1.1.1:53"}, "Custom DNS resolver/servers to use for queries (e.g. 1.1.1.1:53)")
+	discoverCdnCmd.Flags().StringSlice("dns-resolvers", []string{}, "Custom DNS resolvers (e.g. 10.0.0.1). Uses system resolver if not set.")
 	discoverCdnCmd.Flags().String("fingerprints-file", "", "The path to the CDN fingerprints file")
 
 	// Mark Required Flags
@@ -739,10 +735,6 @@ func (a *OsintScan) InitDiscoverCommand() {
 			}
 
 			// Validate DNS resolvers
-			if len(dnsResolvers) == 0 {
-				a.OutputSignal.AddError(fmt.Errorf("no DNS resolvers provided"))
-				return
-			}
 			for _, dnsResolver := range dnsResolvers {
 				err = utils.ValidateDNSServerAddress(dnsResolver)
 				if err != nil {
@@ -761,7 +753,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 	// Target Flags
 	discoverIPDomainASNCmd.Flags().StringSlice("ip-addresses", []string{}, "The IP addresses to perform reverse DNS and ASN lookup on")
 	discoverIPDomainASNCmd.Flags().String("cidr", "", "The CIDR range to perform reverse DNS and ASN lookup on")
-	discoverIPDomainASNCmd.Flags().StringSlice("dns-resolvers", []string{"1.1.1.1:53"}, "Custom DNS resolver/servers to use for queries (e.g. 1.1.1.1:53)")
+	discoverIPDomainASNCmd.Flags().StringSlice("dns-resolvers", []string{}, "Custom DNS resolvers (e.g. 10.0.0.1). Uses system resolver if not set.")
 
 	// Add command to 'ip' command
 	discoverIPCmd.AddCommand(discoverIPDomainASNCmd)
