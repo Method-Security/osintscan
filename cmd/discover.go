@@ -645,10 +645,6 @@ func (a *OsintScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			if len(dnsResolvers) == 0 {
-				a.OutputSignal.AddError(fmt.Errorf("no DNS resolvers provided"))
-				return
-			}
 			for _, dnsResolver := range dnsResolvers {
 				err = utils.ValidateDNSServerAddress(dnsResolver)
 				if err != nil {
@@ -739,10 +735,6 @@ func (a *OsintScan) InitDiscoverCommand() {
 			}
 
 			// Validate DNS resolvers
-			if len(dnsResolvers) == 0 {
-				a.OutputSignal.AddError(fmt.Errorf("no DNS resolvers provided"))
-				return
-			}
 			for _, dnsResolver := range dnsResolvers {
 				err = utils.ValidateDNSServerAddress(dnsResolver)
 				if err != nil {
