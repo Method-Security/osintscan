@@ -23,11 +23,7 @@ func ValidateDNSServerAddress(address string) error {
 			return nil // Valid bare IP
 		}
 		// Try as hostname (no port)
-		host = address
-		port = "53"
-		_ = port // port is only used for format validation below when SplitHostPort succeeds
-		// Fall through to hostname validation
-		host = strings.TrimSuffix(host, ".")
+		host = strings.TrimSuffix(address, ".")
 		if len(host) == 0 || len(host) > 253 {
 			return fmt.Errorf("invalid hostname length: %s", host)
 		}
