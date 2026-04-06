@@ -151,17 +151,6 @@ func discoverDomainsParallel(ctx context.Context, domains []string, baseCfg dnsf
 // extractChildDomains returns the unique set of domains that are exactly one
 // label deeper than rootDomain, derived from the discovered subdomains.
 //
-// For example, with rootDomain "kpmg.com" and depth 1:
-//
-//	a.us.kpmg.com    → us.kpmg.com
-//	b.us.kpmg.com    → us.kpmg.com  (deduped)
-//	c.ema.kpmg.com   → ema.kpmg.com
-//	x.y.dev.kpmg.com → dev.kpmg.com
-//
-// At depth 2, the same logic extracts two-label-deep children:
-//
-//	x.east.us.kpmg.com → east.us.kpmg.com
-//
 // This dramatically reduces the recursive scan surface compared to rescanning
 // every individual FQDN.
 func extractChildDomains(subdomains []string, rootDomain string, depth int, scanned map[string]bool) []string {
