@@ -76,6 +76,9 @@ func discoverDomainsParallel(ctx context.Context, domains []string, baseCfg dnsf
 	if numWorkers > len(domains) {
 		numWorkers = len(domains)
 	}
+	if runSubfinder && numWorkers > subutils.MaxConcurrentSubfinderEnumerations {
+		numWorkers = subutils.MaxConcurrentSubfinderEnumerations
+	}
 
 	var sfRunners []*subutils.SubfinderRunner
 	if runSubfinder {
@@ -145,19 +148,42 @@ func discoverDomainsParallel(ctx context.Context, domains []string, baseCfg dnsf
 	return results
 }
 
-// extractUniqueDomains returns all unique domain values from the subdomain list
-// that have not already been scanned.
-func extractUniqueDomains(subdomains []string, scanned map[string]bool) []string {
+// extractChildDomains returns the unique set of domains that are exactly one
+// label deeper than rootDomain, derived from the discovered subdomains.
+//
+// For example, with rootDomain "kpmg.com" and depth 1:
+//
+//	a.us.kpmg.com    → us.kpmg.com
+//	b.us.kpmg.com    → us.kpmg.com  (deduped)
+//	c.ema.kpmg.com   → ema.kpmg.com
+//	x.y.dev.kpmg.com → dev.kpmg.com
+//
+// At depth 2, the same logic extracts two-label-deep children:
+//
+//	x.east.us.kpmg.com → east.us.kpmg.com
+//
+// This dramatically reduces the recursive scan surface compared to rescanning
+// every individual FQDN.
+func extractChildDomains(subdomains []string, rootDomain string, depth int, scanned map[string]bool) []string {
+	rootLabels := strings.Count(rootDomain, ".") + 1
+	targetLabels := rootLabels + depth
+
 	unique := map[string]bool{}
 	for _, sub := range subdomains {
 		sub = strings.TrimSuffix(strings.TrimSpace(sub), ".")
 		if sub == "" {
 			continue
 		}
-		if !scanned[sub] && !unique[sub] {
-			unique[sub] = true
+		labels := strings.Split(sub, ".")
+		if len(labels) <= rootLabels || len(labels) < targetLabels {
+			continue
+		}
+		child := strings.Join(labels[len(labels)-targetLabels:], ".")
+		if child != rootDomain && !scanned[child] && !unique[child] {
+			unique[child] = true
 		}
 	}
+
 	result := make([]string, 0, len(unique))
 	for d := range unique {
 		result = append(result, d)
@@ -202,12 +228,11 @@ func GetDomainSubdomainsPassive(ctx context.Context, config dnsfern.DiscoverDnsS
 	workers := config.Passive.Threads
 
 	for depth := 1; depth <= recursiveDepth; depth++ {
-		// Get domains we haven't scanned yet from all discovered subdomains
 		allSubs := make([]string, 0, len(allSubdomainsSet))
 		for s := range allSubdomainsSet {
 			allSubs = append(allSubs, s)
 		}
-		newDomains := extractUniqueDomains(allSubs, scannedDomains)
+		newDomains := extractChildDomains(allSubs, config.Passive.Domain, depth, scannedDomains)
 
 		if len(newDomains) == 0 {
 			log.Info("No new domains to scan, stopping recursion early",

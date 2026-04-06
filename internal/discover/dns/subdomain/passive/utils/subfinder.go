@@ -13,6 +13,12 @@ import (
 	"github.com/projectdiscovery/subfinder/v2/pkg/runner"
 )
 
+// MaxConcurrentSubfinderEnumerations limits parallel subfinder runs during
+// recursive scanning. Subfinder's passive sources are global singletons and
+// external APIs (crt.sh, hackertarget, etc.) aggressively rate-limit or drop
+// connections under high concurrency, causing 0-result responses.
+const MaxConcurrentSubfinderEnumerations = 10
+
 // SubfinderRunner wraps a pre-initialized subfinder runner for reuse across
 // multiple domain enumerations, avoiding repeated initialization overhead.
 type SubfinderRunner struct {
