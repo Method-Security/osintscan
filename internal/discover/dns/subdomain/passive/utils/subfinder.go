@@ -11,7 +11,61 @@ import (
 	"github.com/projectdiscovery/subfinder/v2/pkg/runner"
 )
 
-// GetSubdomainsPassiveWithSubfinder runs subfinder in passive mode for a single domain and returns discovered subdomains.
+// SubfinderRunner wraps a pre-initialized subfinder runner for reuse across
+// multiple domain enumerations, avoiding repeated initialization overhead.
+type SubfinderRunner struct {
+	runner *runner.Runner
+}
+
+// NewSubfinderRunner creates a reusable SubfinderRunner from the given config.
+// The returned runner can enumerate many domains without re-loading provider
+// config or re-initializing passive sources each time.
+func NewSubfinderRunner(cfg dnsfern.DiscoverDnsSubdomainPassiveConfig) (*SubfinderRunner, error) {
+	opts := &runner.Options{
+		All:                cfg.AllSources,
+		Threads:            cfg.Threads,
+		Timeout:            30,
+		MaxEnumerationTime: 10,
+		RateLimit:          cfg.RequestsPerSecond,
+	}
+	r, err := runner.NewRunner(opts)
+	if err != nil {
+		return nil, err
+	}
+	return &SubfinderRunner{runner: r}, nil
+}
+
+// EnumerateDomain runs passive subdomain enumeration for a single domain
+// using the pre-initialized runner.
+func (s *SubfinderRunner) EnumerateDomain(ctx context.Context, domain string) ([]string, error) {
+	log := svc1log.FromContext(ctx)
+
+	log.Debug("Starting subfinder enumeration", svc1log.SafeParam("domain", domain))
+
+	output := &bytes.Buffer{}
+	results, err := s.runner.EnumerateSingleDomainWithCtx(ctx, domain, []io.Writer{output})
+	if err != nil {
+		log.Warn("Subfinder enumeration failed",
+			svc1log.SafeParam("domain", domain),
+			svc1log.SafeParam("error", err.Error()))
+		return []string{}, err
+	}
+
+	subdomains := make([]string, 0, len(results))
+	for sub := range results {
+		subdomains = append(subdomains, sub)
+	}
+	sort.Strings(subdomains)
+
+	log.Debug("Subfinder enumeration completed",
+		svc1log.SafeParam("domain", domain),
+		svc1log.SafeParam("subdomains_found", len(subdomains)))
+
+	return subdomains, nil
+}
+
+// GetSubdomainsPassiveWithSubfinder runs subfinder in passive mode for a single domain.
+// For batch operations, prefer NewSubfinderRunner + EnumerateDomain to avoid repeated initialization.
 func GetSubdomainsPassiveWithSubfinder(ctx context.Context, cfg dnsfern.DiscoverDnsSubdomainPassiveConfig) ([]string, error) {
 	log := svc1log.FromContext(ctx)
 
@@ -22,17 +76,7 @@ func GetSubdomainsPassiveWithSubfinder(ctx context.Context, cfg dnsfern.Discover
 		svc1log.SafeParam("all_sources", cfg.AllSources),
 	)
 
-	// Set subfinder config
-	subfinderOpts := &runner.Options{
-		All:                cfg.AllSources,
-		Threads:            cfg.Threads,
-		Timeout:            30,
-		MaxEnumerationTime: 10,
-		RateLimit:          cfg.RequestsPerSecond,
-	}
-
-	// Initialize subfinder runner
-	subfinder, err := runner.NewRunner(subfinderOpts)
+	sr, err := NewSubfinderRunner(cfg)
 	if err != nil {
 		log.Warn("Failed to initialize subfinder runner",
 			svc1log.SafeParam("domain", cfg.Domain),
@@ -40,30 +84,5 @@ func GetSubdomainsPassiveWithSubfinder(ctx context.Context, cfg dnsfern.Discover
 		return []string{}, err
 	}
 
-	log.Debug("Starting subfinder enumeration", svc1log.SafeParam("domain", cfg.Domain))
-
-	output := &bytes.Buffer{}
-	// Run subdomain enumeration for the given domain
-	results, err := subfinder.EnumerateSingleDomainWithCtx(ctx, cfg.Domain, []io.Writer{output})
-	if err != nil {
-		log.Warn("Subfinder enumeration failed",
-			svc1log.SafeParam("domain", cfg.Domain),
-			svc1log.SafeParam("error", err.Error()))
-		return []string{}, err
-	}
-
-	// Collect subdomains from results map keys
-	subdomains := make([]string, 0, len(results))
-	for sub := range results {
-		subdomains = append(subdomains, sub)
-	}
-
-	// Sort subdomains for deterministic output
-	sort.Strings(subdomains)
-
-	log.Debug("Subfinder enumeration completed",
-		svc1log.SafeParam("domain", cfg.Domain),
-		svc1log.SafeParam("subdomains_found", len(subdomains)))
-
-	return subdomains, nil
+	return sr.EnumerateDomain(ctx, cfg.Domain)
 }

@@ -53,41 +53,96 @@ func discoverForDomain(ctx context.Context, cfg dnsfern.DiscoverDnsSubdomainPass
 	return subdomains, errors
 }
 
-// discoverDomainsParallel runs passive discovery across multiple domains concurrently,
-// limited to the given number of worker goroutines. Results are collected and returned.
+// discoverDomainsParallel runs passive discovery across multiple domains using a
+// fixed pool of worker goroutines. Each worker creates its own subfinder runner
+// once and reuses it for every domain it processes, avoiding the overhead of
+// re-initializing provider config and passive sources per domain.
 func discoverDomainsParallel(ctx context.Context, domains []string, baseCfg dnsfern.DiscoverDnsSubdomainPassiveConfig, runSubfinder, runAmass bool, workers int) []domainResult {
+	log := svc1log.FromContext(ctx)
 	results := make([]domainResult, len(domains))
-	sem := make(chan struct{}, workers)
-	var wg sync.WaitGroup
 
-	for i, domain := range domains {
+	type workItem struct {
+		index  int
+		domain string
+	}
+	work := make(chan workItem, len(domains))
+	for i, d := range domains {
+		work <- workItem{index: i, domain: d}
+	}
+	close(work)
+
+	numWorkers := workers
+	if numWorkers > len(domains) {
+		numWorkers = len(domains)
+	}
+
+	log.Info("Starting worker pool",
+		svc1log.SafeParam("workers", numWorkers),
+		svc1log.SafeParam("domains", len(domains)))
+
+	var wg sync.WaitGroup
+	for w := 0; w < numWorkers; w++ {
 		wg.Add(1)
-		go func(idx int, d string) {
+		go func(workerID int) {
 			defer wg.Done()
 
-			// Acquire semaphore slot
-			sem <- struct{}{}
-			defer func() { <-sem }()
-
-			// Check for context cancellation before starting work
-			if ctx.Err() != nil {
-				results[idx] = domainResult{
-					domain: d,
-					errors: []string{ctx.Err().Error()},
+			// Each worker creates its own subfinder runner once and reuses it
+			// for all domains it handles, instead of re-initializing per domain.
+			var sfRunner *subutils.SubfinderRunner
+			if runSubfinder {
+				r, err := subutils.NewSubfinderRunner(baseCfg)
+				if err != nil {
+					log.Warn("Worker failed to create subfinder runner",
+						svc1log.SafeParam("worker_id", workerID),
+						svc1log.SafeParam("error", err.Error()))
+					for item := range work {
+						results[item.index] = domainResult{
+							domain: item.domain,
+							errors: []string{"subfinder init failed: " + err.Error()},
+						}
+					}
+					return
 				}
-				return
+				sfRunner = r
 			}
 
-			cfg := baseCfg
-			cfg.Domain = d
+			for item := range work {
+				if ctx.Err() != nil {
+					results[item.index] = domainResult{
+						domain: item.domain,
+						errors: []string{ctx.Err().Error()},
+					}
+					continue
+				}
 
-			subs, errs := discoverForDomain(ctx, cfg, runSubfinder, runAmass)
-			results[idx] = domainResult{
-				domain:     d,
-				subdomains: subs,
-				errors:     errs,
+				var subdomains []string
+				var errors []string
+
+				if sfRunner != nil {
+					subs, err := sfRunner.EnumerateDomain(ctx, item.domain)
+					if err != nil {
+						errors = append(errors, err.Error())
+					}
+					subdomains = append(subdomains, subs...)
+				}
+
+				if runAmass {
+					cfg := baseCfg
+					cfg.Domain = item.domain
+					subs, err := subutils.GetSubdomainsPassiveWithAmass(ctx, cfg)
+					if err != nil {
+						errors = append(errors, err.Error())
+					}
+					subdomains = append(subdomains, subs...)
+				}
+
+				results[item.index] = domainResult{
+					domain:     item.domain,
+					subdomains: subdomains,
+					errors:     errors,
+				}
 			}
-		}(i, domain)
+		}(w)
 	}
 
 	wg.Wait()
