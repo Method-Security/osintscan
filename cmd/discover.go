@@ -520,9 +520,14 @@ func (a *OsintScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
+			recursiveDepth, err := cmd.Flags().GetInt("recursive-depth")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
 
 			// Create config
-			config, err := getDiscoverDNSPassiveSubdomainConfig(domain, requestsPerSecond, threads, allSources, modules, dnsResolvers, maxDNSQueries, maxResolversQPS)
+			config, err := getDiscoverDNSPassiveSubdomainConfig(domain, requestsPerSecond, threads, allSources, modules, dnsResolvers, maxDNSQueries, maxResolversQPS, recursiveDepth)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -541,12 +546,13 @@ func (a *OsintScan) InitDiscoverCommand() {
 	// Target Flags
 	discoverDNSSubdomainPassiveCmd.Flags().String("domain", "", "The domain name to passively enumerate subdomains for")
 	discoverDNSSubdomainPassiveCmd.Flags().Int("requests-per-second", 0, "Maximum number of requests per second to send to the DNS resolvers")
-	discoverDNSSubdomainPassiveCmd.Flags().Int("threads", 10, "Number of concurrent threads for scanning")
+	discoverDNSSubdomainPassiveCmd.Flags().Int("threads", 25, "Number of concurrent threads for scanning")
 	discoverDNSSubdomainPassiveCmd.Flags().Bool("all-sources", false, "Use all passive sources (subfinder equivalent of --all)")
 	discoverDNSSubdomainPassiveCmd.Flags().StringSlice("modules", []string{"SUBFINDER"}, "Which passive modules to run: SUBFINDER, AMASS, or ALL")
 	discoverDNSSubdomainPassiveCmd.Flags().StringSlice("dns-resolvers", []string{}, "Custom DNS resolvers (e.g. 10.0.0.1). Uses system resolver if not set.")
 	discoverDNSSubdomainPassiveCmd.Flags().Int("max-dns-queries", 2000, "Maximum number of DNS queries to perform per request")
 	discoverDNSSubdomainPassiveCmd.Flags().Int("max-resolvers-qps", 100, "Maximum number of queries per second per resolver")
+	discoverDNSSubdomainPassiveCmd.Flags().Int("recursive-depth", 0, "Recursive discovery depth (0=none, 1=re-scan discovered domains, 2=two levels deep, etc.)")
 
 	// Mark Required Flags
 	_ = discoverDNSSubdomainPassiveCmd.MarkFlagRequired("domain")
@@ -799,7 +805,7 @@ func getDiscoverDNSReverseConfig(ips []string, cidr string, dnsResolvers []strin
 	config := &dnsfern.DiscoverDnsReverseConfig{
 		IpAddresses:  ips,
 		DnsResolvers: dnsResolvers,
-		Threads:      max(threads, 0),
+		Threads:      max(threads, 1),
 	}
 	if cidr != "" {
 		config.Cidr = &cidr
@@ -839,7 +845,7 @@ func getDiscoverDNSCorrelationSubdomainConfig(domains []string, threads int, tim
 }
 
 // getDiscoverDNSPassiveSubdomainConfig creates and returns a configuration for passive subdomain discovery
-func getDiscoverDNSPassiveSubdomainConfig(domain string, requestsPerSecond int, threads int, allSources bool, modules []string, dnsResolvers []string, maxDNSQueries int, maxResolversQPS int) (dnsfern.DiscoverDnsSubdomainConfig, error) {
+func getDiscoverDNSPassiveSubdomainConfig(domain string, requestsPerSecond int, threads int, allSources bool, modules []string, dnsResolvers []string, maxDNSQueries int, maxResolversQPS int, recursiveDepth int) (dnsfern.DiscoverDnsSubdomainConfig, error) {
 
 	var modulesEnum []dnsfern.DiscoverDnsSubdomainModule
 	for _, module := range modules {
@@ -855,12 +861,13 @@ func getDiscoverDNSPassiveSubdomainConfig(domain string, requestsPerSecond int, 
 		Passive: &dnsfern.DiscoverDnsSubdomainPassiveConfig{
 			Domain:            domain,
 			RequestsPerSecond: requestsPerSecond,
-			Threads:           threads,
+			Threads:           max(threads, 1),
 			AllSources:        allSources,
 			Modules:           modulesEnum,
 			DnsResolvers:      dnsResolvers,
 			MaxDnsQueries:     max(maxDNSQueries, 0),
 			MaxResolversQps:   max(maxResolversQPS, 0),
+			RecursiveDepth:    max(recursiveDepth, 0),
 		},
 	}
 	return config, nil

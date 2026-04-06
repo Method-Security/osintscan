@@ -44,6 +44,7 @@ types:
       dnsResolvers: optional<list<string>>
       MaxDNSQueries: integer
       MaxResolversQps: integer
+      recursiveDepth: integer
 # Reports
   DiscoverDnsSubdomainConfig:
     discriminant: discoveryType
