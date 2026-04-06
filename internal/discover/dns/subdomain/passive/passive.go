@@ -54,9 +54,10 @@ func discoverForDomain(ctx context.Context, cfg dnsfern.DiscoverDnsSubdomainPass
 }
 
 // discoverDomainsParallel runs passive discovery across multiple domains using a
-// fixed pool of worker goroutines. Each worker creates its own subfinder runner
-// once and reuses it for every domain it processes, avoiding the overhead of
-// re-initializing provider config and passive sources per domain.
+// fixed pool of worker goroutines. The subfinder worker count is capped because
+// subfinder's passive sources are global singletons — running too many concurrent
+// enumerations causes data races on shared state and hammers external APIs into
+// rate-limiting, making things slower not faster.
 func discoverDomainsParallel(ctx context.Context, domains []string, baseCfg dnsfern.DiscoverDnsSubdomainPassiveConfig, runSubfinder, runAmass bool, workers int) []domainResult {
 	log := svc1log.FromContext(ctx)
 	results := make([]domainResult, len(domains))
@@ -76,6 +77,17 @@ func discoverDomainsParallel(ctx context.Context, domains []string, baseCfg dnsf
 		numWorkers = len(domains)
 	}
 
+	var sfRunners []*subutils.SubfinderRunner
+	if runSubfinder {
+		var err error
+		sfRunners, err = subutils.CreateSubfinderRunners(baseCfg, numWorkers)
+		if err != nil {
+			log.Warn("Failed to create subfinder runners, continuing with other modules",
+				svc1log.SafeParam("error", err.Error()))
+			sfRunners = nil
+		}
+	}
+
 	log.Info("Starting worker pool",
 		svc1log.SafeParam("workers", numWorkers),
 		svc1log.SafeParam("domains", len(domains)))
@@ -83,28 +95,12 @@ func discoverDomainsParallel(ctx context.Context, domains []string, baseCfg dnsf
 	var wg sync.WaitGroup
 	for w := 0; w < numWorkers; w++ {
 		wg.Add(1)
-		go func(workerID int) {
+		var sfRunner *subutils.SubfinderRunner
+		if sfRunners != nil {
+			sfRunner = sfRunners[w]
+		}
+		go func(workerID int, sfRunner *subutils.SubfinderRunner) {
 			defer wg.Done()
-
-			// Each worker creates its own subfinder runner once and reuses it
-			// for all domains it handles, instead of re-initializing per domain.
-			var sfRunner *subutils.SubfinderRunner
-			if runSubfinder {
-				r, err := subutils.NewSubfinderRunner(baseCfg)
-				if err != nil {
-					log.Warn("Worker failed to create subfinder runner",
-						svc1log.SafeParam("worker_id", workerID),
-						svc1log.SafeParam("error", err.Error()))
-					for item := range work {
-						results[item.index] = domainResult{
-							domain: item.domain,
-							errors: []string{"subfinder init failed: " + err.Error()},
-						}
-					}
-					return
-				}
-				sfRunner = r
-			}
 
 			for item := range work {
 				if ctx.Err() != nil {
@@ -142,7 +138,7 @@ func discoverDomainsParallel(ctx context.Context, domains []string, baseCfg dnsf
 					errors:     errors,
 				}
 			}
-		}(w)
+		}(w, sfRunner)
 	}
 
 	wg.Wait()

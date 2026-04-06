@@ -8,6 +8,8 @@ import (
 
 	dnsfern "github.com/Method-Security/osintscan/generated/go/discover/dns"
 	"github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
+	"github.com/projectdiscovery/gologger"
+	"github.com/projectdiscovery/gologger/levels"
 	"github.com/projectdiscovery/subfinder/v2/pkg/runner"
 )
 
@@ -17,22 +19,48 @@ type SubfinderRunner struct {
 	runner *runner.Runner
 }
 
-// NewSubfinderRunner creates a reusable SubfinderRunner from the given config.
-// The returned runner can enumerate many domains without re-loading provider
-// config or re-initializing passive sources each time.
-func NewSubfinderRunner(cfg dnsfern.DiscoverDnsSubdomainPassiveConfig) (*SubfinderRunner, error) {
-	opts := &runner.Options{
+func newSubfinderOpts(cfg dnsfern.DiscoverDnsSubdomainPassiveConfig) *runner.Options {
+	return &runner.Options{
 		All:                cfg.AllSources,
 		Threads:            cfg.Threads,
 		Timeout:            30,
 		MaxEnumerationTime: 10,
 		RateLimit:          cfg.RequestsPerSecond,
 	}
-	r, err := runner.NewRunner(opts)
+}
+
+// NewSubfinderRunner creates a single reusable SubfinderRunner.
+// For batch creation (worker pools), prefer CreateSubfinderRunners to avoid
+// redundant provider config loading.
+func NewSubfinderRunner(cfg dnsfern.DiscoverDnsSubdomainPassiveConfig) (*SubfinderRunner, error) {
+	r, err := runner.NewRunner(newSubfinderOpts(cfg))
 	if err != nil {
 		return nil, err
 	}
 	return &SubfinderRunner{runner: r}, nil
+}
+
+// CreateSubfinderRunners creates count independent runners for use in a worker
+// pool. Runners use tighter timeouts suited for recursive scanning where most
+// domains return no results. The provider config is loaded once by the first
+// runner; subsequent runners suppress the redundant log message.
+func CreateSubfinderRunners(cfg dnsfern.DiscoverDnsSubdomainPassiveConfig, count int) ([]*SubfinderRunner, error) {
+	runners := make([]*SubfinderRunner, count)
+	for i := 0; i < count; i++ {
+		if i == 1 {
+			// gologger levels: Fatal(0) < Silent(1) < Error(2) < Info(3) < Warning(4)
+			// Setting to Error suppresses the redundant "Loading provider config" Info log.
+			gologger.DefaultLogger.SetMaxLevel(levels.LevelError)
+		}
+		r, err := runner.NewRunner(newSubfinderOpts(cfg))
+		if err != nil {
+			gologger.DefaultLogger.SetMaxLevel(levels.LevelInfo)
+			return nil, err
+		}
+		runners[i] = &SubfinderRunner{runner: r}
+	}
+	gologger.DefaultLogger.SetMaxLevel(levels.LevelInfo)
+	return runners, nil
 }
 
 // EnumerateDomain runs passive subdomain enumeration for a single domain
@@ -65,7 +93,7 @@ func (s *SubfinderRunner) EnumerateDomain(ctx context.Context, domain string) ([
 }
 
 // GetSubdomainsPassiveWithSubfinder runs subfinder in passive mode for a single domain.
-// For batch operations, prefer NewSubfinderRunner + EnumerateDomain to avoid repeated initialization.
+// For batch operations, prefer CreateSubfinderRunners + EnumerateDomain to avoid repeated initialization.
 func GetSubdomainsPassiveWithSubfinder(ctx context.Context, cfg dnsfern.DiscoverDnsSubdomainPassiveConfig) ([]string, error) {
 	log := svc1log.FromContext(ctx)
 

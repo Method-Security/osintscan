@@ -12,6 +12,7 @@ require (
 	github.com/palantir/pkg/datetime v1.2.0
 	github.com/palantir/witchcraft-go-logging v1.61.0
 	github.com/projectdiscovery/dnsx v1.2.2
+	github.com/projectdiscovery/gologger v1.1.54
 	github.com/projectdiscovery/subfinder/v2 v2.9.0
 	github.com/spf13/cobra v1.9.1
 	github.com/stretchr/testify v1.11.1
@@ -136,7 +137,6 @@ require (
 	github.com/projectdiscovery/chaos-client v0.5.2 // indirect
 	github.com/projectdiscovery/fastdialer v0.4.1 // indirect
 	github.com/projectdiscovery/goflags v0.1.74 // indirect
-	github.com/projectdiscovery/gologger v1.1.54 // indirect
 	github.com/projectdiscovery/hmap v0.0.90 // indirect
 	github.com/projectdiscovery/machineid v0.0.0-20250715113114-c77eb3567582 // indirect
 	github.com/projectdiscovery/networkpolicy v0.1.16 // indirect
