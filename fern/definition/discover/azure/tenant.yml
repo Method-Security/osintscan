@@ -24,6 +24,15 @@ types:
       serviceType: M365ServiceType
       endpoint: optional<string>
 
+# Credential Type Info
+  CredentialTypeInfo:
+    properties:
+      desktopSsoEnabled: optional<boolean>
+      isSignupDisallowed: optional<boolean>
+      hasPassword: optional<boolean>
+      prefCredential: optional<integer>
+      tenantBrandingConfigured: optional<boolean>
+
 # Result Types
   AzureTenantInfo:
     properties:
@@ -37,6 +46,7 @@ types:
       authorizationEndpoint: optional<string>
       tokenEndpoint: optional<string>
       openidConfigurationUrl: optional<string>
+      credentialTypeInfo: optional<CredentialTypeInfo>
       detectedServices: optional<list<DetectedM365Service>>
 
 # Report Structs

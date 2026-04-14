@@ -16,8 +16,9 @@ import (
 )
 
 const (
-	openIDConfigURLTemplate = "https://login.microsoftonline.com/%s/.well-known/openid-configuration"
-	userRealmURLTemplate    = "https://login.microsoftonline.com/common/userrealm/%s?api-version=2.1"
+	openIDConfigURLTemplate    = "https://login.microsoftonline.com/%s/.well-known/openid-configuration"
+	userRealmURLTemplate       = "https://login.microsoftonline.com/common/userrealm/%s?api-version=2.1"
+	getCredentialTypeURLString = "https://login.microsoftonline.com/common/GetCredentialType"
 )
 
 type openIDConfig struct {
@@ -34,6 +35,23 @@ type userRealmResponse struct {
 	FederationBrandName string `json:"FederationBrandName"`
 	CloudInstanceName   string `json:"CloudInstanceName"`
 	AuthURL             string `json:"AuthURL"`
+}
+
+type getCredentialTypeRequest struct {
+	Username string `json:"username"`
+}
+
+type getCredentialTypeResponse struct {
+	IfExistsResult int `json:"IfExistsResult"`
+	EstsProperties struct {
+		DesktopSsoEnabled  *bool `json:"DesktopSsoEnabled"`
+		UserTenantBranding []any `json:"UserTenantBranding"`
+		IsSignupDisallowed *bool `json:"IsSignupDisallowed"`
+	} `json:"EstsProperties"`
+	Credentials struct {
+		PrefCredential int  `json:"PrefCredential"`
+		HasPassword    bool `json:"HasPassword"`
+	} `json:"Credentials"`
 }
 
 func DiscoverAzureTenant(ctx context.Context, config *azurefern.DiscoverAzureTenantConfig) (*azurefern.DiscoverAzureTenantReport, error) {
@@ -108,7 +126,18 @@ func DiscoverAzureTenant(ctx context.Context, config *azurefern.DiscoverAzureTen
 		}
 	}
 
-	// Step 3: Detect M365 services
+	// Step 3: Query GetCredentialType for auth configuration
+	log.Info("Querying GetCredentialType", svc1log.SafeParam("domain", config.Domain))
+
+	credTypeInfo, err := queryGetCredentialType(ctx, client, config.Domain)
+	if err != nil {
+		log.Warn("Failed to query GetCredentialType", svc1log.SafeParam("error", err.Error()))
+		errors = append(errors, fmt.Sprintf("GetCredentialType query failed: %s", err.Error()))
+	} else {
+		tenantInfo.CredentialTypeInfo = credTypeInfo
+	}
+
+	// Step 4: Detect M365 services
 	log.Info("Detecting M365 services", svc1log.SafeParam("domain", config.Domain))
 	detectedServices, serviceErrors := detectM365Services(ctx, client, config.Domain, timeout)
 	tenantInfo.DetectedServices = detectedServices
@@ -120,7 +149,7 @@ func DiscoverAzureTenant(ctx context.Context, config *azurefern.DiscoverAzureTen
 		Result: &azurefern.DiscoverAzureTenantResult{},
 	}
 
-	if tenantInfo.TenantId != nil || tenantInfo.FederationStatus != nil || len(tenantInfo.DetectedServices) > 0 {
+	if tenantInfo.TenantId != nil || tenantInfo.FederationStatus != nil || tenantInfo.CredentialTypeInfo != nil || len(tenantInfo.DetectedServices) > 0 {
 		report.Result.Tenant = tenantInfo
 	}
 
@@ -201,6 +230,63 @@ func queryUserRealm(ctx context.Context, client *http.Client, url string) (*user
 	}
 
 	return &realm, nil
+}
+
+func queryGetCredentialType(ctx context.Context, client *http.Client, domain string) (*azurefern.CredentialTypeInfo, error) {
+	reqBody := getCredentialTypeRequest{
+		Username: "user@" + domain,
+	}
+	reqJSON, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, getCredentialTypeURLString, strings.NewReader(string(reqJSON)))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("request failed: %w", err)
+	}
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			fmt.Printf("failed to close response body: %v\n", closeErr)
+		}
+	}()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	var credType getCredentialTypeResponse
+	if err := json.Unmarshal(body, &credType); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	info := &azurefern.CredentialTypeInfo{
+		HasPassword:    &credType.Credentials.HasPassword,
+		PrefCredential: &credType.Credentials.PrefCredential,
+	}
+
+	if credType.EstsProperties.DesktopSsoEnabled != nil {
+		info.DesktopSsoEnabled = credType.EstsProperties.DesktopSsoEnabled
+	}
+	if credType.EstsProperties.IsSignupDisallowed != nil {
+		info.IsSignupDisallowed = credType.EstsProperties.IsSignupDisallowed
+	}
+
+	brandingConfigured := len(credType.EstsProperties.UserTenantBranding) > 0
+	info.TenantBrandingConfigured = &brandingConfigured
+
+	return info, nil
 }
 
 func extractTenantID(issuer string) string {
