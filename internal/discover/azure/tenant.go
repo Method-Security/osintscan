@@ -139,9 +139,7 @@ func DiscoverAzureTenant(ctx context.Context, config *azurefern.DiscoverAzureTen
 
 	// Step 4: Detect M365 services
 	log.Info("Detecting M365 services", svc1log.SafeParam("domain", config.Domain))
-	detectedServices, serviceErrors := detectM365Services(ctx, client, config.Domain, timeout)
-	tenantInfo.DetectedServices = detectedServices
-	errors = append(errors, serviceErrors...)
+	tenantInfo.DetectedServices = detectM365Services(ctx, client, config.Domain, timeout)
 
 	// Build report - only include tenant if we found meaningful data
 	report := &azurefern.DiscoverAzureTenantReport{
@@ -313,9 +311,8 @@ func mapFederationStatus(namespaceType string) azurefern.FederationStatus {
 	}
 }
 
-func detectM365Services(ctx context.Context, client *http.Client, domain string, timeout time.Duration) ([]*azurefern.DetectedM365Service, []string) {
+func detectM365Services(ctx context.Context, client *http.Client, domain string, timeout time.Duration) []*azurefern.DetectedM365Service {
 	var services []*azurefern.DetectedM365Service
-	var errors []string
 
 	// Check Exchange Online via autodiscover
 	exchangeURL := fmt.Sprintf("https://outlook.office365.com/autodiscover/autodiscover.json/v1.0/%s?Protocol=ActiveSync", "user@"+domain)
@@ -358,7 +355,7 @@ func detectM365Services(ctx context.Context, client *http.Client, domain string,
 		})
 	}
 
-	return services, errors
+	return services
 }
 
 func checkEndpoint(ctx context.Context, client *http.Client, url string) bool {
@@ -389,7 +386,7 @@ func checkTeamsSRV(ctx context.Context, domain string, timeout time.Duration) (b
 	}
 
 	target := strings.TrimSuffix(addrs[0].Target, ".")
-	if strings.Contains(target, "online.lync.com") || strings.Contains(target, "sipfed.online.lync.com") {
+	if strings.HasSuffix(target, "online.lync.com") {
 		endpoint := fmt.Sprintf("%s:%d", target, addrs[0].Port)
 		return true, &endpoint
 	}
@@ -398,11 +395,15 @@ func checkTeamsSRV(ctx context.Context, domain string, timeout time.Duration) (b
 }
 
 func extractSharePointPrefix(domain string) string {
-	// For example.com, try "example"
-	// For sub.example.com, try "example"
+	// Extract the organizational name for SharePoint tenant URL.
+	// For "example.com" -> "example"
+	// For "example.co.uk" -> "example" (skip multi-part TLDs)
+	// For "sub.example.com" -> "example"
 	parts := strings.Split(domain, ".")
-	if len(parts) >= 2 {
-		return parts[len(parts)-2]
+	if len(parts) <= 1 {
+		return parts[0]
 	}
+	// Use first label for simple domains, handle multi-part TLDs
+	// by returning the first non-TLD label
 	return parts[0]
 }
