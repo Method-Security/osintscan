@@ -1,0 +1,51 @@
+types:
+# Config Struct
+  DiscoverAzureTenantConfig:
+    properties:
+      domain: string
+      timeout: optional<integer>
+
+# Enums
+  FederationStatus:
+    enum:
+    - MANAGED
+    - FEDERATED
+    - UNKNOWN
+
+  M365ServiceType:
+    enum:
+    - EXCHANGE_ONLINE
+    - SHAREPOINT_ONLINE
+    - TEAMS
+    - SSFB
+
+  DetectedM365Service:
+    properties:
+      serviceType: M365ServiceType
+      endpoint: optional<string>
+
+# Result Types
+  AzureTenantInfo:
+    properties:
+      domain: string
+      tenantId: optional<string>
+      tenantBrandName: optional<string>
+      federationStatus: optional<FederationStatus>
+      federationAuthUrl: optional<string>
+      namespaceType: optional<string>
+      cloudInstanceName: optional<string>
+      authorizationEndpoint: optional<string>
+      tokenEndpoint: optional<string>
+      openidConfigurationUrl: optional<string>
+      detectedServices: optional<list<DetectedM365Service>>
+
+# Report Structs
+  DiscoverAzureTenantResult:
+    properties:
+      tenant: optional<AzureTenantInfo>
+
+  DiscoverAzureTenantReport:
+    properties:
+      config: DiscoverAzureTenantConfig
+      result: DiscoverAzureTenantResult
+      errors: optional<list<string>>

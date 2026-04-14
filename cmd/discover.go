@@ -10,12 +10,14 @@ import (
 	// Generated
 	common "github.com/Method-Security/osintscan/generated/go/common"
 	asnfern "github.com/Method-Security/osintscan/generated/go/discover/asn"
+	azurefern "github.com/Method-Security/osintscan/generated/go/discover/azure"
 	cdnfern "github.com/Method-Security/osintscan/generated/go/discover/cdn"
 	dnsfern "github.com/Method-Security/osintscan/generated/go/discover/dns"
 	ipfern "github.com/Method-Security/osintscan/generated/go/discover/ip"
 
 	// Internal
 	discover "github.com/Method-Security/osintscan/internal/discover"
+	azure "github.com/Method-Security/osintscan/internal/discover/azure"
 	dns "github.com/Method-Security/osintscan/internal/discover/dns"
 	subdomain "github.com/Method-Security/osintscan/internal/discover/dns/subdomain"
 	subdomainpassive "github.com/Method-Security/osintscan/internal/discover/dns/subdomain/passive"
@@ -624,6 +626,51 @@ func (a *OsintScan) InitDiscoverCommand() {
 	// Add command to 'shodan' command
 	discoverShodanCmd.AddCommand(discoverShodanHostnameCmd)
 
+	// Azure Command
+	// Subcommands:
+	// - tenant
+	discoverAzureCmd := &cobra.Command{
+		Use:   "azure",
+		Short: "Discover Azure and M365 infrastructure",
+		Long:  `Discover Azure Active Directory tenants and Microsoft 365 services for a given domain using publicly accessible endpoints.`,
+	}
+
+	discoverCmd.AddCommand(discoverAzureCmd)
+
+	// Azure Tenant Command
+	discoverAzureTenantCmd := &cobra.Command{
+		Use:   "tenant",
+		Short: "Discover Azure AD tenant information for a domain",
+		Long:  `Query public Microsoft endpoints to discover Azure AD (Entra ID) tenant information, including tenant ID, federation status, and M365 service presence.`,
+		Run: func(cmd *cobra.Command, args []string) {
+			domain, err := cmd.Flags().GetString("domain")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			timeout, err := cmd.Flags().GetInt("timeout")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			config := getDiscoverAzureTenantConfig(domain, timeout)
+			report, err := azure.DiscoverAzureTenant(cmd.Context(), config)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			a.OutputSignal.Content = report
+		},
+	}
+
+	discoverAzureTenantCmd.Flags().String("domain", "", "The domain name to discover Azure tenant information for")
+	discoverAzureTenantCmd.Flags().Int("timeout", 30, "The timeout in seconds for each HTTP request")
+
+	_ = discoverAzureTenantCmd.MarkFlagRequired("domain")
+
+	discoverAzureCmd.AddCommand(discoverAzureTenantCmd)
+
 	// CDN Command
 	discoverCdnCmd := &cobra.Command{
 		Use:   "cdn",
@@ -886,6 +933,14 @@ func getDiscoverCdnConfig(domain string, ipAddresses []string, dnsResolvers []st
 		config.IpAddresses = ipAddresses
 	}
 	return config
+}
+
+// getDiscoverAzureTenantConfig creates and returns a configuration for Azure tenant discovery
+func getDiscoverAzureTenantConfig(domain string, timeout int) *azurefern.DiscoverAzureTenantConfig {
+	return &azurefern.DiscoverAzureTenantConfig{
+		Domain:  domain,
+		Timeout: &timeout,
+	}
 }
 
 // getDiscoverIPDomainASNConfig creates and returns a configuration for IP domain ASN discovery
