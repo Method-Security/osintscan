@@ -324,15 +324,17 @@ func detectM365Services(ctx context.Context, client *http.Client, domain string,
 		})
 	}
 
-	// Check SharePoint Online via DNS CNAME
-	sharePointDomain := extractSharePointPrefix(domain) + ".sharepoint.com"
-	sharePointURL := fmt.Sprintf("https://%s", sharePointDomain)
-	if checkEndpoint(ctx, client, sharePointURL) {
-		svcType := azurefern.M365ServiceTypeSharepointOnline
-		services = append(services, &azurefern.DetectedM365Service{
-			ServiceType: svcType,
-			Endpoint:    &sharePointURL,
-		})
+	// Check SharePoint Online - try candidate prefixes
+	for _, prefix := range extractSharePointPrefixes(domain) {
+		sharePointURL := fmt.Sprintf("https://%s.sharepoint.com", prefix)
+		if checkEndpoint(ctx, client, sharePointURL) {
+			svcType := azurefern.M365ServiceTypeSharepointOnline
+			services = append(services, &azurefern.DetectedM365Service{
+				ServiceType: svcType,
+				Endpoint:    &sharePointURL,
+			})
+			break
+		}
 	}
 
 	// Check Teams/Skype for Business via DNS SRV
@@ -394,16 +396,25 @@ func checkTeamsSRV(ctx context.Context, domain string, timeout time.Duration) (b
 	return false, nil
 }
 
-func extractSharePointPrefix(domain string) string {
-	// Extract the organizational name for SharePoint tenant URL.
-	// For "example.com" -> "example"
-	// For "example.co.uk" -> "example" (skip multi-part TLDs)
-	// For "sub.example.com" -> "example"
+func extractSharePointPrefixes(domain string) []string {
+	// Return candidate SharePoint tenant prefixes to try.
+	// SharePoint URLs are typically https://<orgname>.sharepoint.com
+	// For "contoso.com" -> ["contoso"]
+	// For "mail.contoso.com" -> ["contoso", "mail"] (try org name first)
+	// For "contoso.co.uk" -> ["contoso"]
 	parts := strings.Split(domain, ".")
 	if len(parts) <= 1 {
-		return parts[0]
+		return parts
 	}
-	// Use first label for simple domains, handle multi-part TLDs
-	// by returning the first non-TLD label
-	return parts[0]
+	if len(parts) == 2 {
+		return []string{parts[0]}
+	}
+	// For 3+ parts, the second-to-last is likely the org name
+	// (handles both "sub.example.com" and "example.co.uk")
+	// Try it first, then fall back to the first label
+	candidates := []string{parts[len(parts)-2]}
+	if parts[0] != candidates[0] {
+		candidates = append(candidates, parts[0])
+	}
+	return candidates
 }
