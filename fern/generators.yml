@@ -3,9 +3,9 @@ groups:
   local:
     generators:
       - name: fernapi/fern-go-sdk
-        version: 0.38.0
+        version: 1.34.5
         config:
-          importpath: github.com/Method-Security/osintscan/generated/go
+          importPath: github.com/Method-Security/osintscan/generated/go
         output:
           location: local-file-system
           path: ../generated/go
