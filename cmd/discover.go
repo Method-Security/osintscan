@@ -20,7 +20,6 @@ import (
 	dns "github.com/Method-Security/osintscan/internal/discover/dns"
 	subdomain "github.com/Method-Security/osintscan/internal/discover/dns/subdomain"
 	subdomainpassive "github.com/Method-Security/osintscan/internal/discover/dns/subdomain/passive"
-	idpdetect "github.com/Method-Security/osintscan/internal/discover/idp"
 	ip "github.com/Method-Security/osintscan/internal/discover/ip"
 
 	// External
@@ -644,7 +643,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 			}
 
 			config := getDiscoverIdpConfig(domain, timeout)
-			report, err := idpdetect.DiscoverIdp(cmd.Context(), config)
+			report, err := discover.DiscoverIdp(cmd.Context(), config)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
