@@ -10,17 +10,17 @@ import (
 	// Generated
 	common "github.com/Method-Security/osintscan/generated/go/common"
 	asnfern "github.com/Method-Security/osintscan/generated/go/discover/asn"
-	azurefern "github.com/Method-Security/osintscan/generated/go/discover/azure"
 	cdnfern "github.com/Method-Security/osintscan/generated/go/discover/cdn"
 	dnsfern "github.com/Method-Security/osintscan/generated/go/discover/dns"
+	idpfern "github.com/Method-Security/osintscan/generated/go/discover/idp"
 	ipfern "github.com/Method-Security/osintscan/generated/go/discover/ip"
 
 	// Internal
 	discover "github.com/Method-Security/osintscan/internal/discover"
-	azure "github.com/Method-Security/osintscan/internal/discover/azure"
 	dns "github.com/Method-Security/osintscan/internal/discover/dns"
 	subdomain "github.com/Method-Security/osintscan/internal/discover/dns/subdomain"
 	subdomainpassive "github.com/Method-Security/osintscan/internal/discover/dns/subdomain/passive"
+	idpdetect "github.com/Method-Security/osintscan/internal/discover/idp"
 	ip "github.com/Method-Security/osintscan/internal/discover/ip"
 
 	// External
@@ -626,22 +626,11 @@ func (a *OsintScan) InitDiscoverCommand() {
 	// Add command to 'shodan' command
 	discoverShodanCmd.AddCommand(discoverShodanHostnameCmd)
 
-	// Azure Command
-	// Subcommands:
-	// - tenant
-	discoverAzureCmd := &cobra.Command{
-		Use:   "azure",
-		Short: "Discover Azure and M365 infrastructure",
-		Long:  `Discover Azure Active Directory tenants and Microsoft 365 services for a given domain using publicly accessible endpoints.`,
-	}
-
-	discoverCmd.AddCommand(discoverAzureCmd)
-
-	// Azure Tenant Command
-	discoverAzureTenantCmd := &cobra.Command{
-		Use:   "tenant",
-		Short: "Discover Azure AD tenant information for a domain",
-		Long:  `Query public Microsoft endpoints to discover Azure AD (Entra ID) tenant information, including tenant ID, federation status, and M365 service presence.`,
+	// IdP Command
+	discoverIdpCmd := &cobra.Command{
+		Use:   "idp",
+		Short: "Discover identity providers for a domain",
+		Long:  `Detect identity providers (Azure AD/Entra ID, Okta, etc.) associated with a domain by querying public endpoints, DNS records, and federation metadata.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			domain, err := cmd.Flags().GetString("domain")
 			if err != nil {
@@ -654,8 +643,8 @@ func (a *OsintScan) InitDiscoverCommand() {
 				return
 			}
 
-			config := getDiscoverAzureTenantConfig(domain, timeout)
-			report, err := azure.DiscoverAzureTenant(cmd.Context(), config)
+			config := getDiscoverIdpConfig(domain, timeout)
+			report, err := idpdetect.DiscoverIdp(cmd.Context(), config)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -664,12 +653,12 @@ func (a *OsintScan) InitDiscoverCommand() {
 		},
 	}
 
-	discoverAzureTenantCmd.Flags().String("domain", "", "The domain name to discover Azure tenant information for")
-	discoverAzureTenantCmd.Flags().Int("timeout", 30, "The timeout in seconds for each HTTP request")
+	discoverIdpCmd.Flags().String("domain", "", "The domain name to discover identity providers for")
+	discoverIdpCmd.Flags().Int("timeout", 30, "The timeout in seconds for each HTTP request")
 
-	_ = discoverAzureTenantCmd.MarkFlagRequired("domain")
+	_ = discoverIdpCmd.MarkFlagRequired("domain")
 
-	discoverAzureCmd.AddCommand(discoverAzureTenantCmd)
+	discoverCmd.AddCommand(discoverIdpCmd)
 
 	// CDN Command
 	discoverCdnCmd := &cobra.Command{
@@ -935,9 +924,9 @@ func getDiscoverCdnConfig(domain string, ipAddresses []string, dnsResolvers []st
 	return config
 }
 
-// getDiscoverAzureTenantConfig creates and returns a configuration for Azure tenant discovery
-func getDiscoverAzureTenantConfig(domain string, timeout int) *azurefern.DiscoverAzureTenantConfig {
-	return &azurefern.DiscoverAzureTenantConfig{
+// getDiscoverIdpConfig creates and returns a configuration for IdP discovery
+func getDiscoverIdpConfig(domain string, timeout int) *idpfern.DiscoverIdpConfig {
+	return &idpfern.DiscoverIdpConfig{
 		Domain:  domain,
 		Timeout: &timeout,
 	}

@@ -1,11 +1,17 @@
 types:
 # Config Struct
-  DiscoverAzureTenantConfig:
+  DiscoverIdpConfig:
     properties:
       domain: string
       timeout: optional<integer>
 
 # Enums
+  IdpProvider:
+    enum:
+    - AZURE
+    - OKTA
+    - OTHER
+
   FederationStatus:
     enum:
     - MANAGED
@@ -19,13 +25,13 @@ types:
     - TEAMS
     - SSFB
 
+# Azure-Specific Types
   DetectedM365Service:
     properties:
       serviceType: M365ServiceType
       endpoint: optional<string>
 
-# Credential Type Info
-  CredentialTypeInfo:
+  AzureCredentialTypeInfo:
     properties:
       desktopSsoEnabled: optional<boolean>
       isSignupDisallowed: optional<boolean>
@@ -33,10 +39,8 @@ types:
       prefCredential: optional<integer>
       tenantBrandingConfigured: optional<boolean>
 
-# Result Types
-  AzureTenantInfo:
+  AzureIdpDetails:
     properties:
-      domain: string
       tenantId: optional<string>
       tenantBrandName: optional<string>
       federationStatus: optional<FederationStatus>
@@ -46,16 +50,34 @@ types:
       authorizationEndpoint: optional<string>
       tokenEndpoint: optional<string>
       openidConfigurationUrl: optional<string>
-      credentialTypeInfo: optional<CredentialTypeInfo>
+      credentialTypeInfo: optional<AzureCredentialTypeInfo>
       detectedServices: optional<list<DetectedM365Service>>
 
-# Report Structs
-  DiscoverAzureTenantResult:
+# Okta-Specific Types
+  OktaIdpDetails:
     properties:
-      tenant: optional<AzureTenantInfo>
+      orgUrl: optional<string>
+      issuer: optional<string>
+      customDomain: optional<string>
+      authorizationEndpoint: optional<string>
+      tokenEndpoint: optional<string>
+      detectionMethod: optional<string>
 
-  DiscoverAzureTenantReport:
+# Result Types
+  DiscoveredIdp:
     properties:
-      config: DiscoverAzureTenantConfig
-      result: DiscoverAzureTenantResult
+      domain: string
+      provider: IdpProvider
+      azure: optional<AzureIdpDetails>
+      okta: optional<OktaIdpDetails>
+
+  DiscoverIdpResult:
+    properties:
+      providers: optional<list<DiscoveredIdp>>
+
+# Report Structs
+  DiscoverIdpReport:
+    properties:
+      config: DiscoverIdpConfig
+      result: DiscoverIdpResult
       errors: optional<list<string>>
