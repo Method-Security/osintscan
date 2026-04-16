@@ -106,7 +106,11 @@ func detectAzure(ctx context.Context, client *http.Client, domain string, timeou
 		}
 	}
 
-	// Step 3: Query GetCredentialType
+	if !found {
+		return nil, errors
+	}
+
+	// Step 3: Query GetCredentialType (only if Azure was detected)
 	credTypeInfo, err := queryGetCredentialType(ctx, client, domain)
 	if err != nil {
 		errors = append(errors, fmt.Sprintf("Azure GetCredentialType query failed: %s", err.Error()))
@@ -117,10 +121,6 @@ func detectAzure(ctx context.Context, client *http.Client, domain string, timeou
 	// Step 4: Detect M365 services
 	log.Info("Detecting M365 services", svc1log.SafeParam("domain", domain))
 	details.DetectedServices = detectM365Services(ctx, client, domain, timeout)
-
-	if !found {
-		return nil, errors
-	}
 
 	return &idpfern.DiscoveredIdp{
 		Domain:   domain,
@@ -259,16 +259,27 @@ func checkTeamsSRV(ctx context.Context, domain string, timeout time.Duration) (b
 }
 
 func extractSharePointPrefixes(domain string) []string {
+	// SharePoint tenant URLs are https://<orgname>.sharepoint.com.
+	// Given a domain, return candidate org names to try.
+	// "example.com"           -> ["example"]
+	// "mail.example.com"      -> ["example", "mail"]
+	// "example.co.uk"         -> ["example"]
+	// "corp.example.co.uk"    -> ["example", "corp"]
 	parts := strings.Split(domain, ".")
-	if len(parts) <= 1 {
-		return parts
-	}
-	if len(parts) == 2 {
+	if len(parts) <= 2 {
 		return []string{parts[0]}
 	}
-	candidates := []string{parts[len(parts)-2]}
-	if parts[0] != candidates[0] {
-		candidates = append(candidates, parts[0])
+	// For 3+ parts, deduplicate: try first label, then second-to-last if different.
+	// First label handles subdomains (mail.example.com -> mail) and ccTLDs (example.co.uk -> example).
+	// Second-to-last handles subdomains better for common cases (mail.example.com -> example).
+	// We try the more likely org name first.
+	secondToLast := parts[len(parts)-2]
+	first := parts[0]
+	if first == secondToLast {
+		return []string{first}
 	}
-	return candidates
+	// For "mail.example.com": secondToLast=example, first=mail -> try [example, mail]
+	// For "example.co.uk": secondToLast=co, first=example -> try [example, co]
+	// First label is more likely the org name in both cases.
+	return []string{first, secondToLast}
 }
