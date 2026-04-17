@@ -148,13 +148,14 @@ func detectAzure(ctx context.Context, client *httpclient.Client, domain string, 
 	}
 
 	// Step 2: Use pre-fetched User Realm data
-	if realmFetched {
+	// Only mark as found if NameSpaceType indicates an actual Azure tenant
+	// (Microsoft returns 200 with NameSpaceType="Unknown" for non-Azure domains)
+	realmIsAzure := realmFetched && (strings.EqualFold(realmInfo.NameSpaceType, "Managed") || strings.EqualFold(realmInfo.NameSpaceType, "Federated"))
+	if realmIsAzure {
 		found = true
-		if realmInfo.NameSpaceType != "" {
-			details.NamespaceType = &realmInfo.NameSpaceType
-			fedStatus := mapAzureFederationStatus(realmInfo.NameSpaceType)
-			details.FederationStatus = &fedStatus
-		}
+		details.NamespaceType = &realmInfo.NameSpaceType
+		fedStatus := mapAzureFederationStatus(realmInfo.NameSpaceType)
+		details.FederationStatus = &fedStatus
 		if realmInfo.FederationBrandName != "" {
 			details.TenantBrandName = &realmInfo.FederationBrandName
 		}
