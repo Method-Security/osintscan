@@ -6,16 +6,13 @@ package discover
 
 import (
 	"context"
-	"crypto/tls"
-	"encoding/json"
 	"fmt"
-	"io"
 	"net"
-	"net/http"
 	"strings"
 	"time"
 
 	idpfern "github.com/Method-Security/osintscan/generated/go/discover/idp"
+	"github.com/Method-Security/pkg/httpclient"
 	"github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
@@ -39,14 +36,7 @@ func DiscoverIdp(ctx context.Context, config *idpfern.DiscoverIdpConfig) (*idpfe
 		timeout = time.Duration(*config.Timeout) * time.Second
 	}
 
-	client := &http.Client{
-		Timeout: timeout,
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				MinVersion: tls.VersionTLS12,
-			},
-		},
-	}
+	client := httpclient.New(httpclient.WithTimeout(timeout))
 
 	var providers []*idpfern.DiscoveredIdp
 
@@ -120,7 +110,7 @@ type azureGetCredentialTypeResponse struct {
 	} `json:"Credentials"`
 }
 
-func detectAzure(ctx context.Context, client *http.Client, domain string, timeout time.Duration) (*idpfern.DiscoveredIdp, []string) {
+func detectAzure(ctx context.Context, client *httpclient.Client, domain string, timeout time.Duration) (*idpfern.DiscoveredIdp, []string) {
 	log := svc1log.FromContext(ctx)
 	errors := []string{}
 	details := &idpfern.AzureIdpDetails{}
@@ -128,8 +118,8 @@ func detectAzure(ctx context.Context, client *http.Client, domain string, timeou
 
 	// Step 1: Query OpenID Configuration
 	openIDURL := fmt.Sprintf(openIDConfigURLTemplate, domain)
-	oidcConfig, err := idpHTTPGetJSON[azureOpenIDConfig](ctx, client, openIDURL)
-	if err != nil {
+	var oidcConfig azureOpenIDConfig
+	if _, err := client.GetJSON(ctx, openIDURL, &oidcConfig); err != nil {
 		errors = append(errors, fmt.Sprintf("Azure OpenID query failed: %s", err.Error()))
 	} else {
 		found = true
@@ -151,8 +141,8 @@ func detectAzure(ctx context.Context, client *http.Client, domain string, timeou
 
 	// Step 2: Query User Realm
 	userRealmURL := fmt.Sprintf(userRealmURLTemplate, "user@"+domain)
-	realmInfo, err := idpHTTPGetJSON[azureUserRealmResponse](ctx, client, userRealmURL)
-	if err != nil {
+	var realmInfo azureUserRealmResponse
+	if _, err := client.GetJSON(ctx, userRealmURL, &realmInfo); err != nil {
 		errors = append(errors, fmt.Sprintf("Azure UserRealm query failed: %s", err.Error()))
 	} else {
 		found = true
@@ -192,37 +182,12 @@ func detectAzure(ctx context.Context, client *http.Client, domain string, timeou
 	}, errors
 }
 
-func queryAzureGetCredentialType(ctx context.Context, client *http.Client, domain string) (*idpfern.AzureCredentialTypeInfo, error) {
+func queryAzureGetCredentialType(ctx context.Context, client *httpclient.Client, domain string) (*idpfern.AzureCredentialTypeInfo, error) {
 	reqBody := azureGetCredentialTypeRequest{Username: "user@" + domain}
-	reqJSON, err := json.Marshal(reqBody)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, getCredentialTypeURLString, strings.NewReader(string(reqJSON)))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("request failed: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response: %w", err)
-	}
 
 	var credType azureGetCredentialTypeResponse
-	if err := json.Unmarshal(body, &credType); err != nil {
-		return nil, fmt.Errorf("failed to parse response: %w", err)
+	if _, err := client.PostJSON(ctx, getCredentialTypeURLString, reqBody, &credType); err != nil {
+		return nil, err
 	}
 
 	info := &idpfern.AzureCredentialTypeInfo{
@@ -241,18 +206,18 @@ func queryAzureGetCredentialType(ctx context.Context, client *http.Client, domai
 	return info, nil
 }
 
-func detectM365Services(ctx context.Context, client *http.Client, domain string, timeout time.Duration) []*idpfern.DetectedM365Service {
+func detectM365Services(ctx context.Context, client *httpclient.Client, domain string, timeout time.Duration) []*idpfern.DetectedM365Service {
 	var services []*idpfern.DetectedM365Service
 
 	exchangeURL := fmt.Sprintf("https://outlook.office365.com/autodiscover/autodiscover.json/v1.0/%s?Protocol=ActiveSync", "user@"+domain)
-	if idpCheckEndpoint(ctx, client, exchangeURL) {
+	if client.IsAlive(ctx, exchangeURL) {
 		svcType := idpfern.M365ServiceTypeExchangeOnline
 		services = append(services, &idpfern.DetectedM365Service{ServiceType: svcType, Endpoint: &exchangeURL})
 	}
 
 	for _, prefix := range extractSharePointPrefixes(domain) {
 		sharePointURL := fmt.Sprintf("https://%s.sharepoint.com", prefix)
-		if idpCheckEndpoint(ctx, client, sharePointURL) {
+		if client.IsAlive(ctx, sharePointURL) {
 			svcType := idpfern.M365ServiceTypeSharepointOnline
 			services = append(services, &idpfern.DetectedM365Service{ServiceType: svcType, Endpoint: &sharePointURL})
 			break
@@ -266,7 +231,7 @@ func detectM365Services(ctx context.Context, client *http.Client, domain string,
 	}
 
 	ssfbURL := fmt.Sprintf("https://lyncdiscover.%s", domain)
-	if idpCheckEndpoint(ctx, client, ssfbURL) {
+	if client.IsAlive(ctx, ssfbURL) {
 		svcType := idpfern.M365ServiceTypeSsfb
 		services = append(services, &idpfern.DetectedM365Service{ServiceType: svcType, Endpoint: &ssfbURL})
 	}
@@ -338,7 +303,7 @@ type oktaOIDCResponse struct {
 
 var oktaSubdomainPrefixes = []string{"login", "sso", "id", "auth"}
 
-func detectOkta(ctx context.Context, client *http.Client, domain string) (*idpfern.DiscoveredIdp, []string) {
+func detectOkta(ctx context.Context, client *httpclient.Client, domain string) (*idpfern.DiscoveredIdp, []string) {
 	log := svc1log.FromContext(ctx)
 	errors := []string{}
 	details := &idpfern.OktaIdpDetails{}
@@ -372,8 +337,8 @@ func detectOkta(ctx context.Context, client *http.Client, domain string) (*idpfe
 		for _, prefix := range oktaSubdomainPrefixes {
 			subdomain := fmt.Sprintf("%s.%s", prefix, domain)
 			oidcURL := fmt.Sprintf("https://%s/.well-known/openid-configuration", subdomain)
-			oidc, err := idpHTTPGetJSON[oktaOIDCResponse](ctx, client, oidcURL)
-			if err != nil {
+			var oidc oktaOIDCResponse
+			if _, err := client.GetJSON(ctx, oidcURL, &oidc); err != nil {
 				continue
 			}
 			issuer := strings.ToLower(oidc.Issuer)
@@ -403,8 +368,8 @@ func detectOkta(ctx context.Context, client *http.Client, domain string) (*idpfe
 	// Method 3: Check Azure UserRealm federation URL for Okta
 	if !found {
 		userRealmURL := fmt.Sprintf(userRealmURLTemplate, "user@"+domain)
-		realmInfo, err := idpHTTPGetJSON[azureUserRealmResponse](ctx, client, userRealmURL)
-		if err == nil && realmInfo.AuthURL != "" {
+		var realmInfo azureUserRealmResponse
+		if _, err := client.GetJSON(ctx, userRealmURL, &realmInfo); err == nil && realmInfo.AuthURL != "" {
 			authURLLower := strings.ToLower(realmInfo.AuthURL)
 			if strings.Contains(authURLLower, "okta.com") || strings.Contains(authURLLower, "oktapreview.com") {
 				found = true
@@ -426,43 +391,4 @@ func detectOkta(ctx context.Context, client *http.Client, domain string) (*idpfe
 		Provider: idpfern.IdpProviderOkta,
 		Okta:     details,
 	}, errors
-}
-
-// ── HTTP Helpers ────────────────────────────────────────────────────────────
-
-func idpHTTPGetJSON[T any](ctx context.Context, client *http.Client, url string) (*T, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("request failed: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-	}
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response: %w", err)
-	}
-	var result T
-	if err := json.Unmarshal(body, &result); err != nil {
-		return nil, fmt.Errorf("failed to parse response: %w", err)
-	}
-	return &result, nil
-}
-
-func idpCheckEndpoint(ctx context.Context, client *http.Client, url string) bool {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return false
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		return false
-	}
-	defer func() { _ = resp.Body.Close() }()
-	return resp.StatusCode != http.StatusNotFound && resp.StatusCode != http.StatusBadGateway
 }
