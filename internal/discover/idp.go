@@ -40,9 +40,17 @@ func DiscoverIdp(ctx context.Context, config *idpfern.DiscoverIdpConfig) (*idpfe
 
 	var providers []*idpfern.DiscoveredIdp
 
+	// Fetch UserRealm once — used by both Azure and Okta detection
+	userRealmURL := fmt.Sprintf(userRealmURLTemplate, "user@"+config.Domain)
+	var realmInfo azureUserRealmResponse
+	var realmFetched bool
+	if _, err := client.GetJSON(ctx, userRealmURL, &realmInfo); err == nil {
+		realmFetched = true
+	}
+
 	// Detect Azure/Entra ID
 	log.Info("Checking for Azure/Entra ID", svc1log.SafeParam("domain", config.Domain))
-	azureResult, azureErrors := detectAzure(ctx, client, config.Domain, timeout)
+	azureResult, azureErrors := detectAzure(ctx, client, config.Domain, timeout, &realmInfo, realmFetched)
 	errors = append(errors, azureErrors...)
 	if azureResult != nil {
 		providers = append(providers, azureResult)
@@ -50,7 +58,7 @@ func DiscoverIdp(ctx context.Context, config *idpfern.DiscoverIdpConfig) (*idpfe
 
 	// Detect Okta
 	log.Info("Checking for Okta", svc1log.SafeParam("domain", config.Domain))
-	oktaResult, oktaErrors := detectOkta(ctx, client, config.Domain)
+	oktaResult, oktaErrors := detectOkta(ctx, client, config.Domain, &realmInfo, realmFetched)
 	errors = append(errors, oktaErrors...)
 	if oktaResult != nil {
 		providers = append(providers, oktaResult)
@@ -110,7 +118,7 @@ type azureGetCredentialTypeResponse struct {
 	} `json:"Credentials"`
 }
 
-func detectAzure(ctx context.Context, client *httpclient.Client, domain string, timeout time.Duration) (*idpfern.DiscoveredIdp, []string) {
+func detectAzure(ctx context.Context, client *httpclient.Client, domain string, timeout time.Duration, realmInfo *azureUserRealmResponse, realmFetched bool) (*idpfern.DiscoveredIdp, []string) {
 	log := svc1log.FromContext(ctx)
 	errors := []string{}
 	details := &idpfern.AzureIdpDetails{}
@@ -139,12 +147,8 @@ func detectAzure(ctx context.Context, client *httpclient.Client, domain string, 
 		details.OpenidConfigurationUrl = &openIDURL
 	}
 
-	// Step 2: Query User Realm
-	userRealmURL := fmt.Sprintf(userRealmURLTemplate, "user@"+domain)
-	var realmInfo azureUserRealmResponse
-	if _, err := client.GetJSON(ctx, userRealmURL, &realmInfo); err != nil {
-		errors = append(errors, fmt.Sprintf("Azure UserRealm query failed: %s", err.Error()))
-	} else {
+	// Step 2: Use pre-fetched User Realm data
+	if realmFetched {
 		found = true
 		if realmInfo.NameSpaceType != "" {
 			details.NamespaceType = &realmInfo.NameSpaceType
@@ -206,18 +210,21 @@ func queryAzureGetCredentialType(ctx context.Context, client *httpclient.Client,
 	return info, nil
 }
 
-func detectM365Services(ctx context.Context, client *httpclient.Client, domain string, timeout time.Duration) []*idpfern.DetectedM365Service {
+func detectM365Services(ctx context.Context, _ *httpclient.Client, domain string, timeout time.Duration) []*idpfern.DetectedM365Service {
+	// Use a no-redirect client for service checks to avoid false positives
+	// from generic Microsoft login redirects returning 200.
+	noRedirectClient := httpclient.New(httpclient.WithTimeout(timeout), httpclient.WithMaxRedirects(0))
 	var services []*idpfern.DetectedM365Service
 
 	exchangeURL := fmt.Sprintf("https://outlook.office365.com/autodiscover/autodiscover.json/v1.0/%s?Protocol=ActiveSync", "user@"+domain)
-	if client.IsAlive(ctx, exchangeURL) {
+	if noRedirectClient.IsAlive(ctx, exchangeURL) {
 		svcType := idpfern.M365ServiceTypeExchangeOnline
 		services = append(services, &idpfern.DetectedM365Service{ServiceType: svcType, Endpoint: &exchangeURL})
 	}
 
 	for _, prefix := range extractSharePointPrefixes(domain) {
 		sharePointURL := fmt.Sprintf("https://%s.sharepoint.com", prefix)
-		if client.IsAlive(ctx, sharePointURL) {
+		if noRedirectClient.IsAlive(ctx, sharePointURL) {
 			svcType := idpfern.M365ServiceTypeSharepointOnline
 			services = append(services, &idpfern.DetectedM365Service{ServiceType: svcType, Endpoint: &sharePointURL})
 			break
@@ -231,7 +238,7 @@ func detectM365Services(ctx context.Context, client *httpclient.Client, domain s
 	}
 
 	ssfbURL := fmt.Sprintf("https://lyncdiscover.%s", domain)
-	if client.IsAlive(ctx, ssfbURL) {
+	if noRedirectClient.IsAlive(ctx, ssfbURL) {
 		svcType := idpfern.M365ServiceTypeSsfb
 		services = append(services, &idpfern.DetectedM365Service{ServiceType: svcType, Endpoint: &ssfbURL})
 	}
@@ -303,7 +310,7 @@ type oktaOIDCResponse struct {
 
 var oktaSubdomainPrefixes = []string{"login", "sso", "id", "auth"}
 
-func detectOkta(ctx context.Context, client *httpclient.Client, domain string) (*idpfern.DiscoveredIdp, []string) {
+func detectOkta(ctx context.Context, client *httpclient.Client, domain string, realmInfo *azureUserRealmResponse, realmFetched bool) (*idpfern.DiscoveredIdp, []string) {
 	log := svc1log.FromContext(ctx)
 	errors := []string{}
 	details := &idpfern.OktaIdpDetails{}
@@ -365,20 +372,16 @@ func detectOkta(ctx context.Context, client *httpclient.Client, domain string) (
 		}
 	}
 
-	// Method 3: Check Azure UserRealm federation URL for Okta
-	if !found {
-		userRealmURL := fmt.Sprintf(userRealmURLTemplate, "user@"+domain)
-		var realmInfo azureUserRealmResponse
-		if _, err := client.GetJSON(ctx, userRealmURL, &realmInfo); err == nil && realmInfo.AuthURL != "" {
-			authURLLower := strings.ToLower(realmInfo.AuthURL)
-			if strings.Contains(authURLLower, "okta.com") || strings.Contains(authURLLower, "oktapreview.com") {
-				found = true
-				details.OrgUrl = &realmInfo.AuthURL
-				detectionMethod := "azure_userrealm_federation"
-				details.DetectionMethod = &detectionMethod
-				log.Info("Okta detected via Azure UserRealm federation",
-					svc1log.SafeParam("auth_url", realmInfo.AuthURL))
-			}
+	// Method 3: Check pre-fetched Azure UserRealm federation URL for Okta
+	if !found && realmFetched && realmInfo.AuthURL != "" {
+		authURLLower := strings.ToLower(realmInfo.AuthURL)
+		if strings.Contains(authURLLower, "okta.com") || strings.Contains(authURLLower, "oktapreview.com") {
+			found = true
+			details.OrgUrl = &realmInfo.AuthURL
+			detectionMethod := "azure_userrealm_federation"
+			details.DetectionMethod = &detectionMethod
+			log.Info("Okta detected via Azure UserRealm federation",
+				svc1log.SafeParam("auth_url", realmInfo.AuthURL))
 		}
 	}
 
