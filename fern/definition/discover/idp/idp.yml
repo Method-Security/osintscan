@@ -25,6 +25,21 @@ types:
     - TEAMS
     - SSFB
 
+  PreferredCredentialType:
+    enum:
+    - PASSWORD
+    - FEDERATION
+    - FIDO2
+    - WINDOWS_HELLO
+    - PHONE_SIGN_IN
+    - UNKNOWN
+
+  OktaDetectionMethod:
+    enum:
+    - DNS_CNAME
+    - OPENID_CONFIG
+    - AZURE_USERREALM_FEDERATION
+
 # Azure-Specific Types
   DetectedM365Service:
     properties:
@@ -36,7 +51,7 @@ types:
       desktopSsoEnabled: optional<boolean>
       isSignupDisallowed: optional<boolean>
       hasPassword: optional<boolean>
-      prefCredential: optional<integer>
+      preferredCredentialType: optional<PreferredCredentialType>
       tenantBrandingConfigured: optional<boolean>
 
   AzureIdpDetails:
@@ -61,7 +76,7 @@ types:
       customDomain: optional<string>
       authorizationEndpoint: optional<string>
       tokenEndpoint: optional<string>
-      detectionMethod: optional<string>
+      detectionMethod: optional<OktaDetectionMethod>
 
 # Result Types
   DiscoveredIdp:

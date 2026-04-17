@@ -194,9 +194,10 @@ func queryAzureGetCredentialType(ctx context.Context, client *httpclient.Client,
 		return nil, err
 	}
 
+	prefCredType := mapPreferredCredentialType(credType.Credentials.PrefCredential)
 	info := &idpfern.AzureCredentialTypeInfo{
-		HasPassword:    &credType.Credentials.HasPassword,
-		PrefCredential: &credType.Credentials.PrefCredential,
+		HasPassword:             &credType.Credentials.HasPassword,
+		PreferredCredentialType: &prefCredType,
 	}
 	if credType.EstsProperties.DesktopSsoEnabled != nil {
 		info.DesktopSsoEnabled = credType.EstsProperties.DesktopSsoEnabled
@@ -255,6 +256,23 @@ func extractAzureTenantID(issuer string) string {
 		}
 	}
 	return ""
+}
+
+func mapPreferredCredentialType(prefCredential int) idpfern.PreferredCredentialType {
+	switch prefCredential {
+	case 1:
+		return idpfern.PreferredCredentialTypePassword
+	case 3:
+		return idpfern.PreferredCredentialTypeFederation
+	case 4:
+		return idpfern.PreferredCredentialTypeFido2
+	case 6:
+		return idpfern.PreferredCredentialTypeWindowsHello
+	case 7:
+		return idpfern.PreferredCredentialTypePhoneSignIn
+	default:
+		return idpfern.PreferredCredentialTypeUnknown
+	}
 }
 
 func mapAzureFederationStatus(namespaceType string) idpfern.FederationStatus {
@@ -328,7 +346,7 @@ func detectOkta(ctx context.Context, client *httpclient.Client, domain string, r
 			found = true
 			customDomain := subdomain
 			details.CustomDomain = &customDomain
-			detectionMethod := fmt.Sprintf("dns_cname:%s->%s", subdomain, cname)
+			detectionMethod := idpfern.OktaDetectionMethodDnsCname
 			details.DetectionMethod = &detectionMethod
 			orgURL := fmt.Sprintf("https://%s", cname)
 			details.OrgUrl = &orgURL
@@ -360,7 +378,7 @@ func detectOkta(ctx context.Context, client *httpclient.Client, domain string, r
 				if oidc.TokenEndpoint != "" {
 					details.TokenEndpoint = &oidc.TokenEndpoint
 				}
-				detectionMethod := fmt.Sprintf("openid_config:%s", subdomain)
+				detectionMethod := idpfern.OktaDetectionMethodOpenidConfig
 				details.DetectionMethod = &detectionMethod
 				orgURL := fmt.Sprintf("https://%s", subdomain)
 				details.OrgUrl = &orgURL
@@ -378,7 +396,7 @@ func detectOkta(ctx context.Context, client *httpclient.Client, domain string, r
 		if strings.Contains(authURLLower, "okta.com") || strings.Contains(authURLLower, "oktapreview.com") {
 			found = true
 			details.OrgUrl = &realmInfo.AuthURL
-			detectionMethod := "azure_userrealm_federation"
+			detectionMethod := idpfern.OktaDetectionMethodAzureUserrealmFederation
 			details.DetectionMethod = &detectionMethod
 			log.Info("Okta detected via Azure UserRealm federation",
 				svc1log.SafeParam("auth_url", realmInfo.AuthURL))
