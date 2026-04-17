@@ -612,8 +612,8 @@ github.com/JohnCGriffin/overflow v0.0.0-20211019200055-46fa312c352c/go.mod h1:X0
 github.com/Knetic/govaluate v3.0.1-0.20171022003610-9aa49832a739+incompatible/go.mod h1:r7JcOSlj0wfOMncg0iLm8Leh48TZaKVeNIfJntJ2wa0=
 github.com/Masterminds/semver/v3 v3.4.0 h1:Zog+i5UMtVoCU8oKka5P7i9q9HgrJeGzI9SA1Xbatp0=
 github.com/Masterminds/semver/v3 v3.4.0/go.mod h1:4V+yj/TJE1HU9XfppCwVMZq3I84lprf4nC11bSS5beM=
-github.com/Method-Security/pkg v0.0.6 h1:8TEtNjzsbTuRGbBl2zblPttnpd3Zmxw2IsujLhGU4EY=
-github.com/Method-Security/pkg v0.0.6/go.mod h1:EjbaqtOZZoZrc03E23ge1nXKIy9c0ZPVmcH8lhJtf/s=
+github.com/Method-Security/pkg v0.0.8 h1:gTlwxqgXfUJ2BFgphomXrDulJeUcDDznvkuyow6UtQ8=
+github.com/Method-Security/pkg v0.0.8/go.mod h1:AeJ/AeYHp2fGpZZ++G7/KFuSYReLwi0SlC8/J+PcpyU=
 github.com/Mzack9999/gcache v0.0.0-20230410081825-519e28eab057 h1:KFac3SiGbId8ub47e7kd2PLZeACxc1LkiiNoDOFRClE=
 github.com/Mzack9999/gcache v0.0.0-20230410081825-519e28eab057/go.mod h1:iLB2pivrPICvLOuROKmlqURtFIEsoJZaMidQfCG1+D4=
 github.com/Mzack9999/go-http-digest-auth-client v0.6.1-0.20220414142836-eb8883508809 h1:ZbFL+BDfBqegi+/Ssh7im5+aQfBRx6it+kHnC7jaDU8=

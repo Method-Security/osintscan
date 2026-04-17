@@ -12,6 +12,7 @@ import (
 	asnfern "github.com/Method-Security/osintscan/generated/go/discover/asn"
 	cdnfern "github.com/Method-Security/osintscan/generated/go/discover/cdn"
 	dnsfern "github.com/Method-Security/osintscan/generated/go/discover/dns"
+	idpfern "github.com/Method-Security/osintscan/generated/go/discover/idp"
 	ipfern "github.com/Method-Security/osintscan/generated/go/discover/ip"
 
 	// Internal
@@ -624,6 +625,40 @@ func (a *OsintScan) InitDiscoverCommand() {
 	// Add command to 'shodan' command
 	discoverShodanCmd.AddCommand(discoverShodanHostnameCmd)
 
+	// IdP Command
+	discoverIdpCmd := &cobra.Command{
+		Use:   "idp",
+		Short: "Discover identity providers for a domain",
+		Long:  `Detect identity providers (Azure AD/Entra ID, Okta, etc.) associated with a domain by querying public endpoints, DNS records, and federation metadata.`,
+		Run: func(cmd *cobra.Command, args []string) {
+			domain, err := cmd.Flags().GetString("domain")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			timeout, err := cmd.Flags().GetInt("timeout")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			config := getDiscoverIdpConfig(domain, timeout)
+			report, err := discover.DiscoverIdp(cmd.Context(), config)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			a.OutputSignal.Content = report
+		},
+	}
+
+	discoverIdpCmd.Flags().String("domain", "", "The domain name to discover identity providers for")
+	discoverIdpCmd.Flags().Int("timeout", 30, "The timeout in seconds for each HTTP request")
+
+	_ = discoverIdpCmd.MarkFlagRequired("domain")
+
+	discoverCmd.AddCommand(discoverIdpCmd)
+
 	// CDN Command
 	discoverCdnCmd := &cobra.Command{
 		Use:   "cdn",
@@ -886,6 +921,14 @@ func getDiscoverCdnConfig(domain string, ipAddresses []string, dnsResolvers []st
 		config.IpAddresses = ipAddresses
 	}
 	return config
+}
+
+// getDiscoverIdpConfig creates and returns a configuration for IdP discovery
+func getDiscoverIdpConfig(domain string, timeout int) *idpfern.DiscoverIdpConfig {
+	return &idpfern.DiscoverIdpConfig{
+		Domain:  domain,
+		Timeout: &timeout,
+	}
 }
 
 // getDiscoverIPDomainASNConfig creates and returns a configuration for IP domain ASN discovery

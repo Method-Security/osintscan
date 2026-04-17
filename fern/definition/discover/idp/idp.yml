@@ -1,0 +1,98 @@
+types:
+# Config Struct
+  DiscoverIdpConfig:
+    properties:
+      domain: string
+      timeout: optional<integer>
+
+# Enums
+  IdpProvider:
+    enum:
+    - AZURE
+    - OKTA
+    - OTHER
+
+  FederationStatus:
+    enum:
+    - MANAGED
+    - FEDERATED
+    - UNKNOWN
+
+  M365ServiceType:
+    enum:
+    - EXCHANGE_ONLINE
+    - SHAREPOINT_ONLINE
+    - TEAMS
+    - SSFB
+
+  PreferredCredentialType:
+    enum:
+    - PASSWORD
+    - FEDERATION
+    - FIDO2
+    - WINDOWS_HELLO
+    - PHONE_SIGN_IN
+    - UNKNOWN
+
+  OktaDetectionMethod:
+    enum:
+    - DNS_CNAME
+    - OPENID_CONFIG
+    - AZURE_USERREALM_FEDERATION
+
+# Azure-Specific Types
+  DetectedM365Service:
+    properties:
+      serviceType: M365ServiceType
+      endpoint: optional<string>
+
+  AzureCredentialTypeInfo:
+    properties:
+      desktopSsoEnabled: optional<boolean>
+      isSignupDisallowed: optional<boolean>
+      hasPassword: optional<boolean>
+      preferredCredentialType: optional<PreferredCredentialType>
+      tenantBrandingConfigured: optional<boolean>
+
+  AzureIdpDetails:
+    properties:
+      tenantId: optional<string>
+      tenantBrandName: optional<string>
+      federationStatus: optional<FederationStatus>
+      federationAuthUrl: optional<string>
+      namespaceType: optional<string>
+      cloudInstanceName: optional<string>
+      authorizationEndpoint: optional<string>
+      tokenEndpoint: optional<string>
+      openidConfigurationUrl: optional<string>
+      credentialTypeInfo: optional<AzureCredentialTypeInfo>
+      detectedServices: optional<list<DetectedM365Service>>
+
+# Okta-Specific Types
+  OktaIdpDetails:
+    properties:
+      orgUrl: optional<string>
+      issuer: optional<string>
+      customDomain: optional<string>
+      authorizationEndpoint: optional<string>
+      tokenEndpoint: optional<string>
+      detectionMethod: optional<OktaDetectionMethod>
+
+# Result Types
+  DiscoveredIdp:
+    properties:
+      domain: string
+      provider: IdpProvider
+      azure: optional<AzureIdpDetails>
+      okta: optional<OktaIdpDetails>
+
+  DiscoverIdpResult:
+    properties:
+      providers: optional<list<DiscoveredIdp>>
+
+# Report Structs
+  DiscoverIdpReport:
+    properties:
+      config: DiscoverIdpConfig
+      result: DiscoverIdpResult
+      errors: optional<list<string>>

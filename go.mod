@@ -3,7 +3,7 @@ module github.com/Method-Security/osintscan
 go 1.26.0
 
 require (
-	github.com/Method-Security/pkg v0.0.6
+	github.com/Method-Security/pkg v0.0.8
 	github.com/google/uuid v1.6.0
 	github.com/miekg/dns v1.1.68
 	github.com/owasp-amass/amass/v4 v4.2.0
