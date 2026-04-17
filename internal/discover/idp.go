@@ -178,7 +178,7 @@ func detectAzure(ctx context.Context, client *httpclient.Client, domain string, 
 
 	// Step 4: Detect M365 services
 	log.Info("Detecting M365 services", svc1log.SafeParam("domain", domain))
-	details.DetectedServices = detectM365Services(ctx, client, domain, timeout)
+	details.DetectedServices = detectM365Services(ctx, domain, timeout)
 
 	return &idpfern.DiscoveredIdp{
 		Domain:   domain,
@@ -212,7 +212,7 @@ func queryAzureGetCredentialType(ctx context.Context, client *httpclient.Client,
 	return info, nil
 }
 
-func detectM365Services(ctx context.Context, _ *httpclient.Client, domain string, timeout time.Duration) []*idpfern.DetectedM365Service {
+func detectM365Services(ctx context.Context, domain string, timeout time.Duration) []*idpfern.DetectedM365Service {
 	// Use a no-redirect client for service checks to avoid false positives
 	// from generic Microsoft login redirects returning 200.
 	noRedirectClient := httpclient.New(httpclient.WithTimeout(timeout), httpclient.WithMaxRedirects(0))
