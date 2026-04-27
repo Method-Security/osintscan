@@ -404,6 +404,36 @@ func detectOkta(ctx context.Context, client *httpclient.Client, domain string, r
 		}
 	}
 
+	// Method 4: Reverse lookup — try {slug}.okta.com OIDC endpoint
+	if !found {
+		for _, slug := range generateOktaOrgSlugs(domain) {
+			oktaOrgHost := fmt.Sprintf("%s.okta.com", slug)
+			oidcURL := fmt.Sprintf("https://%s/.well-known/openid-configuration", oktaOrgHost)
+			var oidc oktaOIDCResponse
+			if _, err := client.GetJSON(ctx, oidcURL, &oidc); err != nil {
+				continue
+			}
+			if oidc.Issuer != "" {
+				found = true
+				details.Issuer = &oidc.Issuer
+				orgURL := fmt.Sprintf("https://%s", oktaOrgHost)
+				details.OrgUrl = &orgURL
+				if oidc.AuthorizationEndpoint != "" {
+					details.AuthorizationEndpoint = &oidc.AuthorizationEndpoint
+				}
+				if oidc.TokenEndpoint != "" {
+					details.TokenEndpoint = &oidc.TokenEndpoint
+				}
+				detectionMethod := idpfern.OktaDetectionMethodOrgSlugLookup
+				details.DetectionMethod = &detectionMethod
+				log.Info("Okta detected via org slug lookup",
+					svc1log.SafeParam("okta_org", oktaOrgHost),
+					svc1log.SafeParam("issuer", oidc.Issuer))
+				break
+			}
+		}
+	}
+
 	if !found {
 		return nil, errors
 	}
@@ -413,4 +443,40 @@ func detectOkta(ctx context.Context, client *httpclient.Client, domain string, r
 		Provider: idpfern.IdpProviderOkta,
 		Okta:     details,
 	}, errors
+}
+
+// generateOktaOrgSlugs produces candidate Okta org slugs from a domain.
+// For "method.security" it yields: ["method-security", "methodsecurity", "method"].
+// For "example.com" it yields: ["example"].
+func generateOktaOrgSlugs(domain string) []string {
+	parts := strings.Split(domain, ".")
+	if len(parts) < 2 {
+		return []string{strings.ToLower(domain)}
+	}
+	name := strings.ToLower(parts[0])
+	tld := strings.ToLower(parts[len(parts)-1])
+
+	seen := map[string]bool{}
+	var slugs []string
+	add := func(s string) {
+		if s != "" && !seen[s] {
+			seen[s] = true
+			slugs = append(slugs, s)
+		}
+	}
+
+	// For non-traditional TLDs (not com/net/org/edu/gov/io), the TLD
+	// may be part of the brand name (e.g., method.security → method-security)
+	commonTLDs := map[string]bool{
+		"com": true, "net": true, "org": true, "edu": true, "gov": true,
+		"io": true, "co": true, "us": true, "uk": true, "ca": true,
+		"au": true, "de": true, "fr": true, "jp": true, "in": true,
+	}
+	if !commonTLDs[tld] {
+		add(name + "-" + tld)
+		add(name + tld)
+	}
+	add(name)
+
+	return slugs
 }
