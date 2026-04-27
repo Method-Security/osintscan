@@ -39,6 +39,7 @@ types:
     - DNS_CNAME
     - OPENID_CONFIG
     - AZURE_USERREALM_FEDERATION
+    - ORG_SLUG_LOOKUP
 
 # Azure-Specific Types
   DetectedM365Service:
