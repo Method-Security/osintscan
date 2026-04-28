@@ -18,12 +18,12 @@ import (
 
 // GetDomainSubdomainsActive performs active (bruteforce) subdomain discovery for a given domain.
 // Returns a report containing all discovered subdomains and any errors encountered.
-func GetDomainSubdomainsActive(ctx context.Context, config dnsfern.DiscoverDnsSubdomainConfig) (dnsfern.DiscoverDnsSubdomainReport, error) {
+func GetDomainSubdomainsActive(ctx context.Context, subdomains []string, config dnsfern.DiscoverDnsSubdomainConfig) (dnsfern.DiscoverDnsSubdomainReport, error) {
 	activeConfig := config.GetActive()
 	errors := []string{}
 
 	// Run the active subdomain discovery
-	subdomains, err := getSubdomainsActive(ctx, activeConfig.Domain, activeConfig.Subdomains, activeConfig.Threads, activeConfig.MaxDepth, activeConfig.Timeout, activeConfig.Sleep, activeConfig.DnsResolvers)
+	subdomains, err := getSubdomainsActive(ctx, activeConfig.Domain, subdomains, activeConfig.Threads, activeConfig.MaxDepth, activeConfig.Timeout, activeConfig.Sleep, activeConfig.WildcardChecks, activeConfig.WildcardRecheck, activeConfig.DnsResolvers)
 	if err != nil {
 		errors = append(errors, err.Error())
 	}
@@ -42,7 +42,7 @@ func GetDomainSubdomainsActive(ctx context.Context, config dnsfern.DiscoverDnsSu
 }
 
 // getSubdomainsActive performs recursive bruteforce subdomain enumeration with concurrency and wildcard detection.
-func getSubdomainsActive(ctx context.Context, domain string, subdomainList []string, parallelThreads int, recursiveDepth int, timeout int, sleep int, dnsServerAddresses []string) ([]string, error) {
+func getSubdomainsActive(ctx context.Context, domain string, subdomainList []string, parallelThreads int, recursiveDepth int, timeout int, sleep int, wildcardChecks int, wildcardRecheck bool, dnsServerAddresses []string) ([]string, error) {
 	log := svc1log.FromContext(ctx)
 	subdomains := []string{}
 	subdomainsSet := make(map[string]struct{}) // To track unique valid subdomains
@@ -59,13 +59,13 @@ func getSubdomainsActive(ctx context.Context, domain string, subdomainList []str
 
 	// First iteration - test all base subdomains for wildcards
 	log.Info("Detecting wildcards", svc1log.SafeParam("domain", domain))
-	wildcardDNS, err := detectWildcardDNS(ctx, domain, resolvers[0])
+	wildcardIPs, err := detectWildcardDNS(ctx, domain, resolvers[0], wildcardChecks)
 	if err != nil {
 		return []string{}, err
 	}
-	if wildcardDNS != nil {
+	if wildcardIPs != nil {
 		// Wildcard DNS detected - skip brute forcing to avoid false positives
-		log.Info("Wildcard DNS detected, skipping brute force", svc1log.SafeParam("wildcard", *wildcardDNS))
+		log.Info("Wildcard DNS detected, skipping brute force", svc1log.SafeParam("wildcard", "*."+domain))
 		return subdomains, nil
 	}
 
@@ -90,15 +90,15 @@ func getSubdomainsActive(ctx context.Context, domain string, subdomainList []str
 
 		validSubdomains := []string{}
 		for _, subdomain := range currentDepthSubdomains {
-			wildcardDNS, err := detectWildcardDNS(ctx, subdomain, resolvers[0]) // Use resolvers[0] for wildcard detection
+			depthWildcardIPs, err := detectWildcardDNS(ctx, subdomain, resolvers[0], wildcardChecks)
 			if err != nil {
 				continue
 			}
-			if wildcardDNS != nil {
+			if depthWildcardIPs != nil {
 				// Wildcard DNS detected for this subdomain - skip to avoid false positives
 				log.Info("Wildcard DNS detected for subdomain, skipping",
 					svc1log.SafeParam("subdomain", subdomain),
-					svc1log.SafeParam("wildcard", *wildcardDNS))
+					svc1log.SafeParam("wildcard", "*."+subdomain))
 				continue
 			}
 			validSubdomains = append(validSubdomains, subdomain)
@@ -106,6 +106,19 @@ func getSubdomainsActive(ctx context.Context, domain string, subdomainList []str
 
 		newPermutations := generatePermutations(validSubdomains, subdomainList)
 		currentDepthSubdomains = testPermutations(ctx, newPermutations, resolvers, semaphore, &wg, subdomainsMutex, subdomainsSet, &subdomains, depth, recursiveDepth, sleep)
+	}
+
+	// Post-brute-force wildcard re-check: re-probe the base domain to catch wildcards
+	// that the initial detection missed due to transient DNS failures
+	if wildcardRecheck && len(subdomains) > 0 {
+		log.Info("Running post-scan wildcard re-check", svc1log.SafeParam("domain", domain))
+		recheckWildcardIPs, recheckErr := detectWildcardDNS(ctx, domain, resolvers[0], wildcardChecks)
+		if recheckErr == nil && recheckWildcardIPs != nil {
+			log.Info("Post-scan wildcard DNS detected, discarding all results",
+				svc1log.SafeParam("domain", domain),
+				svc1log.SafeParam("discarded_count", len(subdomains)))
+			subdomains = []string{}
+		}
 	}
 
 	return subdomains, nil
