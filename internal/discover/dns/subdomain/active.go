@@ -13,6 +13,7 @@ import (
 	// Utils
 	"github.com/Method-Security/osintscan/utils"
 	// External
+	"github.com/miekg/dns"
 	"github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
@@ -71,7 +72,7 @@ func getSubdomainsActive(ctx context.Context, domain string, subdomainList []str
 
 	log.Info("Generating base permutations", svc1log.SafeParam("domain", domain))
 	basePermutations := generatePermutations([]string{domain}, subdomainList)
-	validBaseSubdomains := testPermutations(ctx, basePermutations, resolvers, semaphore, &wg, subdomainsMutex, subdomainsSet, &subdomains, 1, recursiveDepth, sleep)
+	validBaseSubdomains := testPermutations(ctx, basePermutations, resolvers, semaphore, &wg, subdomainsMutex, subdomainsSet, &subdomains, 1, recursiveDepth, sleep, dnsServerAddresses)
 
 	// For each subsequent depth, only build on valid subdomains from previous iteration
 	log.Info("Starting subdomain discovery", svc1log.SafeParam("base_subdomain count", len(validBaseSubdomains)))
@@ -105,7 +106,7 @@ func getSubdomainsActive(ctx context.Context, domain string, subdomainList []str
 		}
 
 		newPermutations := generatePermutations(validSubdomains, subdomainList)
-		currentDepthSubdomains = testPermutations(ctx, newPermutations, resolvers, semaphore, &wg, subdomainsMutex, subdomainsSet, &subdomains, depth, recursiveDepth, sleep)
+		currentDepthSubdomains = testPermutations(ctx, newPermutations, resolvers, semaphore, &wg, subdomainsMutex, subdomainsSet, &subdomains, depth, recursiveDepth, sleep, dnsServerAddresses)
 	}
 
 	// Post-brute-force wildcard re-check: re-probe the base domain to catch wildcards
@@ -126,7 +127,7 @@ func getSubdomainsActive(ctx context.Context, domain string, subdomainList []str
 
 // testPermutations concurrently tests a list of subdomain permutations for DNS resolution.
 // Uses a semaphore to limit concurrency and mutexes to protect shared state.
-func testPermutations(ctx context.Context, permutations []string, resolvers []*net.Resolver, semaphore chan struct{}, wg *sync.WaitGroup, subdomainsMutex *sync.Mutex, subdomainsSet map[string]struct{}, subdomains *[]string, depth int, maxDepth int, sleep int) []string {
+func testPermutations(ctx context.Context, permutations []string, resolvers []*net.Resolver, semaphore chan struct{}, wg *sync.WaitGroup, subdomainsMutex *sync.Mutex, subdomainsSet map[string]struct{}, subdomains *[]string, depth int, maxDepth int, sleep int, dnsServerAddresses []string) []string {
 	log := svc1log.FromContext(ctx)
 	var validSubdomains []string
 	validSubdomainsMutex := &sync.Mutex{}
@@ -157,6 +158,16 @@ func testPermutations(ctx context.Context, permutations []string, resolvers []*n
 			// Capture the duration of the lookup
 			start := time.Now()
 			_, err := resolver.LookupHost(ctx, testSubdomain)
+			// If LookupHost fails (no A/AAAA record), check for CNAME records
+			// via a raw DNS query. Go's net.LookupCNAME follows the CNAME chain
+			// and fails if the target doesn't resolve, so it can't detect dangling
+			// CNAMEs. Dangling CNAMEs are valid discoveries and can indicate
+			// subdomain takeover vulnerabilities.
+			if err != nil {
+				if hasCNAME(testSubdomain, dnsServerAddresses) {
+					err = nil
+				}
+			}
 			duration := time.Since(start)
 
 			// Apply sleep delay if configured (in milliseconds)
@@ -198,6 +209,32 @@ func testPermutations(ctx context.Context, permutations []string, resolvers []*n
 
 	wg.Wait()
 	return validSubdomains
+}
+
+// hasCNAME performs a raw DNS CNAME query to detect CNAME records, including dangling
+// ones where the target doesn't resolve. Go's net.LookupCNAME follows the chain and
+// fails on dangling CNAMEs, so we use miekg/dns for a single-hop raw query instead.
+func hasCNAME(subdomain string, dnsServerAddresses []string) bool {
+	server := "1.1.1.1:53"
+	if len(dnsServerAddresses) > 0 {
+		server = utils.NormalizeDNSAddress(dnsServerAddresses[0])
+	}
+
+	msg := new(dns.Msg)
+	msg.SetQuestion(dns.Fqdn(subdomain), dns.TypeCNAME)
+	msg.RecursionDesired = true
+
+	resp, err := dns.Exchange(msg, server)
+	if err != nil || resp == nil {
+		return false
+	}
+
+	for _, ans := range resp.Answer {
+		if _, ok := ans.(*dns.CNAME); ok {
+			return true
+		}
+	}
+	return false
 }
 
 // generatePermutations creates all possible subdomain permutations for the given base subdomains and subdomain list.
