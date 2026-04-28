@@ -9,32 +9,31 @@ import (
 	"net"
 )
 
-// detectWildcardDNS tests a random high-entropy subdomain to check if a wildcard DNS record is present.
-// Returns the wildcard domain if detected, otherwise nil.
-func detectWildcardDNS(ctx context.Context, domain string, resolver *net.Resolver) (*string, error) {
-	// Generate a high-entropy 16-character random subdomain
-	randomSubdomain, err := generateRandomSubdomain(domain)
-	if err != nil {
-		return nil, err
+// detectWildcardDNS tests multiple random high-entropy subdomains to check if a wildcard DNS record is present.
+// Returns a non-nil slice if wildcard is detected, nil if no wildcard.
+// Using multiple probes reduces the chance of a single false result.
+func detectWildcardDNS(ctx context.Context, domain string, resolver *net.Resolver, wildcardChecks int) ([]string, error) {
+	for i := 0; i < wildcardChecks; i++ {
+		randomSubdomain, err := generateRandomSubdomain(domain)
+		if err != nil {
+			return nil, err
+		}
+
+		ips, err := resolver.LookupHost(ctx, randomSubdomain)
+		if err == nil {
+			// Random subdomain resolved - wildcard is present
+			return ips, nil
+		}
+
+		if !isDNSNotFound(err) {
+			// Non-NXDOMAIN error (timeout, SERVFAIL, etc.) - DNS is unreliable
+			return nil, fmt.Errorf("DNS resolution failed during wildcard detection for %s: %v", randomSubdomain, err)
+		}
+		// NXDOMAIN - this probe says no wildcard, try next probe
 	}
 
-	// Check if the random subdomain resolves
-	_, err = resolver.LookupHost(ctx, randomSubdomain)
-
-	// If no error, it resolved, meaning wildcard is present
-	if err == nil {
-		wildcardDomain := "*." + domain
-		return &wildcardDomain, nil
-	}
-
-	// Check if it's specifically NXDOMAIN (domain doesn't exist)
-	if isDNSNotFound(err) {
-		// NXDOMAIN = no wildcard, safe to continue
-		return nil, nil
-	}
-
-	// Any other DNS error = fail fast, don't continue with potentially unreliable results
-	return nil, fmt.Errorf("DNS resolution failed during wildcard detection for %s: %v", randomSubdomain, err)
+	// All probes returned NXDOMAIN - no wildcard
+	return nil, nil
 }
 
 // generateRandomSubdomain generates a high-entropy subdomain with only letters (16 characters).

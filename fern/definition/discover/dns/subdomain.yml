@@ -20,13 +20,14 @@ types:
   DiscoverDnsSubdomainActiveConfig:
     properties:
       domain: string
-      subdomains: optional<list<string>>
       wordlistSize: optional<WordlistSize>
       wordlistFile: optional<string>
       threads: integer
       maxDepth: integer
       timeout: integer
       sleep: integer
+      wildcardChecks: integer
+      wildcardRecheck: boolean
       dnsResolvers: optional<list<string>>
   DiscoverDnsSubdomainCorrelationConfig:
     properties:

@@ -132,16 +132,16 @@ func validateSingleFQDNCorrelation(ctx context.Context, fqdn string, resolver *n
 	}
 
 	// Check for wildcard DNS - test the full FQDN directly
-	wildcardDomain, err := detectWildcardDNS(lookupCtx, fqdn, resolver)
+	wildcardIPs, err := detectWildcardDNS(lookupCtx, fqdn, resolver, 3)
 	if err != nil {
 		log.Warn("Failed to detect wildcard DNS",
 			svc1log.SafeParam("fqdn", fqdn),
 			svc1log.SafeParam("error", err.Error()))
 		return false, fmt.Errorf("wildcard detection failed: %v", err)
-	} else if wildcardDomain != nil {
+	} else if wildcardIPs != nil {
 		log.Info("Wildcard DNS detected",
 			svc1log.SafeParam("fqdn", fqdn),
-			svc1log.SafeParam("wildcard_domain", *wildcardDomain))
+			svc1log.SafeParam("wildcard_ips", wildcardIPs))
 		return false, nil
 	}
 
