@@ -27,7 +27,6 @@ types:
       timeout: integer
       sleep: integer
       wildcardChecks: integer
-      wildcardRecheck: boolean
       dnsResolvers: optional<list<string>>
   DiscoverDnsSubdomainCorrelationConfig:
     properties:

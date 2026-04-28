@@ -10,30 +10,34 @@ import (
 )
 
 // detectWildcardDNS tests multiple random high-entropy subdomains to check if a wildcard DNS record is present.
-// Returns a non-nil slice if wildcard is detected, nil if no wildcard.
-// Using multiple probes reduces the chance of a single false result.
-func detectWildcardDNS(ctx context.Context, domain string, resolver *net.Resolver, wildcardChecks int) ([]string, error) {
+// Checks both A/AAAA records (via LookupHost) and CNAME records (via raw query) since a dangling
+// wildcard CNAME won't resolve via LookupHost but still produces false positives in brute-force.
+// Returns (true, true) for A/AAAA wildcard, (true, false) for CNAME-only wildcard, (false, false) for no wildcard.
+func detectWildcardDNS(ctx context.Context, domain string, resolver *net.Resolver, wildcardChecks int, rawResolver string) (wildcardFound bool, wildcardA bool, err error) {
 	for i := 0; i < wildcardChecks; i++ {
 		randomSubdomain, err := generateRandomSubdomain(domain)
 		if err != nil {
-			return nil, err
+			return false, false, err
 		}
 
-		ips, err := resolver.LookupHost(ctx, randomSubdomain)
+		_, err = resolver.LookupHost(ctx, randomSubdomain)
 		if err == nil {
-			// Random subdomain resolved - wildcard is present
-			return ips, nil
+			// Random subdomain resolved via A/AAAA - wildcard is present
+			return true, true, nil
 		}
 
 		if !isDNSNotFound(err) {
 			// Non-NXDOMAIN error (timeout, SERVFAIL, etc.) - DNS is unreliable
-			return nil, fmt.Errorf("DNS resolution failed during wildcard detection for %s: %v", randomSubdomain, err)
+			return false, false, fmt.Errorf("DNS resolution failed during wildcard detection for %s: %v", randomSubdomain, err)
 		}
-		// NXDOMAIN - this probe says no wildcard, try next probe
+
+		// NXDOMAIN for A/AAAA - check if a wildcard CNAME exists (only when a raw resolver is provided)
+		if rawResolver != "" && hasCNAME(randomSubdomain, rawResolver) {
+			return true, false, nil
+		}
 	}
 
-	// All probes returned NXDOMAIN - no wildcard
-	return nil, nil
+	return false, false, nil
 }
 
 // generateRandomSubdomain generates a high-entropy subdomain with only letters (16 characters).

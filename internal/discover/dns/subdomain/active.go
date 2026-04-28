@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -13,6 +14,7 @@ import (
 	// Utils
 	"github.com/Method-Security/osintscan/utils"
 	// External
+	"github.com/miekg/dns"
 	"github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
@@ -23,7 +25,7 @@ func GetDomainSubdomainsActive(ctx context.Context, subdomains []string, config 
 	errors := []string{}
 
 	// Run the active subdomain discovery
-	subdomains, err := getSubdomainsActive(ctx, activeConfig.Domain, subdomains, activeConfig.Threads, activeConfig.MaxDepth, activeConfig.Timeout, activeConfig.Sleep, activeConfig.WildcardChecks, activeConfig.WildcardRecheck, activeConfig.DnsResolvers)
+	subdomains, err := getSubdomainsActive(ctx, activeConfig.Domain, subdomains, activeConfig.Threads, activeConfig.MaxDepth, activeConfig.Timeout, activeConfig.Sleep, activeConfig.WildcardChecks, activeConfig.DnsResolvers)
 	if err != nil {
 		errors = append(errors, err.Error())
 	}
@@ -42,7 +44,7 @@ func GetDomainSubdomainsActive(ctx context.Context, subdomains []string, config 
 }
 
 // getSubdomainsActive performs recursive bruteforce subdomain enumeration with concurrency and wildcard detection.
-func getSubdomainsActive(ctx context.Context, domain string, subdomainList []string, parallelThreads int, recursiveDepth int, timeout int, sleep int, wildcardChecks int, wildcardRecheck bool, dnsServerAddresses []string) ([]string, error) {
+func getSubdomainsActive(ctx context.Context, domain string, subdomainList []string, parallelThreads int, recursiveDepth int, timeout int, sleep int, wildcardChecks int, dnsServerAddresses []string) ([]string, error) {
 	log := svc1log.FromContext(ctx)
 	subdomains := []string{}
 	subdomainsSet := make(map[string]struct{}) // To track unique valid subdomains
@@ -57,21 +59,31 @@ func getSubdomainsActive(ctx context.Context, domain string, subdomainList []str
 	}
 	resolvers := utils.GetResolvers(dnsServerAddresses, log)
 
-	// First iteration - test all base subdomains for wildcards
+	// Build normalized server addresses for raw DNS queries (CNAME lookups).
+	rawResolvers := make([]string, len(dnsServerAddresses))
+	for i, addr := range dnsServerAddresses {
+		rawResolvers[i] = utils.NormalizeDNSAddress(addr)
+	}
+
+	// First iteration - test base domain for wildcards (A/AAAA and CNAME)
 	log.Info("Detecting wildcards", svc1log.SafeParam("domain", domain))
-	wildcardIPs, err := detectWildcardDNS(ctx, domain, resolvers[0], wildcardChecks)
+	wildcardFound, wildcardA, err := detectWildcardDNS(ctx, domain, resolvers[0], wildcardChecks, rawResolvers[0])
 	if err != nil {
 		return []string{}, err
 	}
-	if wildcardIPs != nil {
-		// Wildcard DNS detected - skip brute forcing to avoid false positives
+	if wildcardA {
 		log.Info("Wildcard DNS detected, skipping brute force", svc1log.SafeParam("wildcard", "*."+domain))
 		return subdomains, nil
+	}
+	wildcardCNAMEDomains := map[string]struct{}{}
+	if wildcardFound && !wildcardA {
+		wildcardCNAMEDomains[domain] = struct{}{}
+		log.Info("Wildcard CNAME detected, disabling CNAME fallback", svc1log.SafeParam("domain", domain))
 	}
 
 	log.Info("Generating base permutations", svc1log.SafeParam("domain", domain))
 	basePermutations := generatePermutations([]string{domain}, subdomainList)
-	validBaseSubdomains := testPermutations(ctx, basePermutations, resolvers, semaphore, &wg, subdomainsMutex, subdomainsSet, &subdomains, 1, recursiveDepth, sleep)
+	validBaseSubdomains := testPermutations(ctx, basePermutations, resolvers, semaphore, &wg, subdomainsMutex, subdomainsSet, &subdomains, 1, recursiveDepth, sleep, rawResolvers, wildcardCNAMEDomains)
 
 	// For each subsequent depth, only build on valid subdomains from previous iteration
 	log.Info("Starting subdomain discovery", svc1log.SafeParam("base_subdomain count", len(validBaseSubdomains)))
@@ -89,36 +101,29 @@ func getSubdomainsActive(ctx context.Context, domain string, subdomainList []str
 			svc1log.SafeParam("subdomain_count", len(currentDepthSubdomains)))
 
 		validSubdomains := []string{}
+		depthWildcardCNAMEDomains := map[string]struct{}{}
 		for _, subdomain := range currentDepthSubdomains {
-			depthWildcardIPs, err := detectWildcardDNS(ctx, subdomain, resolvers[0], wildcardChecks)
+			depthWildcardFound, depthWildcardA, err := detectWildcardDNS(ctx, subdomain, resolvers[0], wildcardChecks, rawResolvers[0])
 			if err != nil {
 				continue
 			}
-			if depthWildcardIPs != nil {
-				// Wildcard DNS detected for this subdomain - skip to avoid false positives
+			if depthWildcardA {
 				log.Info("Wildcard DNS detected for subdomain, skipping",
 					svc1log.SafeParam("subdomain", subdomain),
 					svc1log.SafeParam("wildcard", "*."+subdomain))
 				continue
 			}
+			if depthWildcardFound && !depthWildcardA {
+				depthWildcardCNAMEDomains[subdomain] = struct{}{}
+				log.Info("Wildcard CNAME detected for subdomain, disabling CNAME fallback",
+					svc1log.SafeParam("subdomain", subdomain),
+					svc1log.SafeParam("wildcard_cname", "*."+subdomain))
+			}
 			validSubdomains = append(validSubdomains, subdomain)
 		}
 
 		newPermutations := generatePermutations(validSubdomains, subdomainList)
-		currentDepthSubdomains = testPermutations(ctx, newPermutations, resolvers, semaphore, &wg, subdomainsMutex, subdomainsSet, &subdomains, depth, recursiveDepth, sleep)
-	}
-
-	// Post-brute-force wildcard re-check: re-probe the base domain to catch wildcards
-	// that the initial detection missed due to transient DNS failures
-	if wildcardRecheck && len(subdomains) > 0 {
-		log.Info("Running post-scan wildcard re-check", svc1log.SafeParam("domain", domain))
-		recheckWildcardIPs, recheckErr := detectWildcardDNS(ctx, domain, resolvers[0], wildcardChecks)
-		if recheckErr == nil && recheckWildcardIPs != nil {
-			log.Info("Post-scan wildcard DNS detected, discarding all results",
-				svc1log.SafeParam("domain", domain),
-				svc1log.SafeParam("discarded_count", len(subdomains)))
-			subdomains = []string{}
-		}
+		currentDepthSubdomains = testPermutations(ctx, newPermutations, resolvers, semaphore, &wg, subdomainsMutex, subdomainsSet, &subdomains, depth, recursiveDepth, sleep, rawResolvers, depthWildcardCNAMEDomains)
 	}
 
 	return subdomains, nil
@@ -126,7 +131,7 @@ func getSubdomainsActive(ctx context.Context, domain string, subdomainList []str
 
 // testPermutations concurrently tests a list of subdomain permutations for DNS resolution.
 // Uses a semaphore to limit concurrency and mutexes to protect shared state.
-func testPermutations(ctx context.Context, permutations []string, resolvers []*net.Resolver, semaphore chan struct{}, wg *sync.WaitGroup, subdomainsMutex *sync.Mutex, subdomainsSet map[string]struct{}, subdomains *[]string, depth int, maxDepth int, sleep int) []string {
+func testPermutations(ctx context.Context, permutations []string, resolvers []*net.Resolver, semaphore chan struct{}, wg *sync.WaitGroup, subdomainsMutex *sync.Mutex, subdomainsSet map[string]struct{}, subdomains *[]string, depth int, maxDepth int, sleep int, rawResolvers []string, wildcardCNAMEDomains map[string]struct{}) []string {
 	log := svc1log.FromContext(ctx)
 	var validSubdomains []string
 	validSubdomainsMutex := &sync.Mutex{}
@@ -154,9 +159,30 @@ func testPermutations(ctx context.Context, permutations []string, resolvers []*n
 			resolver := resolvers[resolverIdx]
 			log.Info("Using resolver", svc1log.SafeParam("resolver_index", resolverIdx))
 
+			// Round robin CNAME server selection (may differ in length from resolvers
+			// when system defaults are used)
+			rawResolverIdx := currentIndex % int64(len(rawResolvers))
+
 			// Capture the duration of the lookup
 			start := time.Now()
 			_, err := resolver.LookupHost(ctx, testSubdomain)
+			// If LookupHost fails (no A/AAAA record), check for CNAME records
+			// via a raw DNS query. Go's net.LookupCNAME follows the CNAME chain
+			// and fails if the target doesn't resolve, so it can't detect dangling
+			// CNAMEs. Dangling CNAMEs are valid discoveries and can indicate
+			// subdomain takeover vulnerabilities.
+			if err != nil {
+				// Extract parent domain to check if it has a wildcard CNAME
+				parentHasWildcardCNAME := false
+				if parts := strings.SplitN(testSubdomain, ".", 2); len(parts) == 2 {
+					_, parentHasWildcardCNAME = wildcardCNAMEDomains[parts[1]]
+				}
+				if !parentHasWildcardCNAME {
+					if hasCNAME(testSubdomain, rawResolvers[rawResolverIdx]) {
+						err = nil
+					}
+				}
+			}
 			duration := time.Since(start)
 
 			// Apply sleep delay if configured (in milliseconds)
@@ -198,6 +224,28 @@ func testPermutations(ctx context.Context, permutations []string, resolvers []*n
 
 	wg.Wait()
 	return validSubdomains
+}
+
+// hasCNAME performs a raw DNS CNAME query to detect CNAME records, including dangling
+// ones where the target doesn't resolve. Go's net.LookupCNAME follows the chain and
+// fails on dangling CNAMEs, so we use miekg/dns for a single-hop raw query instead.
+// The server parameter must be a normalized address with port (e.g. "1.1.1.1:53").
+func hasCNAME(subdomain string, server string) bool {
+	msg := new(dns.Msg)
+	msg.SetQuestion(dns.Fqdn(subdomain), dns.TypeCNAME)
+	msg.RecursionDesired = true
+
+	resp, err := dns.Exchange(msg, server)
+	if err != nil || resp == nil {
+		return false
+	}
+
+	for _, ans := range resp.Answer {
+		if _, ok := ans.(*dns.CNAME); ok {
+			return true
+		}
+	}
+	return false
 }
 
 // generatePermutations creates all possible subdomain permutations for the given base subdomains and subdomain list.

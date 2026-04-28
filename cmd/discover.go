@@ -374,11 +374,6 @@ func (a *OsintScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			wildcardRecheck, err := cmd.Flags().GetBool("wildcard-recheck")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
 			dnsResolvers, err := cmd.Flags().GetStringSlice("dns-resolvers")
 			if err != nil {
 				a.OutputSignal.AddError(err)
@@ -391,7 +386,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 					return
 				}
 			}
-			config := getDiscoverDNSActiveSubdomainConfig(domain, wordlistSizeEnum, &wordlistFile, threads, maxDepth, timeout, sleep, wildcardChecks, wildcardRecheck, dnsResolvers)
+			config := getDiscoverDNSActiveSubdomainConfig(domain, wordlistSizeEnum, &wordlistFile, threads, maxDepth, timeout, sleep, wildcardChecks, dnsResolvers)
 
 			report, err := subdomain.GetDomainSubdomainsActive(cmd.Context(), allSubdomains, config)
 			if err != nil {
@@ -414,7 +409,6 @@ func (a *OsintScan) InitDiscoverCommand() {
 	discoverDNSSubdomainActiveCmd.Flags().Int("timeout", 0, "Maximum time (in minutes) to spend on subdomain discovery")
 	discoverDNSSubdomainActiveCmd.Flags().Int("sleep", 0, "Sleep time in milliseconds between requests to avoid rate limiting")
 	discoverDNSSubdomainActiveCmd.Flags().Int("wildcard-checks", 3, "Number of random subdomain probes used to detect wildcard DNS records")
-	discoverDNSSubdomainActiveCmd.Flags().Bool("wildcard-recheck", false, "Re-run wildcard detection after brute force and discard results if wildcard is found")
 	discoverDNSSubdomainActiveCmd.Flags().StringSlice("dns-resolvers", []string{}, "Custom DNS resolvers (e.g. 10.0.0.1). Uses system resolver if not set.")
 
 	// Mark Required Flags
@@ -861,20 +855,19 @@ func getDiscoverDNSReverseConfig(ips []string, cidr string, dnsResolvers []strin
 }
 
 // getDiscoverDNSActiveSubdomainConfig creates and returns a configuration for active subdomain discovery
-func getDiscoverDNSActiveSubdomainConfig(domain string, wordlistSize *dnsfern.WordlistSize, wordlistFile *string, threads, maxDepth, timeout, sleep, wildcardChecks int, wildcardRecheck bool, dnsResolvers []string) dnsfern.DiscoverDnsSubdomainConfig {
+func getDiscoverDNSActiveSubdomainConfig(domain string, wordlistSize *dnsfern.WordlistSize, wordlistFile *string, threads, maxDepth, timeout, sleep, wildcardChecks int, dnsResolvers []string) dnsfern.DiscoverDnsSubdomainConfig {
 	return dnsfern.DiscoverDnsSubdomainConfig{
 		DiscoveryType: strings.ToLower(string(dnsfern.DiscoverDnsSubdomainTypeActive)),
 		Active: &dnsfern.DiscoverDnsSubdomainActiveConfig{
-			Domain:          domain,
-			WordlistSize:    wordlistSize,
-			WordlistFile:    wordlistFile,
-			Threads:         threads,
-			MaxDepth:        maxDepth,
-			Timeout:         timeout,
-			Sleep:           sleep,
-			WildcardChecks:  wildcardChecks,
-			WildcardRecheck: wildcardRecheck,
-			DnsResolvers:    dnsResolvers,
+			Domain:         domain,
+			WordlistSize:   wordlistSize,
+			WordlistFile:   wordlistFile,
+			Threads:        threads,
+			MaxDepth:       maxDepth,
+			Timeout:        timeout,
+			Sleep:          sleep,
+			WildcardChecks: wildcardChecks,
+			DnsResolvers:   dnsResolvers,
 		},
 	}
 }
