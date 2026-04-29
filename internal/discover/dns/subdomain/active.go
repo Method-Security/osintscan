@@ -171,7 +171,9 @@ func testPermutations(ctx context.Context, permutations []string, resolvers []*n
 			// and fails if the target doesn't resolve, so it can't detect dangling
 			// CNAMEs. Dangling CNAMEs are valid discoveries and can indicate
 			// subdomain takeover vulnerabilities.
-			if err != nil {
+			// Only attempt CNAME detection on a definitive NXDOMAIN — SERVFAIL,
+			// timeouts, and other transient errors must not trigger the CNAME path.
+			if err != nil && isDNSNotFound(err) {
 				// Extract parent domain to check if it has a wildcard CNAME
 				parentHasWildcardCNAME := false
 				if parts := strings.SplitN(testSubdomain, ".", 2); len(parts) == 2 {
@@ -209,15 +211,18 @@ func testPermutations(ctx context.Context, permutations []string, resolvers []*n
 			// If the subdomain is found, add it to the list
 			if err == nil {
 				subdomainsMutex.Lock()
-				if _, exists := subdomainsSet[testSubdomain]; !exists {
+				_, exists := subdomainsSet[testSubdomain]
+				if !exists {
 					subdomainsSet[testSubdomain] = struct{}{}
 					*subdomains = append(*subdomains, testSubdomain)
 				}
 				subdomainsMutex.Unlock()
 
-				validSubdomainsMutex.Lock()
-				validSubdomains = append(validSubdomains, testSubdomain)
-				validSubdomainsMutex.Unlock()
+				if !exists {
+					validSubdomainsMutex.Lock()
+					validSubdomains = append(validSubdomains, testSubdomain)
+					validSubdomainsMutex.Unlock()
+				}
 			}
 		}(testSubdomain)
 	}
