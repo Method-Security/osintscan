@@ -79,6 +79,7 @@ sboms:
 
 signs:
   - cmd: cosign
+    signature: "${artifact}.sig"
     certificate: '${artifact}.pem'
     args:
       - sign-blob
