@@ -9,6 +9,7 @@ on:
       - develop
 
 permissions:
+  contents: read
   id-token: write
   packages: write
   actions: read
@@ -22,6 +23,11 @@ jobs:
   codeql:
     name: 🚨 CodeQL Analysis
     uses: ./.github/workflows/codeql.yml
+    secrets: inherit
+
+  ratchet:
+    name: 🔩 Ratchet Lint
+    uses: ./.github/workflows/ratchet.yml
     secrets: inherit
 
   test-build:
@@ -51,6 +57,7 @@ jobs:
     if: always()
     needs:
       - codeql
+      - ratchet
       - test-build
       - test-docs
       - test-publish

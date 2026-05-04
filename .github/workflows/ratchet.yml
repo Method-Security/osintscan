@@ -1,0 +1,17 @@
+name: 🔩 Ratchet Lint
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  ratchet:
+    name: Ratchet Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # ratchet:actions/checkout@v4
+      - uses: 'sethvargo/ratchet@8b4ca256dbed184350608a3023620f267f0a5253' # ratchet:exclude tag:v0.11.4
+        with:
+          files: '.github/workflows/*.yml'
