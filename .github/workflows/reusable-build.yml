@@ -20,7 +20,7 @@ jobs:
     name: Prepare Linux (arm64)
     runs-on: ubuntu-22.04-arm
     steps:
-      - uses: actions/checkout@v4.1.6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # ratchet:actions/checkout@v6.0.2
         with:
           fetch-depth: 0
       - name: Generate Fern Go Code
@@ -29,14 +29,14 @@ jobs:
           fern generate --group local
         env:
           FERN_TOKEN: ${{ secrets.FERN_TOKEN }}
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # ratchet:actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
-      - uses: goreleaser/goreleaser-action@v4
+      - uses: goreleaser/goreleaser-action@1a80836c5c9d9e5755a25cb59ec6f45a3b5f41a8 # ratchet:goreleaser/goreleaser-action@v7
         with:
           distribution: goreleaser-pro
-          version: latest
+          version: "~> v2.15"
           args: >-
             build --single-target --clean --snapshot --timeout 60m
             -f .goreleaser/goreleaser-build.yml ${{ inputs.goreleaser_options }}
@@ -45,7 +45,7 @@ jobs:
           GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
           GOOS: linux
           GOARCH: arm64
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # ratchet:actions/upload-artifact@v7
         with:
           name: linux-arm64-dist
           path: dist/
@@ -58,19 +58,19 @@ jobs:
       DOCKER_CLI_EXPERIMENTAL: "enabled"
     steps:
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # ratchet:docker/setup-qemu-action@v4
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # ratchet:docker/setup-buildx-action@v4
       - name: Login to ghcr.io registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # ratchet:docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Checkout code
-        uses: actions/checkout@v4.1.6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # ratchet:actions/checkout@v6.0.2
         with:
           fetch-depth: 0
       - name: Generate Fern Go Code
@@ -89,7 +89,7 @@ jobs:
             -e GORELEASER_KEY=${{ secrets.GORELEASER_KEY }} \
             --rm amdbuilder goreleaser build --single-target \
             -f .goreleaser/goreleaser-build.yml ${{ inputs.goreleaser_options }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # ratchet:actions/upload-artifact@v7
         with:
           name: linux-amd64-dist
           path: dist/
@@ -114,16 +114,16 @@ jobs:
         if: matrix.os == 'macos-latest'
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # ratchet:docker/setup-qemu-action@v4
         if: matrix.os == 'ubuntu-latest'
 
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # ratchet:docker/setup-buildx-action@v4
         if: matrix.os == 'ubuntu-latest'
 
       - name: Login to ghcr.io registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # ratchet:docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -131,7 +131,7 @@ jobs:
         if: matrix.os != 'macos-latest'
 
       - name: Checkout code
-        uses: actions/checkout@v4.1.6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # ratchet:actions/checkout@v6.0.2
         with:
           fetch-depth: 0
 
@@ -143,21 +143,21 @@ jobs:
           FERN_TOKEN: ${{ secrets.FERN_TOKEN }}
 
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # ratchet:actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
 
-      - uses: goreleaser/goreleaser-action@v4
+      - uses: goreleaser/goreleaser-action@1a80836c5c9d9e5755a25cb59ec6f45a3b5f41a8 # ratchet:goreleaser/goreleaser-action@v7
         with:
           distribution: goreleaser-pro
-          version: latest
+          version: "~> v2.15"
           args: build --single-target -f=.goreleaser/goreleaser-build.yml ${{ inputs.goreleaser_options }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # ratchet:actions/upload-artifact@v7
         with:
           name: ${{ matrix.os }}-dist
           path: dist/
@@ -177,38 +177,38 @@ jobs:
         run: sudo apt install libpcap-dev
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # ratchet:docker/setup-qemu-action@v4
 
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # ratchet:docker/setup-buildx-action@v4
 
       - name: Show available Docker Buildx platforms
         run: echo ${{ steps.buildx.outputs.platforms }}
 
       - name: Install cosign
-        uses: sigstore/cosign-installer@v3.5.0
+        uses: sigstore/cosign-installer@cad07c2e89fa2edd6e2d7bab4c1aa38e53f76003 # ratchet:sigstore/cosign-installer@v4.1.1
 
       - name: Install Syft
-        uses: anchore/sbom-action/download-syft@v0.16.0
+        uses: anchore/sbom-action/download-syft@e22c389904149dbc22b58101806040fa8d37a610 # ratchet:anchore/sbom-action/download-syft@v0.24.0
         with:
           syft-version: v1.17.0
 
       - name: Login to ghcr.io registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # ratchet:docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Login to docker.io registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # ratchet:docker/login-action@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Checkout code
-        uses: actions/checkout@v4.1.6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # ratchet:actions/checkout@v6.0.2
         with:
           fetch-depth: 0
 
@@ -220,13 +220,13 @@ jobs:
           FERN_TOKEN: ${{ secrets.FERN_TOKEN }}
 
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # ratchet:actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
 
       - name: Download Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # ratchet:actions/download-artifact@v8
         with:
           path: artifacts
 
@@ -248,13 +248,11 @@ jobs:
 
       - name: View Output
         run: ls -al output output/*
-      - uses: goreleaser/goreleaser-action@v4
-        if: steps.cache.outputs.cache-hit != 'true'
+      - uses: goreleaser/goreleaser-action@1a80836c5c9d9e5755a25cb59ec6f45a3b5f41a8 # ratchet:goreleaser/goreleaser-action@v7
         with:
           distribution: goreleaser-pro
-          version: latest
-          args: release -f=.goreleaser/goreleaser-publish.yml ${{ inputs.goreleaser_options }}
+          version: "~> v2.15"
+          args: release -f=.goreleaser/goreleaser-publish.yml ${{ inputs.goreleaser_options }} ${{ contains(inputs.goreleaser_options, '--snapshot') && '--skip=sign' || '' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
-          COSIGN_EXPERIMENTAL: "true"
