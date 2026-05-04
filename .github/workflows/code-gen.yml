@@ -13,7 +13,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4.1.6
+        uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # ratchet:actions/checkout@v4.1.6
         with:
           fetch-depth: 0
 
@@ -26,7 +26,7 @@ jobs:
           FERN_TOKEN: ${{ secrets.FERN_TOKEN }}
 
       - name: Upload Fern Generated Code
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # ratchet:actions/upload-artifact@v4
         with:
           name: fern-generated-code
           path: generated/

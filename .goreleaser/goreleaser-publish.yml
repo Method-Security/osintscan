@@ -46,7 +46,7 @@ archives:
 checksum:
   name_template: "{{ .ProjectName }}_checksums.txt"
 
-dockers:
+dockers_v2:
   - image_templates:
       - "ghcr.io/method-security/osintscan:{{ .Version }}-amd64"
       - "ghcr.io/method-security/osintscan:latest-amd64"
