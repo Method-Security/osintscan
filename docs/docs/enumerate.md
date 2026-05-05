@@ -23,23 +23,23 @@ Attempt DNS zone transfers (AXFR) to enumerate all DNS records if the server all
 
 ##### Usage
 ```bash
-osintscan enumerate dns zonetransfer --domains example.com
-osintscan enumerate dns zonetransfer --nameserver ns1.example.com
+osintscan enumerate dns zone-transfer --zones example.com
+osintscan enumerate dns zone-transfer --zones example.com --target-nameservers 10.0.0.1
 ```
 
 ##### Help Text
 ```bash
-Attempt DNS zone transfers (AXFR) for the specified domains to enumerate all DNS records, if the server allows it. This can reveal all subdomains and records
+Attempt DNS zone transfers (AXFR) for the specified zones to enumerate all DNS records, if the server allows it. This can reveal all subdomains and records
 
 Usage:
-  osintscan enumerate dns zonetransfer [domain...] [flags]
+  osintscan enumerate dns zone-transfer [flags]
 
 Flags:
-      --dns-resolvers strings   Custom DNS resolver/servers to use for queries (e.g. 1.1.1.1:53) (default [1.1.1.1:53])
-      --domains strings         A list of domain names to attempt zone transfers on
-  -h, --help                    help for zonetransfer
-      --nameserver string       Specific nameserver to test zone transfers against (e.g., ns1.example.com or 192.168.1.10)
-      --timeout int             Timeout in seconds for each zone transfer request (default 30)
+      --dns-resolvers strings       DNS resolvers for NS lookups (e.g. 10.0.0.1). Uses system resolver if not set.
+  -h, --help                        help for zone-transfer
+      --target-nameservers strings  Nameserver IPs to attempt AXFR against directly, bypassing NS record lookup (e.g. 10.0.0.1)
+      --timeout int                 Timeout in seconds for each zone transfer request (default 30)
+      --zones strings               Zone FQDNs to test for unauthorized zone transfers (e.g. example.com)
 
 Global Flags:
   -o, --output string        Output format (signal, json, yaml). Default value is signal (default "signal")
