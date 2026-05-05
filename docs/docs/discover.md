@@ -79,12 +79,35 @@ Global Flags:
 
 ### IDP
 
-Detect identity providers (Azure AD/Entra ID, Okta, etc.) associated with a domain by querying public endpoints, DNS records, and federation metadata.
+Detect identity providers associated with a domain by querying public endpoints, DNS records, and federation metadata. Supports detection of Azure AD/Entra ID and Okta.
 
 #### Usage
 ```bash
 osintscan discover idp --domain example.com
 ```
+
+#### Azure AD / Entra ID Detection
+
+For domains using Azure AD/Entra ID, the command queries Microsoft's public federation and OpenID endpoints to extract:
+
+- **Tenant details**: Tenant ID, brand name, cloud instance, namespace type
+- **Federation status**: `MANAGED` (password auth via Azure AD), `FEDERATED` (auth delegated to on-prem IdP), or `UNKNOWN`
+- **Federation metadata**: Auth URL, authorization endpoint, token endpoint, OpenID configuration URL
+- **Credential type info**: Desktop SSO (Seamless SSO) status, preferred credential type (`PASSWORD`, `FEDERATION`, `FIDO2`, `WINDOWS_HELLO`, `PHONE_SIGN_IN`), custom branding configured
+- **M365 service presence**: Detects Exchange Online, SharePoint Online, Teams, and Skype for Business (SSFB)
+
+#### Okta Detection
+
+For domains using Okta, the command tries four detection methods in order:
+
+| Method | Description |
+|--------|-------------|
+| `DNS_CNAME` | Checks for a DNS CNAME on the domain pointing to an Okta endpoint |
+| `OPENID_CONFIG` | Fetches the OpenID Connect discovery document from the domain |
+| `AZURE_USERREALM_FEDERATION` | Queries Microsoft's UserRealm API to detect Okta federation |
+| `ORG_SLUG_LOOKUP` | Generates candidate org slugs from the domain (e.g., `method.security` → `method-security`, `methodsecurity`, `method`) and probes `{slug}.okta.com` OIDC endpoints |
+
+When detected, returns: org URL, issuer, custom domain, authorization endpoint, token endpoint, and the detection method used.
 
 #### Help Text
 ```bash
