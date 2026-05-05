@@ -166,9 +166,10 @@ Usage:
   osintscan discover dns records [flags]
 
 Flags:
-      --domain string          The domain name to query for DNS records
-  -h, --help                   help for records
-      --record-types strings   Comma-separated list of DNS record types to query (A, AAAA, CNAME, MX, NS, SOA, TXT, PTR, SRV, ALL) (default [ALL])
+      --dns-resolvers strings   DNS resolvers to use for record lookups (e.g. 10.0.0.1:53). Uses public resolvers if not set.
+      --domain string           The domain name to query for DNS records
+  -h, --help                    help for records
+      --record-types strings    Comma-separated list of DNS record types to query (A, AAAA, CNAME, MX, NS, SOA, TXT, PTR, SRV, ALL) (default [ALL])
 
 Global Flags:
   -o, --output string        Output format (signal, json, yaml). Default value is signal (default "signal")
