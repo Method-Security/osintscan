@@ -13,6 +13,7 @@ osintscan discover [command]
 - **asn**: ASN information discovery using BGPView API
 - **cdn**: CDN provider detection for IP addresses and domains
 - **dns**: Comprehensive DNS intelligence gathering
+- **idp**: Identity provider discovery for a domain
 - **ip**: IP address and network intelligence
 - **shodan**: Query the Shodan search engine
 
@@ -64,10 +65,38 @@ Usage:
 
 Flags:
       --domain string                The domain name to check against CDN provider ranges
-      --dns-resolvers stringSlice    Custom DNS resolver/servers to use (default [1.1.1.1:53])
-      --fingerprints-file string     Path to CDN fingerprints file (default "/opt/method/osintscan/var/conf/discover/cdn/providers.json")
+      --dns-resolvers stringSlice    Custom DNS resolver/servers to use
+      --fingerprints-file string     The path to the CDN fingerprints file
   -h, --help                        help for cdn
       --ip-addresses stringSlice    IP addresses to check against CDN provider ranges
+
+Global Flags:
+  -o, --output string        Output format (signal, json, yaml). Default value is signal (default "signal")
+  -f, --output-file string   Path to output file. If blank, will output to STDOUT
+  -q, --quiet                Suppress output
+  -v, --verbose              Verbose output
+```
+
+### IDP
+
+Detect identity providers (Azure AD/Entra ID, Okta, etc.) associated with a domain by querying public endpoints, DNS records, and federation metadata.
+
+#### Usage
+```bash
+osintscan discover idp --domain example.com
+```
+
+#### Help Text
+```bash
+Detect identity providers (Azure AD/Entra ID, Okta, etc.) associated with a domain by querying public endpoints, DNS records, and federation metadata.
+
+Usage:
+  osintscan discover idp [flags]
+
+Flags:
+      --domain string   The domain name to discover identity providers for
+  -h, --help            help for idp
+      --timeout int     The timeout in seconds for each HTTP request (default 30)
 
 Global Flags:
   -o, --output string        Output format (signal, json, yaml). Default value is signal (default "signal")
@@ -165,7 +194,7 @@ Usage:
   osintscan discover dns forward [flags]
 
 Flags:
-      --dns-resolvers stringSlice   Custom DNS resolver/servers (default [1.1.1.1:53])
+      --dns-resolvers stringSlice   Custom DNS resolver/servers
       --domain string              Domain name to perform forward lookups on
   -h, --help                      help for forward
 
@@ -195,7 +224,7 @@ Usage:
 
 Flags:
       --cidr string             The CIDR range to perform reverse DNS lookup on
-      --dns-resolvers strings   Custom DNS resolver/servers to use for queries (e.g. 1.1.1.1:53) (default [1.1.1.1:53])
+      --dns-resolvers strings   Custom DNS resolver/servers to use for queries (e.g. 1.1.1.1:53)
   -h, --help                    help for reverse
       --ip-addresses strings    The IP addresses to perform reverse DNS lookup on
       --threads int             Number of concurrent threads for scanning (Default is number of CPUS on machine)
@@ -241,6 +270,7 @@ Flags:
       --subdomains strings      A list of subdomain names to test during discovery
       --threads int             Number of parallel threads to use for discovery (default 10)
       --timeout int             Maximum time (in minutes) to spend on subdomain discovery
+      --wildcard-checks int     Number of random subdomain probes used to detect wildcard DNS records (default 3)
       --wordlist-file string    The file containing the wordlist to use for discovery
       --wordlist-size string    The size of the in-built wordlist to use for discovery
 
@@ -299,12 +329,13 @@ Usage:
 
 Flags:
       --all-sources               Use all passive sources (subfinder equivalent of --all)
-      --dns-resolvers strings     Custom DNS resolver/servers to use for queries (e.g. 1.1.1.1:53) (default [1.1.1.1:53])
+      --dns-resolvers strings     Custom DNS resolver/servers to use for queries (e.g. 1.1.1.1:53)
       --domain string             The domain name to passively enumerate subdomains for
   -h, --help                      help for passive
       --max-dns-queries int       Maximum number of DNS queries to perform per request (default 2000)
       --max-resolvers-qps int     Maximum number of queries per second per resolver (default 100)
       --modules strings           Which passive modules to run: SUBFINDER, AMASS, or ALL (default [SUBFINDER])
+      --recursive-depth int       Recursive discovery depth (0=none, 1=re-scan discovered domains, 2=two levels deep, etc.)
       --requests-per-second int   Maximum number of requests per second to send to the DNS resolvers
       --threads int               Number of concurrent threads for scanning (default 10)
 
@@ -338,7 +369,7 @@ Usage:
 
 Flags:
       --cidr string             The CIDR range to perform reverse DNS and ASN lookup on
-      --dns-resolvers strings   Custom DNS resolver/servers to use for queries (e.g. 1.1.1.1:53) (default [1.1.1.1:53])
+      --dns-resolvers strings   Custom DNS resolver/servers to use for queries (e.g. 1.1.1.1:53)
   -h, --help                    help for domain-asn
       --ip-addresses strings    The IP addresses to perform reverse DNS and ASN lookup on
 
