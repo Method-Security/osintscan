@@ -9,35 +9,73 @@ import (
 	"net"
 )
 
+type wildcardDNSProfile struct {
+	Addresses    map[string]struct{}
+	CNAMETargets map[string]struct{}
+}
+
+func newWildcardDNSProfile() wildcardDNSProfile {
+	return wildcardDNSProfile{
+		Addresses:    map[string]struct{}{},
+		CNAMETargets: map[string]struct{}{},
+	}
+}
+
+func (p wildcardDNSProfile) HasAddresses() bool {
+	return len(p.Addresses) > 0
+}
+
+func (p wildcardDNSProfile) HasCNAMETargets() bool {
+	return len(p.CNAMETargets) > 0
+}
+
 // detectWildcardDNS tests multiple random high-entropy subdomains to check if a wildcard DNS record is present.
 // Checks both A/AAAA records (via LookupHost) and CNAME records (via raw query) since a dangling
 // wildcard CNAME won't resolve via LookupHost but still produces false positives in brute-force.
 // Returns (true, true) for A/AAAA wildcard, (true, false) for CNAME-only wildcard, (false, false) for no wildcard.
 func detectWildcardDNS(ctx context.Context, domain string, resolver *net.Resolver, wildcardChecks int, rawResolver string) (wildcardFound bool, wildcardA bool, err error) {
+	profile, err := detectWildcardDNSProfile(ctx, domain, resolver, wildcardChecks, rawResolver)
+	if err != nil {
+		return false, false, err
+	}
+	return profile.HasAddresses() || profile.HasCNAMETargets(), profile.HasAddresses(), nil
+}
+
+func detectWildcardDNSProfile(ctx context.Context, domain string, resolver *net.Resolver, wildcardChecks int, rawResolver string) (wildcardDNSProfile, error) {
+	profile := newWildcardDNSProfile()
 	for i := 0; i < wildcardChecks; i++ {
 		randomSubdomain, err := generateRandomSubdomain(domain)
 		if err != nil {
-			return false, false, err
+			return profile, err
 		}
 
-		_, err = resolver.LookupHost(ctx, randomSubdomain)
+		addresses, err := resolver.LookupHost(ctx, randomSubdomain)
 		if err == nil {
 			// Random subdomain resolved via A/AAAA - wildcard is present
-			return true, true, nil
+			for _, address := range addresses {
+				profile.Addresses[address] = struct{}{}
+			}
+			for _, target := range lookupCNAMEs(randomSubdomain, rawResolver) {
+				profile.CNAMETargets[target] = struct{}{}
+			}
+			return profile, nil
 		}
 
 		if !isDNSNotFound(err) {
 			// Non-NXDOMAIN error (timeout, SERVFAIL, etc.) - DNS is unreliable
-			return false, false, fmt.Errorf("DNS resolution failed during wildcard detection for %s: %v", randomSubdomain, err)
+			return profile, fmt.Errorf("DNS resolution failed during wildcard detection for %s: %v", randomSubdomain, err)
 		}
 
 		// NXDOMAIN for A/AAAA - check if a wildcard CNAME exists (only when a raw resolver is provided)
-		if rawResolver != "" && hasCNAME(randomSubdomain, rawResolver) {
-			return true, false, nil
+		for _, target := range lookupCNAMEs(randomSubdomain, rawResolver) {
+			profile.CNAMETargets[target] = struct{}{}
+		}
+		if profile.HasCNAMETargets() {
+			return profile, nil
 		}
 	}
 
-	return false, false, nil
+	return profile, nil
 }
 
 // generateRandomSubdomain generates a high-entropy subdomain with only letters (16 characters).
