@@ -169,15 +169,15 @@ func collectProviders(ip net.IP, client *cdncheck.Client, supplemental *suppleme
 	} else if matched {
 		enumKey, ok := cdncheckProviderMap[providerStr]
 		if !ok {
-			log.Warn("unrecognised cdncheck provider", svc1log.SafeParam("provider", providerStr))
-		} else {
-			provider, parseErr := cdnfern.NewCdnProviderFromString(enumKey)
-			if parseErr != nil {
-				errors = append(errors, fmt.Sprintf("failed to map cdncheck provider %q: %v", providerStr, parseErr))
-			} else if _, dup := seen[provider]; !dup {
-				seen[provider] = struct{}{}
-				providers = append(providers, provider)
-			}
+			log.Warn("unrecognised cdncheck provider, mapping to OTHER", svc1log.SafeParam("provider", providerStr))
+			enumKey = "OTHER"
+		}
+		provider, parseErr := cdnfern.NewCdnProviderFromString(enumKey)
+		if parseErr != nil {
+			errors = append(errors, fmt.Sprintf("failed to map cdncheck provider %q: %v", providerStr, parseErr))
+		} else if _, dup := seen[provider]; !dup {
+			seen[provider] = struct{}{}
+			providers = append(providers, provider)
 		}
 	}
 
@@ -215,7 +215,8 @@ func checkSupplemental(ip net.IP, providers *supplementalProviders) (cdnfern.Cdn
 				continue
 			}
 			if prefix.Contains(addr) {
-				provider, err := cdnfern.NewCdnProviderFromString(providerKey)
+				upperCaseProviderKey := strings.ToUpper(providerKey)
+				provider, err := cdnfern.NewCdnProviderFromString(upperCaseProviderKey)
 				if err != nil {
 					continue
 				}
