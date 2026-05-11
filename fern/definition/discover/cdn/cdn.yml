@@ -1,21 +1,20 @@
 types:
 # CdnProvider Enum
   CdnProvider:
-    enum: 
+    enum:
     - AKAMAI
+    - AWS
     - AZURE_FRONTDOOR
     - CLOUDFLARE
     - CLOUDFRONT
+    - EDGECAST
+    - FASTLY
+    - GOCACHE
+    - GOOGLE
     - INCAPSULA
+    - ORACLE
+    - OTHER
     - VERCEL
-# CDN File Structs
-  CdnProviderEntry:
-    properties:
-      ipv4Ranges: list<string>
-      ipv6Ranges: list<string>
-  CdnProviders:
-    properties:
-      cdnProviders: map<string, CdnProviderEntry>
 # Report Config
   DiscoverCdnConfig:
     properties:
@@ -24,15 +23,11 @@ types:
       dnsResolvers: optional<list<string>>
       fingerprintsFile: optional<string>
 # Report Structs
-  CdnMatch:
-    properties:
-      provider: CdnProvider
-      matchedRange: string
   IpCdnResult:
     properties:
       domain: string
       ipAddress: string
-      match: CdnMatch
+      provider: CdnProvider
   DiscoverCdnResult:
     properties:
       matches: optional<list<IpCdnResult>>

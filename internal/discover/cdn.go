@@ -9,7 +9,10 @@ import (
 	"net/netip"
 	"os"
 	"strings"
-	"sync/atomic"
+
+	// External
+	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
+	"github.com/projectdiscovery/cdncheck"
 
 	// Configs
 	"github.com/Method-Security/osintscan/configs"
@@ -17,209 +20,273 @@ import (
 	cdnfern "github.com/Method-Security/osintscan/generated/go/discover/cdn"
 	// Utils
 	"github.com/Method-Security/osintscan/utils"
-	// External
-	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
-// RunDiscoverCdns resolves domains to IP addresses and checks them against known CDN provider ranges
-// and returns a report with any matches found
+// cdncheckProviderMap maps the lowercase provider name strings returned by cdncheck
+// to their corresponding Fern CdnProvider enum key strings.
+// Note: "amazon" is the CNAME-based name cdncheck uses for Amazon CloudFront.
+// Note: "imperva" is the parent company of Incapsula and maps to INCAPSULA.
+var cdncheckProviderMap = map[string]string{
+	"akamai":     "AKAMAI",
+	"amazon":     "CLOUDFRONT",
+	"aws":        "AWS",
+	"cloudflare": "CLOUDFLARE",
+	"cloudfront": "CLOUDFRONT",
+	"edgecast":   "EDGECAST",
+	"fastly":     "FASTLY",
+	"gocache":    "GOCACHE",
+	"google":     "GOOGLE",
+	"imperva":    "INCAPSULA",
+	"incapsula":  "INCAPSULA",
+	"oracle":     "ORACLE",
+}
+
+// supplementalProviderEntry holds IPv4 and IPv6 CIDR ranges for a single provider.
+type supplementalProviderEntry struct {
+	IPv4Ranges []string `json:"ipv4Ranges"`
+	IPv6Ranges []string `json:"ipv6Ranges"`
+}
+
+// supplementalProviders is the shape of providers.json.
+// It ships with AKAMAI, AZURE_FRONTDOOR, CLOUDFLARE, CLOUDFRONT, INCAPSULA, and VERCEL
+// and can be overridden via --fingerprints-file.
+type supplementalProviders struct {
+	CdnProviders map[string]supplementalProviderEntry `json:"cdnProviders"`
+}
+
+// RunDiscoverCdns resolves a domain to IP addresses and checks them against CDN/WAF/cloud
+// providers using two independent sources:
+//  1. projectdiscovery/cdncheck — broad, regularly updated provider ranges.
+//  2. providers.json — supplemental CIDR file shipped with the binary (overridable via
+//     --fingerprints-file) covering AKAMAI, AZURE_FRONTDOOR, CLOUDFLARE, CLOUDFRONT,
+//     INCAPSULA, and VERCEL.
+//
+// Results from both sources are merged; duplicates (same IP + same provider) are dropped.
+// ipAddresses may contain individual IPs or CIDR notation (e.g. 1.2.3.0/24).
 func RunDiscoverCdns(ctx context.Context, config cdnfern.DiscoverCdnConfig) *cdnfern.DiscoverCdnReport {
 	log := svc1log.FromContext(ctx)
 
-	// Initialize empty result structure to hold all IP check results
-	result := &cdnfern.DiscoverCdnResult{
-		Matches: []*cdnfern.IpCdnResult{},
+	result := &cdnfern.DiscoverCdnResult{}
+	report := &cdnfern.DiscoverCdnReport{}
+	report.SetConfig(&config)
+	report.SetResult(result)
+
+	// Build cdncheck client, forwarding any custom DNS resolvers.
+	var (
+		client *cdncheck.Client
+		err    error
+	)
+	if len(config.DnsResolvers) > 0 {
+		normalized := make([]string, 0, len(config.DnsResolvers))
+		for _, r := range config.DnsResolvers {
+			normalized = append(normalized, utils.NormalizeDNSAddress(r))
+		}
+		client, err = cdncheck.NewWithOpts(3, normalized)
+		if err != nil {
+			report.SetErrors([]string{err.Error()})
+			return report
+		}
+	} else {
+		client = cdncheck.New()
 	}
 
-	// Initialize report structure with config and result
-	report := &cdnfern.DiscoverCdnReport{
-		Config: &config,
-		Result: result,
-	}
-
-	// Load CDN provider configuration from specified file path (or embedded default)
+	// Load supplemental providers file.
 	var fingerprintsFile string
 	if config.FingerprintsFile != nil {
 		fingerprintsFile = *config.FingerprintsFile
 	}
-	cdnFingerprints, err := loadCdnDictFromPath(fingerprintsFile)
+	supplemental, err := loadSupplementalProviders(fingerprintsFile)
 	if err != nil {
-		report.Errors = []string{err.Error()}
+		report.SetErrors([]string{err.Error()})
 		return report
 	}
 
-	// If no IP addresses are provided, resolve the domain to IP addresses else check the provided IP addresses
-	if config.IpAddresses == nil {
-		// Create resolvers for each provided DNS server
-		resolvers := utils.GetResolvers(config.DnsResolvers, log)
-
-		// Iterate through each domain provided in the config
+	// Determine IP addresses to check.
+	var rawInputs []string
+	if config.IpAddresses != nil {
+		rawInputs = config.IpAddresses
+	} else {
 		log.Info("Resolving domain", svc1log.SafeParam("domain", config.Domain))
-
-		// Resolve domain to IP addresses using round-robin resolvers
-		ipAddresses, resolveErrors := resolvedomainToIPs(ctx, config.Domain, resolvers, log)
-		report.Errors = append(report.Errors, resolveErrors...)
-
-		// Check each resolved IP address against CDN ranges
-		matches, errors := checkIPAgainstCdnRanges(ctx, ipAddresses, config, cdnFingerprints)
-		report.Errors = append(report.Errors, errors...)
-		result.Matches = append(result.Matches, matches...)
-	} else {
-		matches, errors := checkIPAgainstCdnRanges(ctx, config.IpAddresses, config, cdnFingerprints)
-		report.Errors = append(report.Errors, errors...)
-		result.Matches = append(result.Matches, matches...)
+		dnsData, resolveErr := client.GetDnsData(config.Domain)
+		if resolveErr != nil {
+			report.SetErrors([]string{fmt.Sprintf("failed to resolve domain %s: %v", config.Domain, resolveErr)})
+			return report
+		}
+		rawInputs = append(rawInputs, dnsData.A...)
+		rawInputs = append(rawInputs, dnsData.AAAA...)
+		log.Info("Resolved domain", svc1log.SafeParam("domain", config.Domain), svc1log.SafeParam("ip_count", len(rawInputs)))
 	}
 
-	// Set final result and return complete report
-	report.Result = result
-	return report
-}
+	// Expand any CIDRs into individual IPs.
+	ipAddresses, expandErrors := expandIPs(rawInputs)
+	var errors []string
+	errors = append(errors, expandErrors...)
 
-// loadCdnDictFromPath reads and parses the CDN configuration.
-// When fingerprintsFile is empty, loads from embedded configs directly.
-// Otherwise reads from the filesystem path (user override).
-func loadCdnDictFromPath(fingerprintsFile string) (*cdnfern.CdnProviders, error) {
-	var data []byte
-	var err error
-	if fingerprintsFile == "" {
-		data, err = configs.ReadFile("discover/cdn/providers.json")
-	} else {
-		data, err = os.ReadFile(fingerprintsFile)
-	}
-	if err != nil {
-		return nil, fmt.Errorf("failed to read CDN config file: %w", err)
-	}
+	// Check each IP against both sources and collect unique (ip, provider) pairs.
+	matches := []*cdnfern.IpCdnResult{}
 
-	var cfg cdnfern.CdnProviders
-	if err := json.Unmarshal(data, &cfg); err != nil {
-		return nil, fmt.Errorf("failed to parse CDN config: %w", err)
-	}
-
-	return &cfg, nil
-}
-
-func checkIPAgainstCdnRanges(ctx context.Context, ipAddresses []string, config cdnfern.DiscoverCdnConfig, cdnFingerprints *cdnfern.CdnProviders) (matches []*cdnfern.IpCdnResult, errors []string) {
-	log := svc1log.FromContext(ctx)
-
-	matches = []*cdnfern.IpCdnResult{}
-	errors = []string{}
-
-	for _, ipAddress := range ipAddresses {
-		log.Info("Checking IP address", svc1log.SafeParam("ipAddress", ipAddress))
-
-		// Initialize result structure for this specific IP
-
-		// Parse and validate the IP address string
-		ip := net.ParseIP(strings.TrimSpace(ipAddress))
+	for _, ipStr := range ipAddresses {
+		ip := net.ParseIP(strings.TrimSpace(ipStr))
 		if ip == nil {
-			log.Error("Invalid IP address from resolution", svc1log.SafeParam("domain", config.Domain), svc1log.SafeParam("ipAddress", ipAddress))
+			log.Error("Invalid IP address", svc1log.SafeParam("ipAddress", ipStr))
+			errors = append(errors, fmt.Sprintf("invalid IP address: %s", ipStr))
 			continue
 		}
 
-		// Check if this IP falls within any CDN provider ranges
-		match, errs := checkCdnRanges(ctx, ip, cdnFingerprints)
-		if match != nil {
-			ipResult := &cdnfern.IpCdnResult{
-				Domain:    config.Domain,
-				IpAddress: ipAddress,
-				Match:     match,
-			}
+		log.Info("Checking IP address", svc1log.SafeParam("ipAddress", ipStr))
+
+		providers, checkErrors := collectProviders(ip, client, supplemental, log)
+		errors = append(errors, checkErrors...)
+
+		for _, provider := range providers {
+			ipResult := &cdnfern.IpCdnResult{}
+			ipResult.SetDomain(config.Domain)
+			ipResult.SetIpAddress(ipStr)
+			ipResult.SetProvider(provider)
 			matches = append(matches, ipResult)
 		}
-
-		// Accumulate any errors encountered during checking
-		errors = append(errors, errs...)
 	}
-	return matches, errors
+
+	if len(errors) > 0 {
+		report.SetErrors(errors)
+	}
+	result.SetMatches(matches)
+	report.SetResult(result)
+	return report
 }
 
-// checkIPAgainstCdnRanges compares an IP address against all CDN provider IP ranges
-// Returns the first matching CDN provider and any errors encountered
-func checkCdnRanges(ctx context.Context, ip net.IP, cdnFingerprints *cdnfern.CdnProviders) (*cdnfern.CdnMatch, []string) {
-	log := svc1log.FromContext(ctx)
-	errors := []string{}
+// collectProviders runs both cdncheck and the supplemental file against a single IP
+// and returns the deduplicated set of matched CdnProvider values.
+func collectProviders(ip net.IP, client *cdncheck.Client, supplemental *supplementalProviders, log svc1log.Logger) ([]cdnfern.CdnProvider, []string) {
+	seen := map[cdnfern.CdnProvider]struct{}{}
+	var providers []cdnfern.CdnProvider
+	var errors []string
 
-	// Convert standard net.IP to more efficient netip.Addr for comparison
+	// --- source 1: cdncheck ---
+	matched, providerStr, _, err := client.Check(ip)
+	if err != nil {
+		errors = append(errors, fmt.Sprintf("cdncheck error for %s: %v", ip, err))
+	} else if matched {
+		enumKey, ok := cdncheckProviderMap[providerStr]
+		if !ok {
+			log.Warn("unrecognised cdncheck provider", svc1log.SafeParam("provider", providerStr))
+		} else {
+			provider, parseErr := cdnfern.NewCdnProviderFromString(enumKey)
+			if parseErr != nil {
+				errors = append(errors, fmt.Sprintf("failed to map cdncheck provider %q: %v", providerStr, parseErr))
+			} else if _, dup := seen[provider]; !dup {
+				seen[provider] = struct{}{}
+				providers = append(providers, provider)
+			}
+		}
+	}
+
+	// --- source 2: supplemental providers.json ---
+	supplementalProvider, ok := checkSupplemental(ip, supplemental)
+	if ok {
+		if _, dup := seen[supplementalProvider]; !dup {
+			seen[supplementalProvider] = struct{}{}
+			providers = append(providers, supplementalProvider)
+		}
+	}
+
+	return providers, errors
+}
+
+// checkSupplemental checks an IP against the supplemental provider CIDR ranges.
+func checkSupplemental(ip net.IP, providers *supplementalProviders) (cdnfern.CdnProvider, bool) {
 	addr, ok := netip.AddrFromSlice(ip)
 	if !ok {
-		errors = append(errors, "Invalid IP address")
-		return nil, errors
+		return "", false
 	}
-	// Get IP Type
 	addr = addr.Unmap()
 	isIPv4 := addr.Is4()
 
-	// Iterate through each CDN provider in the configuration
-	for providerKey, provider := range cdnFingerprints.CdnProviders {
-		log.Info("Checking provider", svc1log.SafeParam("providerKey", providerKey))
-
-		// Select appropriate IP ranges based on address type
+	for providerKey, entry := range providers.CdnProviders {
 		var ranges []string
 		if isIPv4 {
-			ranges = provider.Ipv4Ranges
+			ranges = entry.IPv4Ranges
 		} else {
-			ranges = provider.Ipv6Ranges
+			ranges = entry.IPv6Ranges
 		}
-
-		// Check each IP range for this provider
 		for _, raw := range ranges {
-			s := strings.TrimSpace(raw)
-
-			// Parse the IP range/subnet notation
-			prefix, err := netip.ParsePrefix(s)
+			prefix, err := netip.ParsePrefix(strings.TrimSpace(raw))
 			if err != nil {
-				log.Error("Error parsing prefix", svc1log.SafeParam("error", err.Error()))
-				errors = append(errors, "Error parsing prefix")
 				continue
 			}
-
-			// Check if the target IP falls within this range
 			if prefix.Contains(addr) {
-				// Convert provider key string to enum type
-				cdnProvider, err := cdnfern.NewCdnProviderFromString(strings.ToUpper(providerKey))
+				provider, err := cdnfern.NewCdnProviderFromString(providerKey)
 				if err != nil {
-					log.Error("Error parsing provider key", svc1log.SafeParam("error", err.Error()))
-					errors = append(errors, "Error parsing provider key")
 					continue
 				}
-
-				// Return first match found with the matching range info
-				return &cdnfern.CdnMatch{
-					Provider:     cdnProvider,
-					MatchedRange: s,
-				}, errors
+				return provider, true
 			}
 		}
 	}
-
-	return nil, errors
+	return "", false
 }
 
-// resolvedomainToIPs resolves an domain to IP addresses using round-robin resolvers
-// Returns a slice of IP address strings and any errors encountered
-func resolvedomainToIPs(ctx context.Context, domain string, resolvers []*net.Resolver, log svc1log.Logger) ([]string, []string) {
-	var resolverIndex int64
-	var ipAddresses []string
+// loadSupplementalProviders reads the supplemental CDN provider CIDR file.
+// When fingerprintsFile is empty the embedded default is used.
+func loadSupplementalProviders(fingerprintsFile string) (*supplementalProviders, error) {
+	var data []byte
+	var err error
+	if fingerprintsFile != "" {
+		data, err = os.ReadFile(fingerprintsFile)
+	} else {
+		data, err = configs.ReadFile("discover/cdn/providers.json")
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to read supplemental CDN providers: %w", err)
+	}
+	var providers supplementalProviders
+	if err := json.Unmarshal(data, &providers); err != nil {
+		return nil, fmt.Errorf("failed to parse supplemental CDN providers: %w", err)
+	}
+	return &providers, nil
+}
+
+// expandIPs takes a slice of individual IPs and/or CIDR strings and returns
+// the full flat list of IP address strings, plus any parse errors.
+func expandIPs(inputs []string) ([]string, []string) {
+	var ips []string
 	var errors []string
 
-	// Use round-robin resolver selection
-	currentIndex := atomic.AddInt64(&resolverIndex, 1) - 1
-	resolverIdx := currentIndex % int64(len(resolvers))
-	resolver := resolvers[resolverIdx]
-
-	log.Info("Using resolver for domain resolution", svc1log.SafeParam("resolver_index", resolverIdx), svc1log.SafeParam("domain", domain))
-
-	// Resolve the domain to IP addresses
-	ips, err := resolver.LookupHost(ctx, domain)
-	if err != nil {
-		errors = append(errors, fmt.Sprintf("failed to resolve domain %s: %v", domain, err))
-		return ipAddresses, errors
+	for _, input := range inputs {
+		trimmed := strings.TrimSpace(input)
+		if strings.Contains(trimmed, "/") {
+			expanded, err := expandCIDR(trimmed)
+			if err != nil {
+				errors = append(errors, fmt.Sprintf("invalid CIDR %s: %v", trimmed, err))
+				continue
+			}
+			ips = append(ips, expanded...)
+		} else {
+			ips = append(ips, trimmed)
+		}
 	}
+	return ips, errors
+}
 
-	// Add all resolved IPs to the result
-	ipAddresses = append(ipAddresses, ips...)
+// expandCIDR returns all host addresses within the given CIDR block.
+func expandCIDR(cidr string) ([]string, error) {
+	ip, ipNet, err := net.ParseCIDR(cidr)
+	if err != nil {
+		return nil, err
+	}
+	var ips []string
+	for ip = ip.Mask(ipNet.Mask); ipNet.Contains(ip); incrementIP(ip) {
+		ips = append(ips, ip.String())
+	}
+	return ips, nil
+}
 
-	log.Info("Resolved domain", svc1log.SafeParam("domain", domain), svc1log.SafeParam("ip_count", len(ips)))
-
-	return ipAddresses, errors
+// incrementIP advances an IP address by one.
+func incrementIP(ip net.IP) {
+	for j := len(ip) - 1; j >= 0; j-- {
+		ip[j]++
+		if ip[j] > 0 {
+			break
+		}
+	}
 }

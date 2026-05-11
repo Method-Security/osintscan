@@ -711,7 +711,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 
 	// Target Flags
 	discoverCdnCmd.Flags().String("domain", "", "The domain name to check against CDN provider ranges")
-	discoverCdnCmd.Flags().StringSlice("ip-addresses", []string{}, "The IP addresses to check against CDN provider ranges")
+	discoverCdnCmd.Flags().StringSlice("ip-addresses", []string{}, "IP addresses or CIDRs to check (e.g. 1.2.3.4 or 1.2.3.0/24)")
 	discoverCdnCmd.Flags().StringSlice("dns-resolvers", []string{}, "Custom DNS resolvers (e.g. 10.0.0.1). Uses system resolver if not set.")
 	discoverCdnCmd.Flags().String("fingerprints-file", "", "The path to the CDN fingerprints file")
 
