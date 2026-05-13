@@ -55,13 +55,13 @@ type supplementalProviders struct {
 }
 
 // RunDiscoverCdns resolves a domain to IP addresses and checks them against CDN/WAF/cloud
-// providers using two independent sources:
-//  1. projectdiscovery/cdncheck — broad, regularly updated provider ranges.
+// providers. cdncheck is the primary source; the supplemental CIDR file is only consulted
+// when cdncheck returns no match for a given IP.
+//  1. projectdiscovery/cdncheck — broad, regularly updated provider ranges (primary).
 //  2. providers.json — supplemental CIDR file shipped with the binary (overridable via
 //     --fingerprints-file) covering AKAMAI, AZURE_FRONTDOOR, CLOUDFLARE, CLOUDFRONT,
-//     INCAPSULA, and VERCEL.
+//     INCAPSULA, and VERCEL. Used only as a fallback when cdncheck finds nothing.
 //
-// Results from both sources are merged; duplicates (same IP + same provider) are dropped.
 // ipAddresses may contain individual IPs or CIDR notation (e.g. 1.2.3.0/24).
 func RunDiscoverCdns(ctx context.Context, config cdnfern.DiscoverCdnConfig) *cdnfern.DiscoverCdnReport {
 	log := svc1log.FromContext(ctx)
@@ -155,14 +155,14 @@ func RunDiscoverCdns(ctx context.Context, config cdnfern.DiscoverCdnConfig) *cdn
 	return report
 }
 
-// collectProviders runs both cdncheck and the supplemental file against a single IP
-// and returns the deduplicated set of matched CdnProvider values.
+// collectProviders checks a single IP against cdncheck first and falls back to the
+// supplemental providers.json only when cdncheck returns no match. If cdncheck identifies
+// a provider, the supplemental check is skipped entirely.
 func collectProviders(ip net.IP, client *cdncheck.Client, supplemental *supplementalProviders, log svc1log.Logger) ([]cdnfern.CdnProvider, []string) {
-	seen := map[cdnfern.CdnProvider]struct{}{}
 	var providers []cdnfern.CdnProvider
 	var errors []string
 
-	// --- source 1: cdncheck ---
+	// --- primary source: cdncheck ---
 	matched, providerStr, _, err := client.Check(ip)
 	if err != nil {
 		errors = append(errors, fmt.Sprintf("cdncheck error for %s: %v", ip, err))
@@ -175,19 +175,16 @@ func collectProviders(ip net.IP, client *cdncheck.Client, supplemental *suppleme
 		provider, parseErr := cdnfern.NewCdnProviderFromString(enumKey)
 		if parseErr != nil {
 			errors = append(errors, fmt.Sprintf("failed to map cdncheck provider %q: %v", providerStr, parseErr))
-		} else if _, dup := seen[provider]; !dup {
-			seen[provider] = struct{}{}
+		} else {
 			providers = append(providers, provider)
+			return providers, errors
 		}
 	}
 
-	// --- source 2: supplemental providers.json ---
+	// --- fallback: supplemental providers.json (only when cdncheck found nothing) ---
 	supplementalProvider, ok := checkSupplemental(ip, supplemental)
 	if ok {
-		if _, dup := seen[supplementalProvider]; !dup {
-			seen[supplementalProvider] = struct{}{}
-			providers = append(providers, supplementalProvider)
-		}
+		providers = append(providers, supplementalProvider)
 	}
 
 	return providers, errors
