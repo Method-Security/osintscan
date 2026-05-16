@@ -22,14 +22,18 @@ import (
 	"github.com/Method-Security/osintscan/utils"
 )
 
-// cdncheckProviderMap maps the lowercase provider name strings returned by cdncheck
-// to their corresponding Fern CdnProvider enum key strings.
-// Note: "amazon" is the CNAME-based name cdncheck uses for Amazon CloudFront.
+// cdncheckProviderMap maps the lowercase provider name strings returned by
+// cdncheck's IP-based Check (CDN/WAF/Cloud categories) to their corresponding
+// Fern CdnProvider enum key strings.
+//
+// Note: cdncheck's Cloud category returns "aws" for Amazon-owned IP ranges,
+// which include CloudFront's edge IPs as well as the broader AWS network. We
+// map "aws" to CLOUDFRONT so AWS-resolved CDN matches are reported under the
+// CloudFront provider.
 // Note: "imperva" is the parent company of Incapsula and maps to INCAPSULA.
 var cdncheckProviderMap = map[string]string{
 	"akamai":     "AKAMAI",
-	"amazon":     "CLOUDFRONT",
-	"aws":        "AWS",
+	"aws":        "CLOUDFRONT",
 	"cloudflare": "CLOUDFLARE",
 	"cloudfront": "CLOUDFRONT",
 	"edgecast":   "EDGECAST",
