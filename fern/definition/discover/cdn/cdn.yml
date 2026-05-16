@@ -3,7 +3,6 @@ types:
   CdnProvider:
     enum:
     - AKAMAI
-    - AWS
     - AZURE_FRONTDOOR
     - CLOUDFLARE
     - CLOUDFRONT
