@@ -4,6 +4,7 @@ import (
 	// Standard
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/rand"
 	"net"
@@ -118,8 +119,23 @@ func RunDiscoverCdns(ctx context.Context, config cdnfern.DiscoverCdnConfig) *cdn
 func resolveDomain(ctx context.Context, domain string, dnsResolvers []string) ([]string, error) {
 	log := svc1log.FromContext(ctx)
 	resolvers := utils.GetResolvers(dnsResolvers, log)
-	resolver := resolvers[rand.Intn(len(resolvers))]
-	return resolver.LookupHost(ctx, domain)
+	resolverIndex := rand.Intn(len(resolvers))
+	resolver := resolvers[resolverIndex]
+
+	resolverAddress := "system default resolver"
+	if len(dnsResolvers) > 0 {
+		resolverAddress = utils.NormalizeDNSAddress(dnsResolvers[resolverIndex])
+	}
+
+	ips, err := resolver.LookupHost(ctx, domain)
+	if err != nil {
+		var dnsErr *net.DNSError
+		if errors.As(err, &dnsErr) {
+			return nil, fmt.Errorf("lookup using %s failed for %s: %s", resolverAddress, domain, dnsErr.Err)
+		}
+		return nil, fmt.Errorf("lookup using %s failed for %s: %v", resolverAddress, domain, err)
+	}
+	return ips, nil
 }
 
 // checkSupplemental checks an IP against the supplemental provider CIDR ranges.
