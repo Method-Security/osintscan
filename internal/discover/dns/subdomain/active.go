@@ -133,7 +133,12 @@ func getSubdomainsActive(ctx context.Context, domain string, subdomainList []str
 }
 
 func detectWildcardDNSProfileCached(ctx context.Context, domain string, resolvers []*net.Resolver, wildcardChecks int, rawResolvers []string, wildcardProfileCache map[string]wildcardDNSProfile) (wildcardDNSProfile, error) {
+	log := svc1log.FromContext(ctx)
 	if profile, ok := wildcardProfileCache[domain]; ok {
+		log.Info("Using cached wildcard DNS profile",
+			svc1log.SafeParam("domain", domain),
+			svc1log.SafeParam("has_addresses", profile.HasAddresses()),
+			svc1log.SafeParam("has_cname_targets", profile.HasCNAMETargets()))
 		return profile, nil
 	}
 
@@ -143,6 +148,10 @@ func detectWildcardDNSProfileCached(ctx context.Context, domain string, resolver
 	}
 	if profile.HasAddresses() || profile.HasCNAMETargets() {
 		wildcardProfileCache[domain] = profile
+		log.Info("Cached wildcard DNS profile",
+			svc1log.SafeParam("domain", domain),
+			svc1log.SafeParam("has_addresses", profile.HasAddresses()),
+			svc1log.SafeParam("has_cname_targets", profile.HasCNAMETargets()))
 	}
 	return profile, nil
 }

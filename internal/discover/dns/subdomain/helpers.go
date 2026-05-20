@@ -7,7 +7,11 @@ import (
 	"fmt"
 	"math/big"
 	"net"
+	"sort"
 	"time"
+
+	// External
+	"github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
 const wildcardProbeDelay = 5 * time.Second
@@ -49,10 +53,21 @@ func detectWildcardDNSProfile(ctx context.Context, domain string, resolver *net.
 }
 
 func detectWildcardDNSProfileWithResolvers(ctx context.Context, domain string, resolvers []*net.Resolver, wildcardChecks int, rawResolvers []string) (wildcardDNSProfile, error) {
+	log := svc1log.FromContext(ctx)
 	profile := newWildcardDNSProfile()
 	if wildcardChecks <= 0 || len(resolvers) == 0 {
+		log.Info("Skipping wildcard DNS detection",
+			svc1log.SafeParam("domain", domain),
+			svc1log.SafeParam("wildcard_checks", wildcardChecks),
+			svc1log.SafeParam("resolver_count", len(resolvers)))
 		return profile, nil
 	}
+
+	log.Info("Starting wildcard DNS detection",
+		svc1log.SafeParam("domain", domain),
+		svc1log.SafeParam("wildcard_checks", wildcardChecks),
+		svc1log.SafeParam("resolver_count", len(resolvers)),
+		svc1log.SafeParam("raw_resolver_count", len(rawResolvers)))
 
 	var firstTransientErr error
 	nxdomainCount := 0
@@ -69,6 +84,14 @@ func detectWildcardDNSProfileWithResolvers(ctx context.Context, domain string, r
 			rawResolver = rawResolvers[i%len(rawResolvers)]
 		}
 
+		log.Info("Running wildcard DNS probe",
+			svc1log.SafeParam("domain", domain),
+			svc1log.SafeParam("probe", i+1),
+			svc1log.SafeParam("wildcard_checks", wildcardChecks),
+			svc1log.SafeParam("random_subdomain", randomSubdomain),
+			svc1log.SafeParam("resolver_index", i%len(resolvers)),
+			svc1log.SafeParam("raw_resolver", rawResolver))
+
 		addresses, err := resolver.LookupHost(ctx, randomSubdomain)
 		if err == nil {
 			// Random subdomain resolved via A/AAAA - wildcard is present
@@ -78,6 +101,15 @@ func detectWildcardDNSProfileWithResolvers(ctx context.Context, domain string, r
 			for _, target := range lookupCNAMEs(randomSubdomain, rawResolver) {
 				profile.CNAMETargets[target] = struct{}{}
 			}
+			log.Info("Wildcard DNS probe completed",
+				svc1log.SafeParam("domain", domain),
+				svc1log.SafeParam("probe", i+1),
+				svc1log.SafeParam("wildcard_checks", wildcardChecks),
+				svc1log.SafeParam("random_subdomain", randomSubdomain),
+				svc1log.SafeParam("result", "wildcard_detected"),
+				svc1log.SafeParam("record_type", "A/AAAA"),
+				svc1log.SafeParam("addresses", setKeys(profile.Addresses)),
+				svc1log.SafeParam("cname_targets", setKeys(profile.CNAMETargets)))
 			return profile, nil
 		}
 
@@ -88,6 +120,13 @@ func detectWildcardDNSProfileWithResolvers(ctx context.Context, domain string, r
 			if firstTransientErr == nil {
 				firstTransientErr = fmt.Errorf("DNS resolution failed during wildcard detection for %s: %v", randomSubdomain, err)
 			}
+			log.Info("Wildcard DNS probe completed",
+				svc1log.SafeParam("domain", domain),
+				svc1log.SafeParam("random_subdomain", randomSubdomain),
+				svc1log.SafeParam("probe", i+1),
+				svc1log.SafeParam("wildcard_checks", wildcardChecks),
+				svc1log.SafeParam("result", "failure"),
+				svc1log.SafeParam("error", err.Error()))
 			if i < wildcardChecks-1 {
 				select {
 				case <-time.After(wildcardProbeDelay):
@@ -105,8 +144,23 @@ func detectWildcardDNSProfileWithResolvers(ctx context.Context, domain string, r
 			profile.CNAMETargets[target] = struct{}{}
 		}
 		if profile.HasCNAMETargets() {
+			log.Info("Wildcard DNS probe completed",
+				svc1log.SafeParam("domain", domain),
+				svc1log.SafeParam("probe", i+1),
+				svc1log.SafeParam("wildcard_checks", wildcardChecks),
+				svc1log.SafeParam("random_subdomain", randomSubdomain),
+				svc1log.SafeParam("result", "wildcard_detected"),
+				svc1log.SafeParam("record_type", "CNAME"),
+				svc1log.SafeParam("cname_targets", setKeys(profile.CNAMETargets)))
 			return profile, nil
 		}
+
+		log.Info("Wildcard DNS probe completed",
+			svc1log.SafeParam("domain", domain),
+			svc1log.SafeParam("random_subdomain", randomSubdomain),
+			svc1log.SafeParam("probe", i+1),
+			svc1log.SafeParam("wildcard_checks", wildcardChecks),
+			svc1log.SafeParam("result", "NXDOMAIN"))
 
 		if i < wildcardChecks-1 {
 			select {
@@ -118,12 +172,33 @@ func detectWildcardDNSProfileWithResolvers(ctx context.Context, domain string, r
 	}
 
 	if nxdomainCount > 0 {
+		log.Info("Wildcard DNS not detected",
+			svc1log.SafeParam("domain", domain),
+			svc1log.SafeParam("nxdomain_count", nxdomainCount),
+			svc1log.SafeParam("wildcard_checks", wildcardChecks))
 		return profile, nil
 	}
 	if firstTransientErr != nil {
+		log.Warn("Wildcard DNS detection failed after transient DNS errors",
+			svc1log.SafeParam("domain", domain),
+			svc1log.SafeParam("wildcard_checks", wildcardChecks),
+			svc1log.SafeParam("error", firstTransientErr.Error()))
 		return profile, firstTransientErr
 	}
+	log.Info("Wildcard DNS not detected",
+		svc1log.SafeParam("domain", domain),
+		svc1log.SafeParam("nxdomain_count", nxdomainCount),
+		svc1log.SafeParam("wildcard_checks", wildcardChecks))
 	return profile, nil
+}
+
+func setKeys(values map[string]struct{}) []string {
+	keys := make([]string, 0, len(values))
+	for value := range values {
+		keys = append(keys, value)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 // generateRandomSubdomain generates a high-entropy subdomain with only letters (16 characters).
