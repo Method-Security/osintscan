@@ -61,10 +61,11 @@ func getSubdomainsActive(ctx context.Context, domain string, subdomainList []str
 	resolvers := utils.GetResolvers(dnsServerAddresses, log)
 
 	rawResolvers := normalizeRawResolvers(dnsServerAddresses)
+	wildcardProfileCache := map[string]wildcardDNSProfile{}
 
 	// First iteration - test base domain for wildcards (A/AAAA and CNAME)
 	log.Info("Detecting wildcards", svc1log.SafeParam("domain", domain))
-	wildcardProfile, err := detectWildcardDNSProfile(ctx, domain, resolvers[0], wildcardChecks, rawResolvers[0])
+	wildcardProfile, err := detectWildcardDNSProfileCached(ctx, domain, resolvers, wildcardChecks, rawResolvers, wildcardProfileCache)
 	if err != nil {
 		return []string{}, err
 	}
@@ -100,8 +101,12 @@ func getSubdomainsActive(ctx context.Context, domain string, subdomainList []str
 		validSubdomains := []string{}
 		depthWildcardCNAMEDomains := map[string]map[string]struct{}{}
 		for _, subdomain := range currentDepthSubdomains {
-			depthWildcardProfile, err := detectWildcardDNSProfile(ctx, subdomain, resolvers[0], wildcardChecks, rawResolvers[0])
+			depthWildcardProfile, err := detectWildcardDNSProfileCached(ctx, subdomain, resolvers, wildcardChecks, rawResolvers, wildcardProfileCache)
 			if err != nil {
+				log.Warn("Skipping recursive subdomain after wildcard detection failure",
+					svc1log.SafeParam("subdomain", subdomain),
+					svc1log.SafeParam("depth", depth),
+					svc1log.SafeParam("error", err.Error()))
 				continue
 			}
 			if depthWildcardProfile.HasAddresses() {
@@ -125,6 +130,21 @@ func getSubdomainsActive(ctx context.Context, domain string, subdomainList []str
 
 	sort.Strings(subdomains)
 	return subdomains, nil
+}
+
+func detectWildcardDNSProfileCached(ctx context.Context, domain string, resolvers []*net.Resolver, wildcardChecks int, rawResolvers []string, wildcardProfileCache map[string]wildcardDNSProfile) (wildcardDNSProfile, error) {
+	if profile, ok := wildcardProfileCache[domain]; ok {
+		return profile, nil
+	}
+
+	profile, err := detectWildcardDNSProfileWithResolvers(ctx, domain, resolvers, wildcardChecks, rawResolvers)
+	if err != nil {
+		return profile, err
+	}
+	if profile.HasAddresses() || profile.HasCNAMETargets() {
+		wildcardProfileCache[domain] = profile
+	}
+	return profile, nil
 }
 
 // testPermutations concurrently tests a list of subdomain permutations for DNS resolution.
@@ -155,7 +175,6 @@ func testPermutations(ctx context.Context, permutations []string, resolvers []*n
 			currentIndex := atomic.AddInt64(&resolverIndex, 1) - 1
 			resolverIdx := currentIndex % int64(len(resolvers))
 			resolver := resolvers[resolverIdx]
-			log.Info("Using resolver", svc1log.SafeParam("resolver_index", resolverIdx))
 
 			// Round robin CNAME server selection (may differ in length from resolvers
 			// when system defaults are used)
@@ -207,11 +226,14 @@ func testPermutations(ctx context.Context, permutations []string, resolvers []*n
 			completed := atomic.AddInt64(&completedCount, 1)
 
 			if duration.Milliseconds() < 1000 {
-				log.Info("Subdomain check",
-					svc1log.SafeParam("duration_ms", duration.Milliseconds()),
-					svc1log.SafeParam("depth", depth),
-					svc1log.SafeParam("completed", completed),
-					svc1log.SafeParam("total", totalPermutations))
+				shouldLogProgress := completed%500 == 0 || int(completed) == totalPermutations
+				if shouldLogProgress {
+					log.Info("Subdomain check",
+						svc1log.SafeParam("duration_ms", duration.Milliseconds()),
+						svc1log.SafeParam("depth", depth),
+						svc1log.SafeParam("completed", completed),
+						svc1log.SafeParam("total", totalPermutations))
+				}
 			} else {
 				log.Warn("Subdomain check (Longer than 1 second)",
 					svc1log.SafeParam("duration_ms", duration.Milliseconds()),
@@ -252,8 +274,7 @@ func lookupCNAMEs(subdomain string, server string) []string {
 	msg.SetQuestion(dns.Fqdn(subdomain), dns.TypeCNAME)
 	msg.RecursionDesired = true
 
-	client := &dns.Client{Timeout: 5 * time.Second}
-	resp, _, err := client.Exchange(msg, server)
+	resp, err := exchangeDNSWithFallback(msg, server)
 	if err != nil || resp == nil {
 		return nil
 	}
@@ -265,6 +286,24 @@ func lookupCNAMEs(subdomain string, server string) []string {
 		}
 	}
 	return targets
+}
+
+func exchangeDNSWithFallback(msg *dns.Msg, server string) (*dns.Msg, error) {
+	udpClient := &dns.Client{Net: "udp", Timeout: 5 * time.Second}
+	resp, _, err := udpClient.Exchange(msg, server)
+	if err == nil && resp != nil && !resp.Truncated {
+		return resp, nil
+	}
+
+	tcpClient := &dns.Client{Net: "tcp", Timeout: 5 * time.Second}
+	tcpResp, _, tcpErr := tcpClient.Exchange(msg, server)
+	if tcpErr == nil {
+		return tcpResp, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
 }
 
 func getParentWildcardCNAMETargets(subdomain string, wildcardCNAMEDomains map[string]map[string]struct{}) map[string]struct{} {

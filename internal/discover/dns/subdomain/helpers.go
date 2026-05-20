@@ -7,7 +7,10 @@ import (
 	"fmt"
 	"math/big"
 	"net"
+	"time"
 )
+
+const wildcardProbeDelay = 5 * time.Second
 
 type wildcardDNSProfile struct {
 	Addresses    map[string]struct{}
@@ -42,11 +45,28 @@ func detectWildcardDNS(ctx context.Context, domain string, resolver *net.Resolve
 }
 
 func detectWildcardDNSProfile(ctx context.Context, domain string, resolver *net.Resolver, wildcardChecks int, rawResolver string) (wildcardDNSProfile, error) {
+	return detectWildcardDNSProfileWithResolvers(ctx, domain, []*net.Resolver{resolver}, wildcardChecks, []string{rawResolver})
+}
+
+func detectWildcardDNSProfileWithResolvers(ctx context.Context, domain string, resolvers []*net.Resolver, wildcardChecks int, rawResolvers []string) (wildcardDNSProfile, error) {
 	profile := newWildcardDNSProfile()
+	if wildcardChecks <= 0 || len(resolvers) == 0 {
+		return profile, nil
+	}
+
+	var firstTransientErr error
+	nxdomainCount := 0
+
 	for i := 0; i < wildcardChecks; i++ {
 		randomSubdomain, err := generateRandomSubdomain(domain)
 		if err != nil {
 			return profile, err
+		}
+
+		resolver := resolvers[i%len(resolvers)]
+		rawResolver := ""
+		if len(rawResolvers) > 0 {
+			rawResolver = rawResolvers[i%len(rawResolvers)]
 		}
 
 		addresses, err := resolver.LookupHost(ctx, randomSubdomain)
@@ -62,9 +82,23 @@ func detectWildcardDNSProfile(ctx context.Context, domain string, resolver *net.
 		}
 
 		if !isDNSNotFound(err) {
-			// Non-NXDOMAIN error (timeout, SERVFAIL, etc.) - DNS is unreliable
-			return profile, fmt.Errorf("DNS resolution failed during wildcard detection for %s: %v", randomSubdomain, err)
+			// Non-NXDOMAIN errors (timeouts, SERVFAIL, etc.) are common when
+			// resolvers are under load. Keep probing so one bad packet does not
+			// disable wildcard detection.
+			if firstTransientErr == nil {
+				firstTransientErr = fmt.Errorf("DNS resolution failed during wildcard detection for %s: %v", randomSubdomain, err)
+			}
+			if i < wildcardChecks-1 {
+				select {
+				case <-time.After(wildcardProbeDelay):
+				case <-ctx.Done():
+					return profile, ctx.Err()
+				}
+			}
+			continue
 		}
+
+		nxdomainCount++
 
 		// NXDOMAIN for A/AAAA - check if a wildcard CNAME exists (only when a raw resolver is provided)
 		for _, target := range lookupCNAMEs(randomSubdomain, rawResolver) {
@@ -73,8 +107,22 @@ func detectWildcardDNSProfile(ctx context.Context, domain string, resolver *net.
 		if profile.HasCNAMETargets() {
 			return profile, nil
 		}
+
+		if i < wildcardChecks-1 {
+			select {
+			case <-time.After(wildcardProbeDelay):
+			case <-ctx.Done():
+				return profile, ctx.Err()
+			}
+		}
 	}
 
+	if nxdomainCount > 0 {
+		return profile, nil
+	}
+	if firstTransientErr != nil {
+		return profile, firstTransientErr
+	}
 	return profile, nil
 }
 
