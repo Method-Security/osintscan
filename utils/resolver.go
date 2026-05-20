@@ -55,7 +55,7 @@ func GetResolver(dnsServerAddress string, log svc1log.Logger) *net.Resolver {
 				d := net.Dialer{
 					Timeout: time.Second * 10,
 				}
-				return d.DialContext(ctx, "udp", addr)
+				return d.DialContext(ctx, network, addr)
 			},
 		}
 	}
