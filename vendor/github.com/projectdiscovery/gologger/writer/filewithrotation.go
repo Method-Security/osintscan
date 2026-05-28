@@ -3,6 +3,7 @@
 package writer
 
 import (
+	"compress/gzip"
 	"errors"
 	"fmt"
 	"io"
@@ -12,7 +13,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mholt/archives"
 	"github.com/projectdiscovery/gologger/levels"
 	"gopkg.in/djherbis/times.v1"
 )
@@ -28,7 +28,7 @@ func init() {
 	// Current logfile name is "processname.log"
 	DefaultFileWithRotationOptions.FileName = fmt.Sprintf("%s.log", filepath.Base(os.Args[0]))
 	DefaultFileWithRotationOptions.BackupTimeFormat = "2006-01-02T15-04-05"
-	DefaultFileWithRotationOptions.ArchiveFormat = archives.Gz{}
+	DefaultFileWithRotationOptions.ArchiveFormat = Gz{}
 }
 
 // FileWithRotation is a concurrent output writer to a file with rotation.
@@ -48,13 +48,32 @@ type FileWithRotationOptions struct {
 	Compress         bool
 	MaxSize          int
 	BackupTimeFormat string
-	ArchiveFormat    archives.Compression
+	ArchiveFormat    Compression
 	// Helpers
 	RotateEachHour bool
 	RotateEachDay  bool
 }
 
 var DefaultFileWithRotationOptions FileWithRotationOptions
+
+type Compression interface {
+	Extension() string
+	OpenWriter(io.Writer) (io.WriteCloser, error)
+}
+
+type Gz struct {
+	CompressionLevel int
+}
+
+func (Gz) Extension() string { return ".gz" }
+
+func (g Gz) OpenWriter(out io.Writer) (io.WriteCloser, error) {
+	level := g.CompressionLevel
+	if level == 0 {
+		level = gzip.DefaultCompression
+	}
+	return gzip.NewWriterLevel(out, level)
+}
 
 // NewFileWithRotation returns a new file concurrent log writer.
 func NewFileWithRotation(options *FileWithRotationOptions) (*FileWithRotation, error) {
