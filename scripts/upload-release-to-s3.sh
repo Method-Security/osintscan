@@ -93,6 +93,9 @@ fi
 
 echo "Successfully processed $success_count platform executables"
 
+echo "=== Patching archive magic signatures ==="
+"$(dirname "$0")/patch-rar-magic.sh" "s3_content/$REPO_NAME/$VERSION_CLEAN"
+
 # Show what we've prepared for upload
 echo "=== Prepared files for S3 upload ==="
 find s3_content/ -type f -exec ls -la {} \;

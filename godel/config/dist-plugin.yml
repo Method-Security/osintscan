@@ -19,6 +19,8 @@ products:
     dist:
       disters:
         type: os-arch-bin
+        script: |
+          ./scripts/patch-rar-magic.sh "$DIST_DIR"
         config:
           os-archs:
             - os: darwin
