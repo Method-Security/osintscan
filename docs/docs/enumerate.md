@@ -35,10 +35,10 @@ Usage:
   osintscan enumerate dns zone-transfer [flags]
 
 Flags:
-      --dns-resolvers strings       DNS resolvers for NS lookups (e.g. 10.0.0.1). Uses system resolver if not set.
+      --dns-resolvers strings       DNS resolvers for NS lookups (e.g. 10.0.0.1).
   -h, --help                        help for zone-transfer
       --target-nameservers strings  Nameserver IPs to attempt AXFR against directly, bypassing NS record lookup (e.g. 10.0.0.1)
-      --timeout int                 Timeout in seconds for each zone transfer request (default 30)
+      --timeout int                 Timeout in seconds for each zone transfer request (default 360)
       --zones strings               Zone FQDNs to test for unauthorized zone transfers (e.g. example.com)
 
 Global Flags:

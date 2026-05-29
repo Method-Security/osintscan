@@ -189,7 +189,7 @@ Usage:
   osintscan discover dns records [flags]
 
 Flags:
-      --dns-resolvers strings   DNS resolvers to use for record lookups (e.g. 10.0.0.1:53). Uses public resolvers if not set.
+      --dns-resolvers strings   DNS resolvers to use for record lookups (e.g. 10.0.0.1:53).
       --domain string           The domain name to query for DNS records
   -h, --help                    help for records
       --record-types strings    Comma-separated list of DNS record types to query (A, AAAA, CNAME, MX, NS, SOA, TXT, PTR, SRV, ALL) (default [ALL])
@@ -251,7 +251,7 @@ Flags:
       --dns-resolvers strings   Custom DNS resolver/servers to use for queries (e.g. 1.1.1.1:53)
   -h, --help                    help for reverse
       --ip-addresses strings    The IP addresses to perform reverse DNS lookup on
-      --threads int             Number of concurrent threads for scanning (Default is number of CPUS on machine)
+      --threads int             Number of concurrent threads for scanning
 
 Global Flags:
   -o, --output string        Output format (signal, json, yaml). Default value is signal (default "signal")
@@ -289,14 +289,14 @@ Flags:
       --dns-resolvers strings   Custom DNS resolver/servers to use for queries (e.g. 1.1.1.1:53)
       --domain string           The domain name to discover subdomains for
   -h, --help                    help for active
-      --max-depth int           Maximum recursion depth for subdomain discovery (default 2)
+      --max-depth int           Maximum recursion depth for subdomain discovery (default 1)
       --sleep int               Sleep time in milliseconds between requests to avoid rate limiting
       --subdomains strings      A list of subdomain names to test during discovery
-      --threads int             Number of parallel threads to use for discovery (default 10)
-      --timeout int             Maximum time (in minutes) to spend on subdomain discovery
-      --wildcard-checks int     Number of random subdomain probes used to detect wildcard DNS records (default 3)
+      --threads int             Number of parallel threads to use for discovery (default 100)
+      --timeout int             Maximum time (in minutes) to spend on subdomain discovery (default 65)
+      --wildcard-checks int     Number of random subdomain probes used to detect wildcard DNS records (default 5)
       --wordlist-file string    The file containing the wordlist to use for discovery
-      --wordlist-size string    The size of the in-built wordlist to use for discovery
+      --wordlist-size string    The size of the in-built wordlist to use for discovery (default "SMALL")
 
 Global Flags:
   -o, --output string        Output format (signal, json, yaml). Default value is signal (default "signal")
@@ -352,16 +352,16 @@ Usage:
   osintscan discover dns subdomain passive [flags]
 
 Flags:
-      --all-sources               Use all passive sources (subfinder equivalent of --all)
+      --all-sources               Use all passive sources (subfinder equivalent of --all) (default true)
       --dns-resolvers strings     Custom DNS resolver/servers to use for queries (e.g. 1.1.1.1:53)
       --domain string             The domain name to passively enumerate subdomains for
   -h, --help                      help for passive
       --max-dns-queries int       Maximum number of DNS queries to perform per request (default 2000)
-      --max-resolvers-qps int     Maximum number of queries per second per resolver (default 100)
+      --max-resolvers-qps int     Maximum number of queries per second per resolver (default 20)
       --modules strings           Which passive modules to run: SUBFINDER, AMASS, or ALL (default [SUBFINDER])
-      --recursive-depth int       Recursive discovery depth (0=none, 1=re-scan discovered domains, 2=two levels deep, etc.)
+      --recursive-depth int       Recursive discovery depth (0=none, 1=re-scan discovered domains, 2=two levels deep, etc.) (default 1)
       --requests-per-second int   Maximum number of requests per second to send to the DNS resolvers
-      --threads int               Number of concurrent threads for scanning (default 10)
+      --threads int               Number of concurrent threads for scanning (default 50)
 
 Global Flags:
   -o, --output string        Output format (signal, json, yaml). Default value is signal (default "signal")
@@ -432,7 +432,7 @@ Usage:
   osintscan discover shodan hostname [flags]
 
 Flags:
-      --api-key string    Shodan API Key (defaults to SHODAN_API_KEY environment variable if not provided)
+      --api-key string    Shodan API Key
   -h, --help              help for hostname
       --hostname string   The hostname suffix to match in Shodan search results
       --query string      The search query string to use with Shodan (e.g., 'apache', 'nginx')
