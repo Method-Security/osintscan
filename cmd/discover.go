@@ -559,7 +559,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 	discoverDNSSubdomainPassiveCmd.Flags().StringSlice("dns-resolvers", []string{}, "Custom DNS resolvers (e.g. 10.0.0.1).")
 	discoverDNSSubdomainPassiveCmd.Flags().Int("max-dns-queries", 2000, "Maximum number of DNS queries to perform per request")
 	discoverDNSSubdomainPassiveCmd.Flags().Int("max-resolvers-qps", 20, "Maximum number of queries per second per resolver")
-	discoverDNSSubdomainPassiveCmd.Flags().Int("recursive-depth", 1, "Recursive discovery depth (0=none, 1=re-scan discovered domains, 2=two levels deep, etc.)")
+	discoverDNSSubdomainPassiveCmd.Flags().Int("recursive-depth", 0, "Recursive discovery depth (0=none, 1=re-scan discovered domains, 2=two levels deep, etc.)")
 
 	// Mark Required Flags
 	_ = discoverDNSSubdomainPassiveCmd.MarkFlagRequired("domain")
