@@ -156,7 +156,8 @@ require (
 	github.com/rubenv/sql-migrate v1.7.0 // indirect
 	github.com/saintfish/chardet v0.0.0-20230101081208-5e3ef4b5456d // indirect
 	github.com/shirou/gopsutil/v3 v3.24.5 // indirect
-	github.com/shoenig/go-m1cpu v0.1.6 // indirect
+	// Keep >= v0.2.1; v0.1.6 can crash during darwin/arm64 cgo init.
+	github.com/shoenig/go-m1cpu v0.2.1 // indirect
 	github.com/sorairolake/lzip-go v0.3.5 // indirect
 	github.com/spf13/pflag v1.0.7 // indirect
 	github.com/syndtr/goleveldb v1.0.0 // indirect
