@@ -34,8 +34,22 @@ func GetDomainSubdomainsActive(ctx context.Context, subdomains []string, config 
 	activeConfig := config.GetActive()
 	errors := []string{}
 
-	// Run the active subdomain discovery
-	subdomains, err := getSubdomainsActive(ctx, activeConfig.Domain, subdomains, activeConfig.Threads, activeConfig.MaxDepth, activeConfig.Timeout, activeConfig.Sleep, activeConfig.WildcardChecks, activeConfig.DnsResolvers)
+	// Single shared timeout budget for the entire active flow (wordlist
+	// bruteforce + ccTLD pivot). The CLI's --timeout flag is documented as
+	// a wall-clock cap on subdomain discovery as a whole, not per-phase,
+	// so we set up the timeout context once here and pass timeout=0 into
+	// each sub-operation so they skip their own internal WithTimeout. This
+	// prevents a 2x worst-case (e.g. --timeout 65 producing a 130-minute
+	// run when both phases hit their per-phase ceilings).
+	if activeConfig.Timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, time.Duration(activeConfig.Timeout)*time.Minute)
+		defer cancel()
+	}
+
+	// Run the active subdomain discovery. Pass timeout=0 to share the
+	// budget established above.
+	subdomains, err := getSubdomainsActive(ctx, activeConfig.Domain, subdomains, activeConfig.Threads, activeConfig.MaxDepth, 0, activeConfig.Sleep, activeConfig.WildcardChecks, activeConfig.DnsResolvers)
 	if err != nil {
 		errors = append(errors, err.Error())
 	}
@@ -43,13 +57,14 @@ func GetDomainSubdomainsActive(ctx context.Context, subdomains []string, config 
 	// Run ccTLD pivot. Independent of the wordlist-driven flow: a wildcard
 	// on the input domain disables brute-force but does NOT affect ccTLD
 	// pivot since each ccTLD candidate is queried at the apex of its own
-	// registry zone, not under the input domain.
+	// registry zone, not under the input domain. Same timeout=0 convention
+	// — the deadline lives on the shared ctx.
 	cctldMatches, cctldErr := cctld.GetCctldPivots(
 		ctx,
 		activeConfig.Domain,
 		activeConfig.Cctlds,
 		activeConfig.Threads,
-		activeConfig.Timeout,
+		0,
 		activeConfig.DnsResolvers,
 	)
 	if cctldErr != nil {
