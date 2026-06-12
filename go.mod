@@ -16,6 +16,8 @@ require (
 	github.com/projectdiscovery/subfinder/v2 v2.9.0
 	github.com/spf13/cobra v1.9.1
 	github.com/stretchr/testify v1.11.1
+	github.com/weppos/publicsuffix-go v0.40.3-0.20250708083804-25ff8f86d8b3
+	golang.org/x/net v0.47.0
 )
 
 require (
@@ -175,7 +177,6 @@ require (
 	github.com/tomnomnom/linkheader v0.0.0-20250811210735-e5fe3b51442e // indirect
 	github.com/tylertreat/BoomFilters v0.0.0-20210315201527-1a82519a3e43 // indirect
 	github.com/ulikunitz/xz v0.5.15 // indirect
-	github.com/weppos/publicsuffix-go v0.40.3-0.20250708083804-25ff8f86d8b3 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	github.com/yl2chen/cidranger v1.0.2 // indirect
 	github.com/yuin/goldmark v1.7.13 // indirect
@@ -193,7 +194,6 @@ require (
 	golang.org/x/crypto v0.45.0 // indirect
 	golang.org/x/exp v0.0.0-20250819193227-8b4c13bb791b // indirect
 	golang.org/x/mod v0.29.0 // indirect
-	golang.org/x/net v0.47.0 // indirect
 	golang.org/x/oauth2 v0.30.0 // indirect
 	golang.org/x/sync v0.18.0 // indirect
 	golang.org/x/sys v0.38.0 // indirect

@@ -14,7 +14,6 @@ import (
 
 	// External
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
-
 	// Configs
 	"github.com/Method-Security/osintscan/configs"
 	// Generated
