@@ -12,6 +12,8 @@ import (
 
 	// Generated
 	dnsfern "github.com/Method-Security/osintscan/generated/go/discover/dns"
+	// Internal
+	"github.com/Method-Security/osintscan/internal/discover/dns/subdomain/cctld"
 	// Utils
 	"github.com/Method-Security/osintscan/utils"
 	// External
@@ -21,6 +23,13 @@ import (
 
 // GetDomainSubdomainsActive performs active (bruteforce) subdomain discovery for a given domain.
 // Returns a report containing all discovered subdomains and any errors encountered.
+//
+// In addition to the wordlist-driven bruteforce, this also runs a ccTLD pivot
+// against the input domain's registrable label (e.g. for `acme.com`, tests
+// `acme.ru`, `acme.cn`, ...). The ccTLD list defaults to a curated APT- and
+// economy-relevant set; callers can override it via activeConfig.Cctlds. Any
+// resolved ccTLD candidates are appended to the same `subdomains` output so
+// the downstream processor handles them as plain Fqdn objects.
 func GetDomainSubdomainsActive(ctx context.Context, subdomains []string, config dnsfern.DiscoverDnsSubdomainConfig) (dnsfern.DiscoverDnsSubdomainReport, error) {
 	activeConfig := config.GetActive()
 	errors := []string{}
@@ -30,6 +39,23 @@ func GetDomainSubdomainsActive(ctx context.Context, subdomains []string, config 
 	if err != nil {
 		errors = append(errors, err.Error())
 	}
+
+	// Run ccTLD pivot. Independent of the wordlist-driven flow: a wildcard
+	// on the input domain disables brute-force but does NOT affect ccTLD
+	// pivot since each ccTLD candidate is queried at the apex of its own
+	// registry zone, not under the input domain.
+	cctldMatches, cctldErr := cctld.GetCctldPivots(
+		ctx,
+		activeConfig.Domain,
+		activeConfig.Cctlds,
+		activeConfig.Threads,
+		activeConfig.Timeout,
+		activeConfig.DnsResolvers,
+	)
+	if cctldErr != nil {
+		errors = append(errors, cctldErr.Error())
+	}
+	subdomains = appendUniqueSubdomains(subdomains, cctldMatches)
 
 	result := dnsfern.DiscoverDnsSubdomainResult{
 		Subdomains: subdomains,
@@ -42,6 +68,28 @@ func GetDomainSubdomainsActive(ctx context.Context, subdomains []string, config 
 	}
 
 	return report, nil
+}
+
+// appendUniqueSubdomains appends `extra` entries to `base`, skipping any
+// that are already present (case-insensitive). Used to merge ccTLD pivot
+// matches into the existing subdomain list without producing duplicates.
+func appendUniqueSubdomains(base []string, extra []string) []string {
+	if len(extra) == 0 {
+		return base
+	}
+	seen := make(map[string]struct{}, len(base)+len(extra))
+	for _, s := range base {
+		seen[strings.ToLower(s)] = struct{}{}
+	}
+	for _, s := range extra {
+		key := strings.ToLower(s)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		base = append(base, s)
+	}
+	return base
 }
 
 // getSubdomainsActive performs recursive bruteforce subdomain enumeration with concurrency and wildcard detection.
