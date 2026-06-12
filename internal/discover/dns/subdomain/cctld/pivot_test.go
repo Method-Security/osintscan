@@ -5,33 +5,39 @@ import (
 	"testing"
 )
 
-func TestRegistrableLabel(t *testing.T) {
+func TestRegistrableLabelAndApex(t *testing.T) {
 	cases := []struct {
-		name    string
-		input   string
-		want    string
-		wantErr bool
+		name      string
+		input     string
+		wantLabel string
+		wantApex  string
+		wantErr   bool
 	}{
-		{"apex domain", "acme.com", "acme", false},
-		{"subdomain", "mail.acme.com", "acme", false},
-		{"deep subdomain", "shop.eu.acme.com", "acme", false},
-		{"multi-label suffix", "acme.co.uk", "acme", false},
-		{"deep multi-label suffix", "shop.acme.co.uk", "acme", false},
-		{"uppercase", "ACME.COM", "acme", false},
-		{"trailing dot", "acme.com.", "acme", false},
-		{"bare label", "acme", "acme", false},
-		{"with whitespace", "  acme.com  ", "acme", false},
-		{"empty", "", "", true},
-		{"whitespace only", "   ", "", true},
+		{"apex domain", "acme.com", "acme", "acme.com", false},
+		{"subdomain", "mail.acme.com", "acme", "acme.com", false},
+		{"deep subdomain", "shop.eu.acme.com", "acme", "acme.com", false},
+		{"multi-label suffix", "acme.co.uk", "acme", "acme.co.uk", false},
+		{"deep multi-label suffix", "shop.acme.co.uk", "acme", "acme.co.uk", false},
+		{"ccTLD apex", "acme.ru", "acme", "acme.ru", false},
+		{"subdomain under ccTLD", "mail.acme.ru", "acme", "acme.ru", false},
+		{"uppercase", "ACME.COM", "acme", "acme.com", false},
+		{"trailing dot", "acme.com.", "acme", "acme.com", false},
+		{"bare label", "acme", "acme", "", false},
+		{"with whitespace", "  acme.com  ", "acme", "acme.com", false},
+		{"empty", "", "", "", true},
+		{"whitespace only", "   ", "", "", true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := registrableLabel(tc.input)
+			label, apex, err := registrableLabelAndApex(tc.input)
 			if (err != nil) != tc.wantErr {
-				t.Fatalf("registrableLabel(%q) err = %v, wantErr %v", tc.input, err, tc.wantErr)
+				t.Fatalf("registrableLabelAndApex(%q) err = %v, wantErr %v", tc.input, err, tc.wantErr)
 			}
-			if got != tc.want {
-				t.Fatalf("registrableLabel(%q) = %q, want %q", tc.input, got, tc.want)
+			if label != tc.wantLabel {
+				t.Fatalf("registrableLabelAndApex(%q) label = %q, want %q", tc.input, label, tc.wantLabel)
+			}
+			if apex != tc.wantApex {
+				t.Fatalf("registrableLabelAndApex(%q) apex = %q, want %q", tc.input, apex, tc.wantApex)
 			}
 		})
 	}

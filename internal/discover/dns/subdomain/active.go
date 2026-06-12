@@ -71,6 +71,12 @@ func GetDomainSubdomainsActive(ctx context.Context, subdomains []string, config 
 		errors = append(errors, cctldErr.Error())
 	}
 	subdomains = appendUniqueSubdomains(subdomains, cctldMatches)
+	// Re-sort the merged list. getSubdomainsActive returns subdomains
+	// sorted, but appendUniqueSubdomains tacks ccTLD matches on in the
+	// order they arrived (which is goroutine-completion order from the
+	// pivot fan-out). A final sort keeps the report output deterministic
+	// and consistent with the pre-ccTLD active-discovery contract.
+	sort.Strings(subdomains)
 
 	result := dnsfern.DiscoverDnsSubdomainResult{
 		Subdomains: subdomains,

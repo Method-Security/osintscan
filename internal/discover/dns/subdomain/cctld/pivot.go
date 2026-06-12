@@ -39,7 +39,7 @@ func GetCctldPivots(
 ) ([]string, error) {
 	log := svc1log.FromContext(ctx)
 
-	label, err := registrableLabel(domain)
+	label, inputRegistrable, err := registrableLabelAndApex(domain)
 	if err != nil {
 		return nil, fmt.Errorf("ccTLD pivot: cannot derive registrable label from %q: %w", domain, err)
 	}
@@ -101,6 +101,14 @@ func GetCctldPivots(
 			}
 			candidate = strings.ToLower(candidate)
 
+			// Skip candidates that resolve back to the input's own registrable
+			// apex — e.g. input "acme.ru" or "mail.acme.ru" with cc="ru" would
+			// otherwise emit "acme.ru" as a discovered cross-zone pivot of
+			// itself. The ccTLD pivot is only meaningful for cross-zone hits.
+			if inputRegistrable != "" && candidate == inputRegistrable {
+				return
+			}
+
 			idx := atomic.AddInt64(&resolverIndex, 1) - 1
 			resolver := resolvers[idx%int64(len(resolvers))]
 
@@ -132,28 +140,37 @@ func GetCctldPivots(
 	return found, nil
 }
 
-// registrableLabel returns the second-level domain label (SLD) of the
-// input — e.g. "acme" from "acme.com", "mail.acme.com", or
-// "shop.acme.co.uk". Uses the public-suffix list so multi-label suffixes
-// (.co.uk, .com.au, .net.cn) are handled correctly. An input without a
-// dot is treated as a bare label and returned as-is.
-func registrableLabel(domain string) (string, error) {
+// registrableLabelAndApex returns the second-level domain label (SLD) of
+// the input plus the input's registrable apex (SLD + public suffix) — e.g.
+// ("acme", "acme.com") from "acme.com" or "mail.acme.com"; ("acme",
+// "acme.co.uk") from "shop.acme.co.uk". Uses the public-suffix list so
+// multi-label suffixes (.co.uk, .com.au, .net.cn) are handled correctly.
+//
+// The apex is used to filter ccTLD candidates that resolve back to the
+// input itself (e.g. input "acme.ru" against the default ccTLD "ru"). An
+// input without a dot is treated as a bare label with empty apex; in that
+// case no apex-self-match filter is applied.
+func registrableLabelAndApex(domain string) (string, string, error) {
 	domain = strings.TrimSpace(strings.ToLower(domain))
 	domain = strings.TrimSuffix(domain, ".")
 	if domain == "" {
-		return "", errors.New("empty domain")
+		return "", "", errors.New("empty domain")
 	}
 	if !strings.Contains(domain, ".") {
-		return domain, nil
+		return domain, "", nil
 	}
 	parsed, err := publicsuffix.Parse(domain)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	if parsed.SLD == "" {
-		return "", fmt.Errorf("could not extract registrable label from %q", domain)
+		return "", "", fmt.Errorf("could not extract registrable label from %q", domain)
 	}
-	return parsed.SLD, nil
+	apex := parsed.SLD
+	if parsed.TLD != "" {
+		apex = parsed.SLD + "." + parsed.TLD
+	}
+	return parsed.SLD, apex, nil
 }
 
 // normalizeCctldList trims, lowercases, and deduplicates the input list.
