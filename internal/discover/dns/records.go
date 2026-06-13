@@ -2,6 +2,7 @@ package dns
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"slices"
@@ -36,10 +37,16 @@ func normalizeDnsxResolvers(resolvers []string, useTCP bool) []string {
 	}
 	normalized := make([]string, 0, len(resolvers))
 	for _, r := range resolvers {
-		if strings.HasPrefix(r, "udp:") || strings.HasPrefix(r, "tcp:") {
+		hasPrefix := strings.HasPrefix(r, "udp:") || strings.HasPrefix(r, "tcp:")
+		// Respect an explicit per-resolver transport only when not globally
+		// forcing TCP. When useTCP is set, the override must win even over a
+		// resolver already prefixed with udp:.
+		if hasPrefix && !useTCP {
 			normalized = append(normalized, r)
 			continue
 		}
+		r = strings.TrimPrefix(r, "udp:")
+		r = strings.TrimPrefix(r, "tcp:")
 		// Add default port if missing
 		if _, _, err := net.SplitHostPort(r); err != nil {
 			r = net.JoinHostPort(r, "53")
@@ -124,6 +131,19 @@ func getDNSRecords(ctx context.Context, domain string, questionTypes []uint16, d
 
 	select {
 	case <-queryCtx.Done():
+		// The resolver may have completed in the same scheduling window the
+		// context fired; prefer an already-available result over reporting a
+		// failure that didn't actually happen.
+		select {
+		case result := <-resultCh:
+			return result.records, result.err
+		default:
+		}
+		// Distinguish a parent-context cancellation (e.g. CLI interrupt) from an
+		// actual resolver timeout so the error isn't misattributed.
+		if errors.Is(queryCtx.Err(), context.Canceled) {
+			return []*common.DnsRecord{}, fmt.Errorf("DNS query for %s canceled: %w", domain, queryCtx.Err())
+		}
 		log.Warn("DNS query timed out",
 			svc1log.SafeParam("domain", domain),
 			svc1log.SafeParam("timeoutSeconds", timeoutSeconds))
