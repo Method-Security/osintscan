@@ -6,6 +6,8 @@ types:
       domain: string
       recordTypes: list<string>
       dnsResolvers: optional<list<string>>
+      useTcp: optional<boolean> # Query resolvers over TCP instead of UDP
+      timeout: optional<integer> # Per-query timeout in seconds (default 10)
   DiscoverDnsRecordsResult:
     properties:
       dnsRecords: optional<list<dns.DnsRecord>>
