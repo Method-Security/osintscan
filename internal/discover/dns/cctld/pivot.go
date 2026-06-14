@@ -346,9 +346,20 @@ func processCandidateTLD(
 	if probeResult.CertSubject != nil {
 		certSubjectStr = *probeResult.CertSubject
 	}
+	// When the web probe followed redirects to a different host, the
+	// title and body we captured belong to the redirect target — NOT to
+	// the candidate. Zero them out before classifying so the title-based
+	// impersonation heuristic and the tiny-body parking heuristic don't
+	// fire on content that isn't the candidate's. The cert dial happens
+	// against the original candidate host, so CertSubject / CertSANs
+	// remain usable.
 	titleStr := ""
-	if probeResult.Title != nil {
-		titleStr = *probeResult.Title
+	bodyLen := 0
+	if !probeResult.RedirectedOffCandidate {
+		if probeResult.Title != nil {
+			titleStr = *probeResult.Title
+		}
+		bodyLen = len(probeResult.Body)
 	}
 	similarityVal := -1.0
 	if similarityPtr != nil {
@@ -362,7 +373,7 @@ func processCandidateTLD(
 		HasBaseline:          hasBaseline && similarityPtr != nil,
 		Title:                titleStr,
 		HTTPStatus:           httpStatus,
-		BodyLen:              len(probeResult.Body),
+		BodyLen:              bodyLen,
 		NSRecords:            nsRecords,
 	}
 	classificationStr := Classify(classIn)
