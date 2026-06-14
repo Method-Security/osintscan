@@ -1,0 +1,60 @@
+types:
+# Enums
+  DiscoverDnsCctldClassification:
+    enum:
+      - LIKELY_LEGIT_ALT_REGION
+      - LIKELY_IMPERSONATION
+      - PARKED
+      - UNRELATED
+
+  DiscoverDnsCctldPreset:
+    enum:
+      - APT_RELEVANT
+      - TOP50
+      - EU27
+      - ASEAN
+      - ALL
+
+# Candidate Details
+  DiscoverDnsCctldCandidate:
+    properties:
+      tld: string
+      fqdn: string
+      ips: optional<list<string>>
+      aaaa: optional<list<string>>
+      ns: optional<list<string>>
+      mx: optional<list<string>>
+      wildcard: boolean
+      httpStatus: optional<integer>
+      httpsStatus: optional<integer>
+      finalUrl: optional<string>
+      title: optional<string>
+      serverHeader: optional<string>
+      certSubject: optional<string>
+      certSans: optional<list<string>>
+      similarityToBaseline: optional<double>
+      classification: DiscoverDnsCctldClassification
+
+# Config
+  DiscoverDnsCctldConfig:
+    properties:
+      domain: string
+      cctlds: optional<list<string>>
+      cctldsPreset: optional<DiscoverDnsCctldPreset>
+      baselineUrl: optional<string>
+      probeWeb: boolean
+      threads: integer
+      timeout: integer
+      dnsResolvers: optional<list<string>>
+
+# Result
+  DiscoverDnsCctldResult:
+    properties:
+      candidates: optional<list<DiscoverDnsCctldCandidate>>
+
+# Report
+  DiscoverDnsCctldReport:
+    properties:
+      config: DiscoverDnsCctldConfig
+      result: DiscoverDnsCctldResult
+      errors: optional<list<string>>
