@@ -53,17 +53,21 @@ func PivotCcTLD(ctx context.Context, config dnsfern.DiscoverDnsCctldConfig) dnsf
 	log := svc1log.FromContext(ctx)
 	errs := []string{}
 
+	// Normalize the input domain: trim leading/trailing whitespace and a
+	// trailing dot so that "acme.com." and " acme.com " both parse correctly.
+	domain := strings.TrimSuffix(strings.TrimSpace(config.Domain), ".")
+
 	// Resolve the registrable label (SLD) from the input domain.
 	// publicsuffix.Parse returns a *DomainName with .SLD == "acme" for "acme.com"
 	// and also handles multi-label TLDs like "acme.co.uk" → SLD="acme".
-	dn, err := publicsuffix.Parse(config.Domain)
+	dn, err := publicsuffix.Parse(domain)
 	if err != nil {
 		// Fall back to splitting on the first dot. We must populate TLD
 		// from the remainder too — otherwise inputApex collapses to just
 		// the base label, and the later EqualFold-against-inputApex skip
 		// can't recognize the input domain itself and the sweep ends up
 		// re-discovering it as a ccTLD candidate.
-		parts := strings.SplitN(config.Domain, ".", 2)
+		parts := strings.SplitN(domain, ".", 2)
 		fallback := &publicsuffix.DomainName{SLD: parts[0]}
 		if len(parts) == 2 {
 			fallback.TLD = parts[1]
@@ -91,7 +95,7 @@ func PivotCcTLD(ctx context.Context, config dnsfern.DiscoverDnsCctldConfig) dnsf
 	}
 
 	log.Info("Starting ccTLD pivot",
-		svc1log.SafeParam("domain", config.Domain),
+		svc1log.SafeParam("domain", domain),
 		svc1log.SafeParam("base_label", baseLabel),
 		svc1log.SafeParam("input_apex", inputApex))
 
@@ -134,6 +138,10 @@ func PivotCcTLD(ctx context.Context, config dnsfern.DiscoverDnsCctldConfig) dnsf
 	var resolverIndex int64
 
 	for _, tld := range normalizedTLDs {
+		// Respect context cancellation before queuing new work.
+		if ctx.Err() != nil {
+			break
+		}
 		tld := tld // capture
 		wg.Add(1)
 		semaphore <- struct{}{}
@@ -177,7 +185,7 @@ func PivotCcTLD(ctx context.Context, config dnsfern.DiscoverDnsCctldConfig) dnsf
 	}
 
 	log.Info("Completed ccTLD pivot",
-		svc1log.SafeParam("domain", config.Domain),
+		svc1log.SafeParam("domain", domain),
 		svc1log.SafeParam("tld_count", len(normalizedTLDs)),
 		svc1log.SafeParam("resolved_count", len(candidates)),
 		svc1log.SafeParam("error_count", len(errs)))
@@ -246,12 +254,10 @@ func processCandidateTLD(
 
 	log := svc1log.FromContext(ctx)
 
-	// Wildcard detection: probe the candidate FQDN itself, then probe a random label.
-	wildcardDetected := detectCandidateWildcard(ctx, fqdn, resolver, config.Timeout)
-
-	// Per-call DNS deadline derived from config.Timeout so a slow registry
-	// resolver does not stall the whole sweep beyond what the operator
-	// expects. The CLI's --timeout flag documents these semantics.
+	// Main DNS lookup first — if the name doesn't resolve there's nothing
+	// to wildcard-detect against. We pass the resolved IPs into
+	// detectCandidateWildcard so it can reuse them as the base set without
+	// a redundant apex lookup.
 	dnsCtx, cancel := withDNSDeadline(ctx, config.Timeout)
 	defer cancel()
 	ips, err := resolver.LookupHost(dnsCtx, fqdn)
@@ -263,6 +269,10 @@ func processCandidateTLD(
 		// Transient error — record but skip.
 		return nil, "DNS resolution error for " + fqdn + ": " + err.Error()
 	}
+
+	// Wildcard detection using the already-resolved apex IPs avoids a
+	// redundant LookupHost call on the apex FQDN.
+	wildcardDetected := detectCandidateWildcard(ctx, fqdn, ips, resolver, config.Timeout)
 
 	// Separate A and AAAA.
 	var aRecords, aaaaRecords []string
@@ -311,19 +321,13 @@ func processCandidateTLD(
 }
 
 // detectCandidateWildcard checks whether the registry zone for this candidate
-// exhibits wildcard behavior by probing a random label under the candidate FQDN.
-func detectCandidateWildcard(ctx context.Context, fqdn string, resolver *net.Resolver, timeoutMs int) bool {
-	if resolver == nil {
+// exhibits wildcard behavior. baseIPs is the already-resolved IP set for fqdn,
+// passed in to avoid a redundant apex lookup.
+func detectCandidateWildcard(ctx context.Context, fqdn string, baseIPs []string, resolver *net.Resolver, timeoutMs int) bool {
+	if resolver == nil || len(baseIPs) == 0 {
 		return false
 	}
 
-	// First confirm the FQDN itself resolves (per-call deadline).
-	baseCtx, baseCancel := withDNSDeadline(ctx, timeoutMs)
-	defer baseCancel()
-	baseIPs, err := resolver.LookupHost(baseCtx, fqdn)
-	if err != nil || len(baseIPs) == 0 {
-		return false
-	}
 	baseSet := map[string]struct{}{}
 	for _, ip := range baseIPs {
 		baseSet[ip] = struct{}{}
