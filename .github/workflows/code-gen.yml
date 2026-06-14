@@ -21,7 +21,7 @@ jobs:
         run: npm install -g fern-api
 
       - name: Generate Fern Go Code
-        run: fern generate --group local
+        run: fern generate --group local --retry-rate-limited
         env:
           FERN_TOKEN: ${{ secrets.FERN_TOKEN }}
 
