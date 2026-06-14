@@ -172,7 +172,7 @@ func extractTLSInfo(rawURL string, timeout time.Duration, result *rawProbeResult
 	if err != nil {
 		return
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	tlsConn, ok := conn.(*tls.Conn)
 	if !ok {
