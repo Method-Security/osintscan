@@ -2,10 +2,12 @@ package dns
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"slices"
 	"strings"
+	"time"
 
 	common "github.com/Method-Security/osintscan/generated/go/common"
 	dnsfern "github.com/Method-Security/osintscan/generated/go/discover/dns"
@@ -14,23 +16,46 @@ import (
 	"github.com/projectdiscovery/dnsx/libs/dnsx"
 )
 
+// defaultTCPResolvers are well-known public resolvers used when TCP is forced but
+// no explicit resolvers are supplied (dnsx's defaults are UDP-only).
+var defaultTCPResolvers = []string{"1.1.1.1:53", "8.8.8.8:53", "9.9.9.9:53"}
+
+// defaultDNSTimeoutSeconds mirrors the Fern schema default for the per-query DNS
+// timeout, applied when a caller omits it so the blocking resolver call is bounded.
+const defaultDNSTimeoutSeconds = 10
+
 // normalizeDnsxResolvers converts resolver addresses (e.g. "1.1.1.1:53") to the
-// format expected by the dnsx library ("udp:1.1.1.1:53").
-func normalizeDnsxResolvers(resolvers []string) []string {
+// format expected by the dnsx library ("udp:1.1.1.1:53" or "tcp:1.1.1.1:53").
+// When useTCP is set and no resolvers are supplied, a TCP-prefixed default set is
+// returned so the transport override still takes effect.
+func normalizeDnsxResolvers(resolvers []string, useTCP bool) []string {
+	proto := "udp:"
+	if useTCP {
+		proto = "tcp:"
+	}
 	if len(resolvers) == 0 {
-		return nil
+		if !useTCP {
+			return nil
+		}
+		resolvers = defaultTCPResolvers
 	}
 	normalized := make([]string, 0, len(resolvers))
 	for _, r := range resolvers {
-		if strings.HasPrefix(r, "udp:") || strings.HasPrefix(r, "tcp:") {
+		hasPrefix := strings.HasPrefix(r, "udp:") || strings.HasPrefix(r, "tcp:")
+		// Respect an explicit per-resolver transport only when not globally
+		// forcing TCP. When useTCP is set, the override must win even over a
+		// resolver already prefixed with udp:.
+		if hasPrefix && !useTCP {
 			normalized = append(normalized, r)
 			continue
 		}
+		r = strings.TrimPrefix(r, "udp:")
+		r = strings.TrimPrefix(r, "tcp:")
 		// Add default port if missing
 		if _, _, err := net.SplitHostPort(r); err != nil {
 			r = net.JoinHostPort(r, "53")
 		}
-		normalized = append(normalized, "udp:"+r)
+		normalized = append(normalized, proto+r)
 	}
 	return normalized
 }
@@ -67,7 +92,8 @@ func filterDNSRecordsByType(records []*common.DnsRecord, recordTypes []common.Dn
 }
 
 // getDNSRecords queries DNS for the specified record types for a domain and returns a DnsRecords struct.
-func getDNSRecords(ctx context.Context, domain string, questionTypes []uint16, dnsResolvers []string) ([]*common.DnsRecord, error) {
+// When timeoutSeconds > 0, the (blocking) resolver query is bounded by that wall-clock deadline.
+func getDNSRecords(ctx context.Context, domain string, questionTypes []uint16, dnsResolvers []string, timeoutSeconds int) ([]*common.DnsRecord, error) {
 	log := svc1log.FromContext(ctx)
 
 	log.Debug("Querying DNS records",
@@ -86,6 +112,54 @@ func getDNSRecords(ctx context.Context, domain string, questionTypes []uint16, d
 			svc1log.SafeParam("error", err.Error()))
 		return []*common.DnsRecord{}, err
 	}
+
+	// dnsx exposes no timeout option, so bound the blocking query with a context
+	// deadline. The detached goroutine returns once the resolver's own retry budget
+	// is exhausted, so it cannot leak indefinitely.
+	if timeoutSeconds <= 0 {
+		return collectDNSRecords(ctx, client, domain, questionTypes)
+	}
+
+	queryCtx, cancel := context.WithTimeout(ctx, time.Duration(timeoutSeconds)*time.Second)
+	defer cancel()
+
+	type recordsResult struct {
+		records []*common.DnsRecord
+		err     error
+	}
+	resultCh := make(chan recordsResult, 1)
+	go func() {
+		records, queryErr := collectDNSRecords(ctx, client, domain, questionTypes)
+		resultCh <- recordsResult{records: records, err: queryErr}
+	}()
+
+	select {
+	case <-queryCtx.Done():
+		// The resolver may have completed in the same scheduling window the
+		// context fired; prefer an already-available result over reporting a
+		// failure that didn't actually happen.
+		select {
+		case result := <-resultCh:
+			return result.records, result.err
+		default:
+		}
+		// Distinguish a parent-context cancellation (e.g. CLI interrupt) from an
+		// actual resolver timeout so the error isn't misattributed.
+		if errors.Is(queryCtx.Err(), context.Canceled) {
+			return []*common.DnsRecord{}, fmt.Errorf("DNS query for %s canceled: %w", domain, queryCtx.Err())
+		}
+		log.Warn("DNS query timed out",
+			svc1log.SafeParam("domain", domain),
+			svc1log.SafeParam("timeoutSeconds", timeoutSeconds))
+		return []*common.DnsRecord{}, fmt.Errorf("DNS query for %s timed out after %d seconds", domain, timeoutSeconds)
+	case result := <-resultCh:
+		return result.records, result.err
+	}
+}
+
+// collectDNSRecords runs the resolver query and maps the raw response into DnsRecord structs.
+func collectDNSRecords(ctx context.Context, client *dnsx.DNSX, domain string, questionTypes []uint16) ([]*common.DnsRecord, error) {
+	log := svc1log.FromContext(ctx)
 
 	dnsRecords := []*common.DnsRecord{}
 
@@ -167,23 +241,32 @@ func getDNSRecords(ctx context.Context, domain string, questionTypes []uint16, d
 // Returns a report containing all records and any non-fatal errors encountered.
 func DiscoverDomainDNSRecords(ctx context.Context, config dnsfern.DiscoverDnsRecordsConfig) *dnsfern.DiscoverDnsRecordsReport {
 	log := svc1log.FromContext(ctx)
-	errors := []string{}
+	errs := []string{}
 
 	log.Info("Starting DNS records discovery",
 		svc1log.SafeParam("domain", config.Domain),
 		svc1log.SafeParam("requested_record_types", len(config.RecordTypes)))
 
-	// Normalize resolver format for dnsx (requires "udp:host:port" prefix)
-	resolvers := normalizeDnsxResolvers(config.DnsResolvers)
+	useTCP := config.UseTcp != nil && *config.UseTcp
+	// The Fern schema documents a 10s default; apply it when the caller omits a
+	// timeout so the blocking resolver query is always bounded (an explicit 0 from
+	// a caller still means "no deadline").
+	timeoutSeconds := defaultDNSTimeoutSeconds
+	if config.Timeout != nil {
+		timeoutSeconds = *config.Timeout
+	}
+
+	// Normalize resolver format for dnsx (requires "udp:host:port" / "tcp:host:port" prefix)
+	resolvers := normalizeDnsxResolvers(config.DnsResolvers, useTCP)
 
 	// Get all the DNS records (query all types, then filter)
 	questionTypes := []uint16{dns.TypeA, dns.TypeAAAA, dns.TypeCAA, dns.TypeCNAME, dns.TypeMX, dns.TypeNS, dns.TypePTR, dns.TypeSOA, dns.TypeSRV, dns.TypeTXT}
-	allDNSRecords, err := getDNSRecords(ctx, config.Domain, questionTypes, resolvers)
+	allDNSRecords, err := getDNSRecords(ctx, config.Domain, questionTypes, resolvers, timeoutSeconds)
 	if err != nil {
 		log.Warn("Failed to get DNS records",
 			svc1log.SafeParam("domain", config.Domain),
 			svc1log.SafeParam("error", err.Error()))
-		errors = append(errors, err.Error())
+		errs = append(errs, err.Error())
 	}
 
 	recordTypes := []common.DnsRecordType{}
@@ -195,7 +278,7 @@ func DiscoverDomainDNSRecords(ctx context.Context, config dnsfern.DiscoverDnsRec
 				svc1log.SafeParam("domain", config.Domain),
 				svc1log.SafeParam("record_type", recordType),
 				svc1log.SafeParam("error", err.Error()))
-			errors = append(errors, err.Error())
+			errs = append(errs, err.Error())
 			continue
 		}
 		recordTypes = append(recordTypes, recordTypeEnum)
@@ -224,12 +307,12 @@ func DiscoverDomainDNSRecords(ctx context.Context, config dnsfern.DiscoverDnsRec
 		dmarcDomain := "_dmarc." + config.Domain
 		log.Debug("Querying DMARC records", svc1log.SafeParam("dmarc_domain", dmarcDomain))
 		var dmarcErr error
-		dmarcRecords, dmarcErr = getDNSRecords(ctx, dmarcDomain, []uint16{dns.TypeTXT}, resolvers)
+		dmarcRecords, dmarcErr = getDNSRecords(ctx, dmarcDomain, []uint16{dns.TypeTXT}, resolvers, timeoutSeconds)
 		if dmarcErr != nil {
 			log.Warn("Failed to get DMARC records",
 				svc1log.SafeParam("dmarc_domain", dmarcDomain),
 				svc1log.SafeParam("error", dmarcErr.Error()))
-			errors = append(errors, dmarcErr.Error())
+			errs = append(errs, dmarcErr.Error())
 		} else {
 			log.Debug("Retrieved DMARC records",
 				svc1log.SafeParam("dmarc_domain", dmarcDomain),
@@ -248,13 +331,13 @@ func DiscoverDomainDNSRecords(ctx context.Context, config dnsfern.DiscoverDnsRec
 
 		for _, selector := range selectors {
 			dkimDomain := selector + "._domainkey." + config.Domain
-			dkimRecordForSelector, dkimErr := getDNSRecords(ctx, dkimDomain, []uint16{dns.TypeTXT}, resolvers)
+			dkimRecordForSelector, dkimErr := getDNSRecords(ctx, dkimDomain, []uint16{dns.TypeTXT}, resolvers, timeoutSeconds)
 			if dkimErr != nil {
 				log.Debug("Failed to get DKIM records for selector",
 					svc1log.SafeParam("selector", selector),
 					svc1log.SafeParam("dkim_domain", dkimDomain),
 					svc1log.SafeParam("error", dkimErr.Error()))
-				errors = append(errors, dkimErr.Error())
+				errs = append(errs, dkimErr.Error())
 			} else if len(dkimRecordForSelector) > 0 {
 				log.Debug("Retrieved DKIM records for selector",
 					svc1log.SafeParam("selector", selector),
@@ -273,7 +356,7 @@ func DiscoverDomainDNSRecords(ctx context.Context, config dnsfern.DiscoverDnsRec
 			DmarcRecords: dmarcRecords,
 			DkimRecords:  dkimRecords,
 		},
-		Errors: errors,
+		Errors: errs,
 	}
 
 	log.Info("Completed DNS records discovery",
@@ -281,7 +364,7 @@ func DiscoverDomainDNSRecords(ctx context.Context, config dnsfern.DiscoverDnsRec
 		svc1log.SafeParam("dns_records", len(dnsRecords)),
 		svc1log.SafeParam("dmarc_records", len(dmarcRecords)),
 		svc1log.SafeParam("dkim_records", len(dkimRecords)),
-		svc1log.SafeParam("error_count", len(errors)))
+		svc1log.SafeParam("error_count", len(errs)))
 
 	return &report
 }

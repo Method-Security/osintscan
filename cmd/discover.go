@@ -164,8 +164,19 @@ func (a *OsintScan) InitDiscoverCommand() {
 				return
 			}
 
+			useTCP, err := cmd.Flags().GetBool("use-tcp")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			timeout, err := cmd.Flags().GetInt("timeout")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
 			// Create config
-			config := getDiscoverDNSRecordsConfig(domain, recordTypes, dnsResolvers)
+			config := getDiscoverDNSRecordsConfig(domain, recordTypes, dnsResolvers, useTCP, timeout)
 
 			// Create report
 			report := dns.DiscoverDomainDNSRecords(cmd.Context(), config)
@@ -177,6 +188,8 @@ func (a *OsintScan) InitDiscoverCommand() {
 	discoverDNSRecordsCmd.Flags().String("domain", "", "The domain name to query for DNS records")
 	discoverDNSRecordsCmd.Flags().StringSlice("record-types", []string{"ALL"}, "Comma-separated list of DNS record types to query (A, AAAA, CNAME, MX, NS, SOA, TXT, PTR, SRV, ALL)")
 	discoverDNSRecordsCmd.Flags().StringSlice("dns-resolvers", []string{}, "DNS resolvers to use for record lookups (e.g. 10.0.0.1:53).")
+	discoverDNSRecordsCmd.Flags().Bool("use-tcp", false, "Query DNS resolvers over TCP instead of UDP")
+	discoverDNSRecordsCmd.Flags().Int("timeout", 10, "Per-query timeout in seconds")
 
 	// Mark Required Flags
 	_ = discoverDNSRecordsCmd.MarkFlagRequired("domain")
@@ -832,12 +845,20 @@ func getDiscoverDNSCertsConfig(domain string) dnsfern.DiscoverDnsCertsConfig {
 }
 
 // getDiscoverDNSRecordsConfig creates and returns a configuration for DNS records discovery
-func getDiscoverDNSRecordsConfig(domain string, recordTypes []string, dnsResolvers []string) dnsfern.DiscoverDnsRecordsConfig {
-	return dnsfern.DiscoverDnsRecordsConfig{
+func getDiscoverDNSRecordsConfig(domain string, recordTypes []string, dnsResolvers []string, useTCP bool, timeout int) dnsfern.DiscoverDnsRecordsConfig {
+	config := dnsfern.DiscoverDnsRecordsConfig{
 		Domain:       domain,
 		RecordTypes:  recordTypes,
 		DnsResolvers: dnsResolvers,
 	}
+	if useTCP {
+		config.UseTcp = &useTCP
+	}
+	// Always forward the flag value (default 10) so an explicit --timeout=0 is
+	// preserved as "no deadline"; only a genuinely omitted timeout (library/MCP
+	// callers leaving it nil) falls back to the schema default.
+	config.Timeout = &timeout
+	return config
 }
 
 // getDiscoverDNSForwardConfig creates and returns a configuration for forward DNS lookup
