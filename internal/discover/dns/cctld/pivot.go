@@ -1,7 +1,6 @@
 // Package cctld implements ccTLD pivot discovery: given an input domain it
 // constructs <base>.<tld> apex candidates for each ccTLD in the supplied list
-// or preset, resolves DNS records, optionally probes HTTP/HTTPS, and classifies
-// each resolved candidate.
+// or preset, resolves DNS records, and returns structured per-candidate results.
 package cctld
 
 import (
@@ -26,9 +25,9 @@ import (
 
 // dnsCallTimeout derives the per-DNS-call deadline from config.Timeout
 // (which the CLI documents as the per-request timeout in milliseconds
-// for DNS and HTTP probes). Returns 0 if the caller passed a
-// nonpositive value, in which case callers should fall through to the
-// parent context with no extra deadline.
+// for DNS calls). Returns 0 if the caller passed a nonpositive value,
+// in which case callers should fall through to the parent context with
+// no extra deadline.
 func dnsCallTimeout(timeoutMs int) time.Duration {
 	if timeoutMs <= 0 {
 		return 0
@@ -119,25 +118,6 @@ func PivotCcTLD(ctx context.Context, config dnsfern.DiscoverDnsCctldConfig) dnsf
 	// Build resolver pool.
 	resolvers := utils.GetResolvers(config.DnsResolvers, log)
 
-	// Optionally fetch baseline body. Only set `hasBaseline` when we actually
-	// retrieved a non-empty body — if FetchBody fails (DNS, connect refused,
-	// 5xx, empty 200) we want classification to fall through to the
-	// no-baseline cert/title heuristic rather than score every candidate
-	// against an empty token set (which produces similarity=0 across the
-	// board and misclassifies legitimate matches as UNRELATED).
-	baselineBody := ""
-	hasBaseline := false
-	if config.BaselineUrl != nil && *config.BaselineUrl != "" {
-		log.Info("Fetching baseline URL", svc1log.SafeParam("url", *config.BaselineUrl))
-		baselineBody = FetchBody(ctx, *config.BaselineUrl, config.Timeout)
-		if baselineBody != "" {
-			hasBaseline = true
-		} else {
-			log.Warn("Baseline fetch returned empty body; falling back to no-baseline classification",
-				svc1log.SafeParam("baseline_url", *config.BaselineUrl))
-		}
-	}
-
 	// Fan-out over TLDs.
 	type result struct {
 		candidate *dnsfern.DiscoverDnsCctldCandidate
@@ -168,7 +148,7 @@ func PivotCcTLD(ctx context.Context, config dnsfern.DiscoverDnsCctldConfig) dnsf
 				idx := atomic.AddInt64(&resolverIndex, 1) - 1
 				resolver = resolvers[idx%int64(len(resolvers))]
 			}
-			candidate, candidateErr := processCandidateTLD(ctx, baseLabel, tld, inputApex, config, resolver, baselineBody, hasBaseline)
+			candidate, candidateErr := processCandidateTLD(ctx, baseLabel, tld, inputApex, config, resolver)
 			r := result{}
 			if candidateErr != "" {
 				r.err = candidateErr
@@ -243,7 +223,7 @@ func resolveTLDs(config dnsfern.DiscoverDnsCctldConfig) ([]string, []string) {
 	return tlds, errs
 }
 
-// processCandidateTLD resolves and classifies a single <base>.<tld> candidate.
+// processCandidateTLD resolves a single <base>.<tld> candidate.
 // Returns nil candidate (and possibly an error string) if the candidate does not resolve.
 func processCandidateTLD(
 	ctx context.Context,
@@ -252,8 +232,6 @@ func processCandidateTLD(
 	inputApex string,
 	config dnsfern.DiscoverDnsCctldConfig,
 	resolver *net.Resolver,
-	baselineBody string,
-	hasBaseline bool,
 ) (*dnsfern.DiscoverDnsCctldCandidate, string) {
 	fqdn := baseLabel + "." + tld
 
@@ -310,88 +288,10 @@ func processCandidateTLD(
 	// Resolve MX records (with the same per-call deadline).
 	mxRecords := lookupMX(ctx, fqdn, resolver, config.Timeout)
 
-	// Web probe.
-	var probeResult ProbeResult
-	if config.ProbeWeb {
-		probeResult = ProbeWeb(ctx, fqdn, config.Timeout)
-	}
-
-	// Similarity to baseline. Skip when the probe followed redirects to a
-	// different host — the body / title we tokenized belongs to the
-	// redirect target, not the candidate. A regional subsidiary that
-	// redirects to the global site would otherwise score 1.0 against the
-	// baseline and look like impersonation.
-	var similarityPtr *float64
-	if hasBaseline && probeResult.Body != "" && !probeResult.RedirectedOffCandidate {
-		score := SimilarityScore(baselineBody, probeResult.Body)
-		similarityPtr = &score
-	}
-
-	// Determine the effective HTTP-ish status for classification. HTTPS is
-	// preferred — many candidates redirect bare HTTP to HTTPS or only ever
-	// serve TLS, and the body/title we tokenized lives on whichever probe
-	// actually responded. Falling back to plain HTTPStatus here previously
-	// caused HTTPS-only candidates to look like "no response" to the
-	// classifier and never trigger the parked / tiny-body heuristics.
-	httpStatus := 0
-	switch {
-	case probeResult.HTTPSStatus != nil:
-		httpStatus = *probeResult.HTTPSStatus
-	case probeResult.HTTPStatus != nil:
-		httpStatus = *probeResult.HTTPStatus
-	}
-
-	// Classification.
-	certSubjectStr := ""
-	if probeResult.CertSubject != nil {
-		certSubjectStr = *probeResult.CertSubject
-	}
-	// When the web probe followed redirects to a different host, the
-	// title and body we captured belong to the redirect target — NOT to
-	// the candidate. Zero them out before classifying so the title-based
-	// impersonation heuristic and the tiny-body parking heuristic don't
-	// fire on content that isn't the candidate's. The cert dial happens
-	// against the original candidate host, so CertSubject / CertSANs
-	// remain usable.
-	titleStr := ""
-	bodyLen := 0
-	if !probeResult.RedirectedOffCandidate {
-		if probeResult.Title != nil {
-			titleStr = *probeResult.Title
-		}
-		bodyLen = len(probeResult.Body)
-	}
-	similarityVal := -1.0
-	if similarityPtr != nil {
-		similarityVal = *similarityPtr
-	}
-	classIn := ClassificationInput{
-		RegistrableLabel:     baseLabel,
-		CertSubject:          certSubjectStr,
-		CertSANs:             probeResult.CertSANs,
-		SimilarityToBaseline: similarityVal,
-		HasBaseline:          hasBaseline && similarityPtr != nil,
-		Title:                titleStr,
-		HTTPStatus:           httpStatus,
-		BodyLen:              bodyLen,
-		NSRecords:            nsRecords,
-	}
-	classificationStr := Classify(classIn)
-	classification, _ := dnsfern.NewDiscoverDnsCctldClassificationFromString(classificationStr)
-
 	candidate := &dnsfern.DiscoverDnsCctldCandidate{
-		Tld:                  tld,
-		Fqdn:                 fqdn,
-		Wildcard:             wildcardDetected,
-		Classification:       classification,
-		SimilarityToBaseline: similarityPtr,
-		CertSubject:          probeResult.CertSubject,
-		CertSans:             probeResult.CertSANs,
-		FinalUrl:             probeResult.FinalURL,
-		Title:                probeResult.Title,
-		ServerHeader:         probeResult.ServerHeader,
-		HttpStatus:           probeResult.HTTPStatus,
-		HttpsStatus:          probeResult.HTTPSStatus,
+		Tld:      tld,
+		Fqdn:     fqdn,
+		Wildcard: wildcardDetected,
 	}
 
 	if len(aRecords) > 0 {

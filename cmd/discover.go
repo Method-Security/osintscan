@@ -584,7 +584,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 	discoverDNSCctldCmd := &cobra.Command{
 		Use:   "cctld",
 		Short: "Pivot across ccTLDs to discover lookalike apex domains",
-		Long:  `Permute <base>.<tld> candidates across a list or preset of country-code TLDs to discover lookalike or alt-region apex domains. Resolves DNS records and optionally probes HTTP/HTTPS for each candidate.`,
+		Long:  `Permute <base>.<tld> candidates across a list or preset of country-code TLDs to discover lookalike or alt-region apex domains. Resolves DNS (A, AAAA, NS, MX) records for each candidate.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			domain, err := cmd.Flags().GetString("domain")
 			if err != nil {
@@ -606,18 +606,6 @@ func (a *OsintScan) InitDiscoverCommand() {
 
 			if len(cctlds) == 0 && cctldsPreset == "" {
 				a.OutputSignal.AddError(fmt.Errorf("either --cctlds or --cctlds-preset must be provided"))
-				return
-			}
-
-			baselineURL, err := cmd.Flags().GetString("baseline-url")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-
-			probeWeb, err := cmd.Flags().GetBool("probe-web")
-			if err != nil {
-				a.OutputSignal.AddError(err)
 				return
 			}
 
@@ -646,7 +634,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 				}
 			}
 
-			config, err := getDiscoverDNSCctldConfig(domain, cctlds, cctldsPreset, baselineURL, probeWeb, threads, timeout, dnsResolvers)
+			config, err := getDiscoverDNSCctldConfig(domain, cctlds, cctldsPreset, threads, timeout, dnsResolvers)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -661,10 +649,8 @@ func (a *OsintScan) InitDiscoverCommand() {
 	discoverDNSCctldCmd.Flags().String("domain", "", "The domain name to pivot ccTLDs from (e.g. acme.com)")
 	discoverDNSCctldCmd.Flags().StringSlice("cctlds", []string{}, "Explicit list of ccTLD labels to test (e.g. ru,cn,de)")
 	discoverDNSCctldCmd.Flags().String("cctlds-preset", "", "Named preset of ccTLDs: APT_RELEVANT, TOP50, EU27, ASEAN, ALL")
-	discoverDNSCctldCmd.Flags().String("baseline-url", "", "URL to fetch as baseline for content similarity scoring (e.g. https://acme.com)")
-	discoverDNSCctldCmd.Flags().Bool("probe-web", true, "Probe HTTP/HTTPS for each resolved candidate")
-	discoverDNSCctldCmd.Flags().Int("threads", 50, "Number of concurrent probe goroutines")
-	discoverDNSCctldCmd.Flags().Int("timeout", 5000, "Per-request timeout in milliseconds for DNS and HTTP probes")
+	discoverDNSCctldCmd.Flags().Int("threads", 50, "Number of concurrent DNS probe goroutines")
+	discoverDNSCctldCmd.Flags().Int("timeout", 5000, "Per-request timeout in milliseconds for DNS probes")
 	discoverDNSCctldCmd.Flags().StringSlice("dns-resolvers", []string{}, "Custom DNS resolvers (e.g. 1.1.1.1,8.8.8.8)")
 
 	// Mark Required Flags
@@ -1067,10 +1053,9 @@ func getDiscoverIPDomainASNConfig(ips []string, cidr string, dnsResolvers []stri
 }
 
 // getDiscoverDNSCctldConfig creates and returns a configuration for ccTLD pivot discovery.
-func getDiscoverDNSCctldConfig(domain string, cctlds []string, cctldsPreset string, baselineURL string, probeWeb bool, threads int, timeout int, dnsResolvers []string) (dnsfern.DiscoverDnsCctldConfig, error) {
+func getDiscoverDNSCctldConfig(domain string, cctlds []string, cctldsPreset string, threads int, timeout int, dnsResolvers []string) (dnsfern.DiscoverDnsCctldConfig, error) {
 	config := dnsfern.DiscoverDnsCctldConfig{
 		Domain:       domain,
-		ProbeWeb:     probeWeb,
 		Threads:      max(threads, 1),
 		Timeout:      timeout,
 		DnsResolvers: dnsResolvers,
@@ -1086,10 +1071,6 @@ func getDiscoverDNSCctldConfig(domain string, cctlds []string, cctldsPreset stri
 			return dnsfern.DiscoverDnsCctldConfig{}, fmt.Errorf("invalid --cctlds-preset value %q: %w", cctldsPreset, err)
 		}
 		config.CctldsPreset = &preset
-	}
-
-	if baselineURL != "" {
-		config.BaselineUrl = &baselineURL
 	}
 
 	return config, nil

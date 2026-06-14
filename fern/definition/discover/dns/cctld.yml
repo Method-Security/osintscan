@@ -1,12 +1,5 @@
 types:
 # Enums
-  DiscoverDnsCctldClassification:
-    enum:
-      - LIKELY_LEGIT_ALT_REGION
-      - LIKELY_IMPERSONATION
-      - PARKED
-      - UNRELATED
-
   DiscoverDnsCctldPreset:
     enum:
       - APT_RELEVANT
@@ -25,15 +18,6 @@ types:
       ns: optional<list<string>>
       mx: optional<list<string>>
       wildcard: boolean
-      httpStatus: optional<integer>
-      httpsStatus: optional<integer>
-      finalUrl: optional<string>
-      title: optional<string>
-      serverHeader: optional<string>
-      certSubject: optional<string>
-      certSans: optional<list<string>>
-      similarityToBaseline: optional<double>
-      classification: DiscoverDnsCctldClassification
 
 # Config
   DiscoverDnsCctldConfig:
@@ -41,8 +25,6 @@ types:
       domain: string
       cctlds: optional<list<string>>
       cctldsPreset: optional<DiscoverDnsCctldPreset>
-      baselineUrl: optional<string>
-      probeWeb: boolean
       threads: integer
       timeout: integer
       dnsResolvers: optional<list<string>>
