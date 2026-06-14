@@ -357,12 +357,10 @@ func (a *OsintScan) InitDiscoverCommand() {
 			}
 			allSubdomains := append(subdomains, wordlistSubdomains...)
 
-			// We no longer fail when the wordlist is empty: the ccTLD pivot
-			// (which now runs as part of the active flow) provides a default
-			// candidate set even if the bruteforce wordlist is empty. Empty
-			// subdomain output is a valid outcome — better than a hard error
-			// for an operator who explicitly opted out of wordlist brute force
-			// to do only ccTLD discovery.
+			if len(allSubdomains) == 0 {
+				a.OutputSignal.AddError(fmt.Errorf("no subdomains provided"))
+				return
+			}
 			threads, err := cmd.Flags().GetInt("threads")
 			if err != nil {
 				a.OutputSignal.AddError(err)
@@ -400,12 +398,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 					return
 				}
 			}
-			cctlds, err := cmd.Flags().GetStringSlice("cctlds")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-			config := getDiscoverDNSActiveSubdomainConfig(domain, wordlistSizeEnum, &wordlistFile, threads, maxDepth, timeout, sleep, wildcardChecks, dnsResolvers, cctlds)
+			config := getDiscoverDNSActiveSubdomainConfig(domain, wordlistSizeEnum, &wordlistFile, threads, maxDepth, timeout, sleep, wildcardChecks, dnsResolvers)
 
 			report, err := subdomain.GetDomainSubdomainsActive(cmd.Context(), allSubdomains, config)
 			if err != nil {
@@ -429,7 +422,6 @@ func (a *OsintScan) InitDiscoverCommand() {
 	discoverDNSSubdomainActiveCmd.Flags().Int("sleep", 0, "Sleep time in milliseconds between requests to avoid rate limiting")
 	discoverDNSSubdomainActiveCmd.Flags().Int("wildcard-checks", 5, "Number of random subdomain probes used to detect wildcard DNS records")
 	discoverDNSSubdomainActiveCmd.Flags().StringSlice("dns-resolvers", []string{}, "Custom DNS resolvers (e.g. 10.0.0.1).")
-	discoverDNSSubdomainActiveCmd.Flags().StringSlice("cctlds", []string{}, "Country-code TLDs to test for ccTLD pivots of the domain's registrable label (e.g. ru cn xn--p1ai). Each entry is the bare TLD label without a leading dot; Unicode and punycode are both accepted and IDN-normalized at lookup time. When empty (the default), a curated built-in list is used.")
 
 	// Mark Required Flags
 	_ = discoverDNSSubdomainActiveCmd.MarkFlagRequired("domain")
@@ -883,7 +875,7 @@ func getDiscoverDNSReverseConfig(ips []string, cidr string, dnsResolvers []strin
 }
 
 // getDiscoverDNSActiveSubdomainConfig creates and returns a configuration for active subdomain discovery
-func getDiscoverDNSActiveSubdomainConfig(domain string, wordlistSize *dnsfern.WordlistSize, wordlistFile *string, threads, maxDepth, timeout, sleep, wildcardChecks int, dnsResolvers []string, cctlds []string) dnsfern.DiscoverDnsSubdomainConfig {
+func getDiscoverDNSActiveSubdomainConfig(domain string, wordlistSize *dnsfern.WordlistSize, wordlistFile *string, threads, maxDepth, timeout, sleep, wildcardChecks int, dnsResolvers []string) dnsfern.DiscoverDnsSubdomainConfig {
 	return dnsfern.DiscoverDnsSubdomainConfig{
 		DiscoveryType: strings.ToLower(string(dnsfern.DiscoverDnsSubdomainTypeActive)),
 		Active: &dnsfern.DiscoverDnsSubdomainActiveConfig{
@@ -896,7 +888,6 @@ func getDiscoverDNSActiveSubdomainConfig(domain string, wordlistSize *dnsfern.Wo
 			Sleep:          sleep,
 			WildcardChecks: wildcardChecks,
 			DnsResolvers:   dnsResolvers,
-			Cctlds:         cctlds,
 		},
 	}
 }

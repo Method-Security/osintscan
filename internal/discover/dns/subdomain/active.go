@@ -12,8 +12,6 @@ import (
 
 	// Generated
 	dnsfern "github.com/Method-Security/osintscan/generated/go/discover/dns"
-	// Internal
-	"github.com/Method-Security/osintscan/internal/discover/dns/subdomain/cctld"
 	// Utils
 	"github.com/Method-Security/osintscan/utils"
 	// External
@@ -23,60 +21,14 @@ import (
 
 // GetDomainSubdomainsActive performs active (bruteforce) subdomain discovery for a given domain.
 // Returns a report containing all discovered subdomains and any errors encountered.
-//
-// In addition to the wordlist-driven bruteforce, this also runs a ccTLD pivot
-// against the input domain's registrable label (e.g. for `acme.com`, tests
-// `acme.ru`, `acme.cn`, ...). The ccTLD list defaults to a curated APT- and
-// economy-relevant set; callers can override it via activeConfig.Cctlds. Any
-// resolved ccTLD candidates are appended to the same `subdomains` output so
-// the downstream processor handles them as plain Fqdn objects.
 func GetDomainSubdomainsActive(ctx context.Context, subdomains []string, config dnsfern.DiscoverDnsSubdomainConfig) (dnsfern.DiscoverDnsSubdomainReport, error) {
 	activeConfig := config.GetActive()
 	errors := []string{}
 
-	// Single shared timeout budget for the entire active flow (wordlist
-	// bruteforce + ccTLD pivot). The CLI's --timeout flag is documented as
-	// a wall-clock cap on subdomain discovery as a whole, not per-phase,
-	// so we set up the timeout context once here and pass timeout=0 into
-	// each sub-operation so they skip their own internal WithTimeout. This
-	// prevents a 2x worst-case (e.g. --timeout 65 producing a 130-minute
-	// run when both phases hit their per-phase ceilings).
-	if activeConfig.Timeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, time.Duration(activeConfig.Timeout)*time.Minute)
-		defer cancel()
-	}
-
-	// Run the active subdomain discovery. Pass timeout=0 to share the
-	// budget established above.
-	subdomains, err := getSubdomainsActive(ctx, activeConfig.Domain, subdomains, activeConfig.Threads, activeConfig.MaxDepth, 0, activeConfig.Sleep, activeConfig.WildcardChecks, activeConfig.DnsResolvers)
+	subdomains, err := getSubdomainsActive(ctx, activeConfig.Domain, subdomains, activeConfig.Threads, activeConfig.MaxDepth, activeConfig.Timeout, activeConfig.Sleep, activeConfig.WildcardChecks, activeConfig.DnsResolvers)
 	if err != nil {
 		errors = append(errors, err.Error())
 	}
-
-	// Run ccTLD pivot. Independent of the wordlist-driven flow: a wildcard
-	// on the input domain disables brute-force but does NOT affect ccTLD
-	// pivot since each ccTLD candidate is queried at the apex of its own
-	// registry zone, not under the input domain. Same timeout=0 convention
-	// — the deadline lives on the shared ctx.
-	cctldMatches, cctldErr := cctld.GetCctldPivots(
-		ctx,
-		activeConfig.Domain,
-		activeConfig.Cctlds,
-		activeConfig.Threads,
-		0,
-		activeConfig.DnsResolvers,
-	)
-	if cctldErr != nil {
-		errors = append(errors, cctldErr.Error())
-	}
-	subdomains = appendUniqueSubdomains(subdomains, cctldMatches)
-	// Re-sort the merged list. getSubdomainsActive returns subdomains
-	// sorted, but appendUniqueSubdomains tacks ccTLD matches on in the
-	// order they arrived (which is goroutine-completion order from the
-	// pivot fan-out). A final sort keeps the report output deterministic
-	// and consistent with the pre-ccTLD active-discovery contract.
-	sort.Strings(subdomains)
 
 	result := dnsfern.DiscoverDnsSubdomainResult{
 		Subdomains: subdomains,
@@ -89,28 +41,6 @@ func GetDomainSubdomainsActive(ctx context.Context, subdomains []string, config 
 	}
 
 	return report, nil
-}
-
-// appendUniqueSubdomains appends `extra` entries to `base`, skipping any
-// that are already present (case-insensitive). Used to merge ccTLD pivot
-// matches into the existing subdomain list without producing duplicates.
-func appendUniqueSubdomains(base []string, extra []string) []string {
-	if len(extra) == 0 {
-		return base
-	}
-	seen := make(map[string]struct{}, len(base)+len(extra))
-	for _, s := range base {
-		seen[strings.ToLower(s)] = struct{}{}
-	}
-	for _, s := range extra {
-		key := strings.ToLower(s)
-		if _, ok := seen[key]; ok {
-			continue
-		}
-		seen[key] = struct{}{}
-		base = append(base, s)
-	}
-	return base
 }
 
 // getSubdomainsActive performs recursive bruteforce subdomain enumeration with concurrency and wildcard detection.
