@@ -854,9 +854,10 @@ func getDiscoverDNSRecordsConfig(domain string, recordTypes []string, dnsResolve
 	if useTCP {
 		config.UseTcp = &useTCP
 	}
-	if timeout > 0 {
-		config.Timeout = &timeout
-	}
+	// Always forward the flag value (default 10) so an explicit --timeout=0 is
+	// preserved as "no deadline"; only a genuinely omitted timeout (library/MCP
+	// callers leaving it nil) falls back to the schema default.
+	config.Timeout = &timeout
 	return config
 }
 
