@@ -47,6 +47,38 @@ func TestClassify_LikelyLegitAltRegion_WithBaseline(t *testing.T) {
 	assert.Equal(t, "LIKELY_LEGIT_ALT_REGION", Classify(in))
 }
 
+func TestClassify_CertMatchBeatsLowSimilarity(t *testing.T) {
+	// Cert match should classify as LIKELY_LEGIT_ALT_REGION even when the
+	// content is region-localized enough that similarity to the global
+	// baseline is below the old 0.7 threshold.
+	in := ClassificationInput{
+		RegistrableLabel:     "acme",
+		CertSubject:          "CN=acme.de",
+		CertSANs:             []string{"acme.de"},
+		SimilarityToBaseline: 0.2,
+		HasBaseline:          true,
+		Title:                "Acme Deutschland",
+		HTTPStatus:           200,
+		BodyLen:              30000,
+	}
+	assert.Equal(t, "LIKELY_LEGIT_ALT_REGION", Classify(in))
+}
+
+func TestClassify_CertMatchBeatsTinyBody(t *testing.T) {
+	// A short legitimate landing page (no marker title, body < 2048)
+	// should NOT be PARKED if the cert matches the input brand.
+	in := ClassificationInput{
+		RegistrableLabel: "acme",
+		CertSubject:      "CN=acme.sg",
+		CertSANs:         []string{"acme.sg"},
+		HTTPStatus:       200,
+		BodyLen:          800,
+		Title:            "",
+		HasBaseline:      false,
+	}
+	assert.Equal(t, "LIKELY_LEGIT_ALT_REGION", Classify(in))
+}
+
 func TestClassify_LikelyImpersonation_WithBaseline(t *testing.T) {
 	in := ClassificationInput{
 		RegistrableLabel:     "acme",
@@ -81,6 +113,19 @@ func TestClassify_Parked_TinyBody(t *testing.T) {
 		HasBaseline:      false,
 	}
 	assert.Equal(t, "PARKED", Classify(in))
+}
+
+func TestClassify_TinyBodyWithTitleIsNotParked(t *testing.T) {
+	// Small body but a non-parking title — should NOT classify as PARKED.
+	// Many regional landing pages return < 2 KB with a real title.
+	in := ClassificationInput{
+		RegistrableLabel: "acme",
+		Title:            "Welcome to Foo",
+		HTTPStatus:       200,
+		BodyLen:          1500,
+		HasBaseline:      false,
+	}
+	assert.NotEqual(t, "PARKED", Classify(in))
 }
 
 func TestClassify_Parked_NSNameserver(t *testing.T) {

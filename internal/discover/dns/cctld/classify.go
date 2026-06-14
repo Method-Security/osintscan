@@ -4,15 +4,21 @@ import (
 	"strings"
 )
 
-// parkingNameservers is a best-effort list of known parking NS patterns.
+// parkingNameservers is a best-effort list of dedicated parking / for-sale
+// service NS patterns.
+//
+// Important: this list deliberately EXCLUDES default-registrar nameservers
+// like `domaincontrol.com` (GoDaddy default) and `registrar-servers.com`
+// (Namecheap default). Those NS hosts serve BOTH parked and fully-active
+// sites — using them as a parking signal produces false PARKED
+// classifications on legitimate small businesses that just happen to run
+// on GoDaddy / Namecheap default DNS. Same for `namecheaphosting.com`,
+// which is the actual hosting NS, not a parking NS.
 var parkingNameservers = []string{
 	"sedo.com",
 	"sedoparking.com",
-	"domaincontrol.com", // GoDaddy parking
 	"parkingcrew.net",
 	"namebrightdns.com",
-	"namecheaphosting.com",
-	"registrar-servers.com", // Namecheap parking
 	"hugedomains.com",
 	"afternic.com",
 	"bodis.com",
@@ -55,34 +61,45 @@ type ClassificationInput struct {
 
 // Classify returns a classification string for a candidate.
 // The returned string matches one of the DiscoverDnsCctldClassification enum values.
+//
+// Order of precedence: a matching cert (subject or SAN contains the input's
+// registrable label) is the strongest single signal — a TLS cert binding
+// requires registry / CA participation in a way that title text and body
+// content do not. We short-circuit on that signal so that a low-similarity
+// regional subsidiary (e.g. acme.de runs an entirely localized site whose
+// vocabulary barely overlaps the global English baseline) is still
+// classified as LIKELY_LEGIT_ALT_REGION rather than UNRELATED. Then we
+// check the parked heuristics, which intentionally lose to an explicit
+// cert match so a legitimate brand site that happens to be short is not
+// mis-flagged. Finally we fall through to baseline similarity for
+// impersonation detection.
 func Classify(in ClassificationInput) string {
 	label := strings.ToLower(in.RegistrableLabel)
 
 	certMatchesInput := certContainsLabel(in.CertSubject, in.CertSANs, label)
 
-	// Check for PARKED first — it is the weakest signal and should win over
-	// UNRELATED but lose to explicit alt-region / impersonation signals.
+	// 1. Cert match → strong LIKELY_LEGIT_ALT_REGION signal regardless of
+	//    baseline / similarity. This also prevents the parked heuristic
+	//    below from misclassifying a short legitimate page as PARKED.
+	if certMatchesInput {
+		return "LIKELY_LEGIT_ALT_REGION"
+	}
+
+	// 2. Parked / for-sale heuristics. Only meaningful when the cert did
+	//    NOT match the input (the cert-match branch above already returned).
 	if isParked(in) {
 		return "PARKED"
 	}
 
+	// 3. Without a cert match, lean on baseline similarity (when available)
+	//    or title containment (no baseline) to flag impersonation.
 	if in.HasBaseline {
-		// With a baseline we can use content similarity.
-		if certMatchesInput && in.SimilarityToBaseline >= 0.7 {
-			return "LIKELY_LEGIT_ALT_REGION"
-		}
-		if !certMatchesInput && in.SimilarityToBaseline >= 0.5 {
+		if in.SimilarityToBaseline >= 0.5 {
 			return "LIKELY_IMPERSONATION"
 		}
-	} else {
-		// Without a baseline, rely on cert and title.
-		if certMatchesInput {
-			return "LIKELY_LEGIT_ALT_REGION"
-		}
-		// Title contains brand label but cert doesn't match
-		if strings.Contains(strings.ToLower(in.Title), label) && !certMatchesInput {
-			return "LIKELY_IMPERSONATION"
-		}
+	} else if strings.Contains(strings.ToLower(in.Title), label) {
+		// Title contains brand label but cert does not match.
+		return "LIKELY_IMPERSONATION"
 	}
 
 	return "UNRELATED"
@@ -101,19 +118,29 @@ func certContainsLabel(subject string, sans []string, label string) bool {
 	return false
 }
 
-// isParked returns true if the candidate looks like a parked domain.
+// isParked returns true if the candidate looks like a parked / for-sale
+// domain. Each independent signal below either fires conclusively (title
+// marker, dedicated parking NS) or contributes to the tiny-body heuristic.
+//
+// Note: tiny body alone is intentionally NOT enough — many legitimate
+// small landing pages return a short body with status 200 (e.g. "Coming
+// soon" pages for real future products, region-specific stub pages
+// pointing back to the global site). We require tiny body AND a missing
+// title to avoid those false positives. The cert-match short-circuit in
+// Classify also prevents this from firing on real subsidiary pages.
 func isParked(in ClassificationInput) bool {
-	// Tiny body with 200 OK is a parking indicator
-	if in.HTTPStatus == 200 && in.BodyLen > 0 && in.BodyLen < 2048 {
-		return true
-	}
-
 	// Check title for parking markers
 	titleLower := strings.ToLower(in.Title)
 	for _, marker := range parkingTitleMarkers {
 		if strings.Contains(titleLower, marker) {
 			return true
 		}
+	}
+
+	// Tiny body + no title combination — weaker but reasonable parking
+	// signal in the absence of a positive title marker.
+	if in.HTTPStatus == 200 && in.BodyLen > 0 && in.BodyLen < 2048 && titleLower == "" {
+		return true
 	}
 
 	// Check NS records for known parking providers

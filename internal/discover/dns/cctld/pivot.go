@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	// Generated
 	dnsfern "github.com/Method-Security/osintscan/generated/go/discover/dns"
@@ -22,6 +23,30 @@ import (
 	"github.com/weppos/publicsuffix-go/publicsuffix"
 	"golang.org/x/net/idna"
 )
+
+// dnsCallTimeout derives the per-DNS-call deadline from config.Timeout
+// (which the CLI documents as the per-request timeout in milliseconds
+// for DNS and HTTP probes). Returns 0 if the caller passed a
+// nonpositive value, in which case callers should fall through to the
+// parent context with no extra deadline.
+func dnsCallTimeout(timeoutMs int) time.Duration {
+	if timeoutMs <= 0 {
+		return 0
+	}
+	return time.Duration(timeoutMs) * time.Millisecond
+}
+
+// withDNSDeadline returns a child context bounded by the per-call
+// timeout, or the parent context unchanged if no timeout is configured.
+// The caller MUST defer the returned cancel func — when no deadline was
+// applied we still return a no-op cancel so call sites stay simple.
+func withDNSDeadline(parent context.Context, timeoutMs int) (context.Context, context.CancelFunc) {
+	d := dnsCallTimeout(timeoutMs)
+	if d == 0 {
+		return parent, func() {}
+	}
+	return context.WithTimeout(parent, d)
+}
 
 // PivotCcTLD is the main entry point.  It orchestrates the full ccTLD pivot
 // workflow and returns a structured report.
@@ -38,10 +63,24 @@ func PivotCcTLD(ctx context.Context, config dnsfern.DiscoverDnsCctldConfig) dnsf
 		parts := strings.SplitN(config.Domain, ".", 2)
 		dn = &publicsuffix.DomainName{SLD: parts[0]}
 	}
-	baseLabel := strings.ToLower(dn.SLD)
-	inputApex := strings.ToLower(dn.SLD)
+	// IDN-normalize the base label so a Unicode-spelled input (e.g.
+	// "акмe.com" with a Cyrillic "a") becomes punycode before we build
+	// candidate FQDNs. Without this, only the ccTLD labels get normalized
+	// and "акмe.ru" never resolves because the base half is still Unicode.
+	rawBase := strings.ToLower(dn.SLD)
+	baseLabel, baseErr := idna.Lookup.ToASCII(rawBase)
+	if baseErr != nil || baseLabel == "" {
+		// Fall back to the raw lowercase label; lookups will likely fail
+		// for non-ASCII inputs but the operator still sees the attempt.
+		baseLabel = rawBase
+	}
+	inputApex := baseLabel
 	if dn.TLD != "" {
-		inputApex = baseLabel + "." + strings.ToLower(dn.TLD)
+		tldNorm, _ := idna.Lookup.ToASCII(strings.ToLower(dn.TLD))
+		if tldNorm == "" {
+			tldNorm = strings.ToLower(dn.TLD)
+		}
+		inputApex = baseLabel + "." + tldNorm
 	}
 
 	log.Info("Starting ccTLD pivot",
@@ -72,13 +111,23 @@ func PivotCcTLD(ctx context.Context, config dnsfern.DiscoverDnsCctldConfig) dnsf
 	// Build resolver pool.
 	resolvers := utils.GetResolvers(config.DnsResolvers, log)
 
-	// Optionally fetch baseline body.
+	// Optionally fetch baseline body. Only set `hasBaseline` when we actually
+	// retrieved a non-empty body — if FetchBody fails (DNS, connect refused,
+	// 5xx, empty 200) we want classification to fall through to the
+	// no-baseline cert/title heuristic rather than score every candidate
+	// against an empty token set (which produces similarity=0 across the
+	// board and misclassifies legitimate matches as UNRELATED).
 	baselineBody := ""
 	hasBaseline := false
 	if config.BaselineUrl != nil && *config.BaselineUrl != "" {
 		log.Info("Fetching baseline URL", svc1log.SafeParam("url", *config.BaselineUrl))
 		baselineBody = FetchBody(ctx, *config.BaselineUrl, config.Timeout)
-		hasBaseline = true
+		if baselineBody != "" {
+			hasBaseline = true
+		} else {
+			log.Warn("Baseline fetch returned empty body; falling back to no-baseline classification",
+				svc1log.SafeParam("baseline_url", *config.BaselineUrl))
+		}
 	}
 
 	// Fan-out over TLDs.
@@ -156,7 +205,9 @@ func resolveTLDs(config dnsfern.DiscoverDnsCctldConfig) ([]string, []string) {
 
 	addUnique := func(list []string) {
 		for _, t := range list {
-			t = strings.ToLower(strings.TrimSpace(t))
+			// Accept both ".ru" and "ru" from --cctlds; otherwise the
+			// candidate FQDN ends up as "acme..ru" and never resolves.
+			t = strings.TrimPrefix(strings.ToLower(strings.TrimSpace(t)), ".")
 			if t == "" {
 				continue
 			}
@@ -210,9 +261,14 @@ func processCandidateTLD(
 	log := svc1log.FromContext(ctx)
 
 	// Wildcard detection: probe the candidate FQDN itself, then probe a random label.
-	wildcardDetected := detectCandidateWildcard(ctx, fqdn, resolver)
+	wildcardDetected := detectCandidateWildcard(ctx, fqdn, resolver, config.Timeout)
 
-	ips, err := resolver.LookupHost(ctx, fqdn)
+	// Per-call DNS deadline derived from config.Timeout so a slow registry
+	// resolver does not stall the whole sweep beyond what the operator
+	// expects. The CLI's --timeout flag documents these semantics.
+	dnsCtx, cancel := withDNSDeadline(ctx, config.Timeout)
+	defer cancel()
+	ips, err := resolver.LookupHost(dnsCtx, fqdn)
 	if err != nil {
 		// NXDOMAIN or resolution failure — candidate does not exist, skip.
 		if isDNSNotFound(err) {
@@ -241,10 +297,10 @@ func processCandidateTLD(
 		svc1log.SafeParam("a_count", len(aRecords)),
 		svc1log.SafeParam("aaaa_count", len(aaaaRecords)))
 
-	// Resolve NS records.
-	nsRecords := lookupNS(ctx, fqdn, resolver)
-	// Resolve MX records.
-	mxRecords := lookupMX(ctx, fqdn, resolver)
+	// Resolve NS records (with the same per-call deadline).
+	nsRecords := lookupNS(ctx, fqdn, resolver, config.Timeout)
+	// Resolve MX records (with the same per-call deadline).
+	mxRecords := lookupMX(ctx, fqdn, resolver, config.Timeout)
 
 	// Web probe.
 	var probeResult ProbeResult
@@ -259,9 +315,17 @@ func processCandidateTLD(
 		similarityPtr = &score
 	}
 
-	// Determine HTTP/HTTPS status for classification.
+	// Determine the effective HTTP-ish status for classification. HTTPS is
+	// preferred — many candidates redirect bare HTTP to HTTPS or only ever
+	// serve TLS, and the body/title we tokenized lives on whichever probe
+	// actually responded. Falling back to plain HTTPStatus here previously
+	// caused HTTPS-only candidates to look like "no response" to the
+	// classifier and never trigger the parked / tiny-body heuristics.
 	httpStatus := 0
-	if probeResult.HTTPStatus != nil {
+	switch {
+	case probeResult.HTTPSStatus != nil:
+		httpStatus = *probeResult.HTTPSStatus
+	case probeResult.HTTPStatus != nil:
 		httpStatus = *probeResult.HTTPStatus
 	}
 
@@ -325,13 +389,15 @@ func processCandidateTLD(
 
 // detectCandidateWildcard checks whether the registry zone for this candidate
 // exhibits wildcard behavior by probing a random label under the candidate FQDN.
-func detectCandidateWildcard(ctx context.Context, fqdn string, resolver *net.Resolver) bool {
+func detectCandidateWildcard(ctx context.Context, fqdn string, resolver *net.Resolver, timeoutMs int) bool {
 	if resolver == nil {
 		return false
 	}
 
-	// First confirm the FQDN itself resolves.
-	baseIPs, err := resolver.LookupHost(ctx, fqdn)
+	// First confirm the FQDN itself resolves (per-call deadline).
+	baseCtx, baseCancel := withDNSDeadline(ctx, timeoutMs)
+	defer baseCancel()
+	baseIPs, err := resolver.LookupHost(baseCtx, fqdn)
 	if err != nil || len(baseIPs) == 0 {
 		return false
 	}
@@ -345,7 +411,9 @@ func detectCandidateWildcard(ctx context.Context, fqdn string, resolver *net.Res
 	if err != nil {
 		return false
 	}
-	randomIPs, err := resolver.LookupHost(ctx, randomFQDN)
+	randCtx, randCancel := withDNSDeadline(ctx, timeoutMs)
+	defer randCancel()
+	randomIPs, err := resolver.LookupHost(randCtx, randomFQDN)
 	if err != nil || len(randomIPs) == 0 {
 		return false
 	}
@@ -373,9 +441,12 @@ func generateRandomLabel(domain string) (string, error) {
 	return string(b) + "." + domain, nil
 }
 
-// lookupNS returns the NS records for the given FQDN using the resolver.
-func lookupNS(ctx context.Context, fqdn string, resolver *net.Resolver) []string {
-	nsList, err := resolver.LookupNS(ctx, fqdn)
+// lookupNS returns the NS records for the given FQDN using the resolver,
+// bounded by the per-call DNS deadline.
+func lookupNS(ctx context.Context, fqdn string, resolver *net.Resolver, timeoutMs int) []string {
+	c, cancel := withDNSDeadline(ctx, timeoutMs)
+	defer cancel()
+	nsList, err := resolver.LookupNS(c, fqdn)
 	if err != nil {
 		return nil
 	}
@@ -386,9 +457,12 @@ func lookupNS(ctx context.Context, fqdn string, resolver *net.Resolver) []string
 	return result
 }
 
-// lookupMX returns the MX records for the given FQDN using the resolver.
-func lookupMX(ctx context.Context, fqdn string, resolver *net.Resolver) []string {
-	mxList, err := resolver.LookupMX(ctx, fqdn)
+// lookupMX returns the MX records for the given FQDN using the resolver,
+// bounded by the per-call DNS deadline.
+func lookupMX(ctx context.Context, fqdn string, resolver *net.Resolver, timeoutMs int) []string {
+	c, cancel := withDNSDeadline(ctx, timeoutMs)
+	defer cancel()
+	mxList, err := resolver.LookupMX(c, fqdn)
 	if err != nil {
 		return nil
 	}
