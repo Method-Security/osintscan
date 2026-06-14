@@ -97,8 +97,11 @@ func Classify(in ClassificationInput) string {
 		if in.SimilarityToBaseline >= 0.5 {
 			return "LIKELY_IMPERSONATION"
 		}
-	} else if strings.Contains(strings.ToLower(in.Title), label) {
-		// Title contains brand label but cert does not match.
+	} else if containsAsLabel(strings.ToLower(in.Title), label) {
+		// Title contains the brand label as a bounded token (not a
+		// substring inside an unrelated word). Same rationale as cert
+		// matching: a short brand like "go" would otherwise match inside
+		// "going", "logo", etc. and produce false IMPERSONATION classifications.
 		return "LIKELY_IMPERSONATION"
 	}
 

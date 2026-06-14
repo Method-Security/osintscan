@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"net"
+	"net/url"
 	"regexp"
 	"strings"
 	"time"
@@ -28,6 +29,15 @@ type ProbeResult struct {
 	CertSubject  *string
 	CertSANs     []string
 	Body         string // raw body, capped at maxBodyBytes, for similarity
+
+	// RedirectedOffCandidate is true when the probe followed redirects to a
+	// final URL whose host is no longer the candidate FQDN (case-insensitive,
+	// port-insensitive). Callers should NOT use the body / title / similarity
+	// signal when this is set — what we tokenized is the redirect target's
+	// content, not the candidate's. This protects against a regional
+	// subsidiary that redirects to the global site looking like an
+	// impersonation just because the tokens are identical.
+	RedirectedOffCandidate bool
 }
 
 // ProbeWeb fetches HTTPS then HTTP for the given host (bare hostname).
@@ -54,6 +64,9 @@ func ProbeWeb(ctx context.Context, host string, timeoutMs int) ProbeResult {
 		}
 		result.CertSANs = httpsResult.CertSANs
 		result.Body = httpsBody
+		if redirectLeftHost(host, httpsResult.FinalURL) {
+			result.RedirectedOffCandidate = true
+		}
 	}
 
 	// HTTP probe (always run, captures status even if HTTPS succeeded)
@@ -73,9 +86,33 @@ func ProbeWeb(ctx context.Context, host string, timeoutMs int) ProbeResult {
 		if result.ServerHeader == nil && httpResult.ServerHeader != "" {
 			result.ServerHeader = &httpResult.ServerHeader
 		}
+		// If only the HTTP probe had a usable body and that body came from
+		// off-candidate, propagate the off-candidate flag too.
+		if !result.RedirectedOffCandidate && redirectLeftHost(host, httpResult.FinalURL) {
+			result.RedirectedOffCandidate = true
+		}
 	}
 
 	return result
+}
+
+// redirectLeftHost reports whether finalURL points at a host that differs
+// from the candidate. The candidate is a bare hostname; finalURL is the
+// post-redirect URL. Case-insensitive on host, port-insensitive. Returns
+// false for unparseable or empty finalURL.
+func redirectLeftHost(candidate string, finalURL string) bool {
+	if finalURL == "" {
+		return false
+	}
+	u, err := url.Parse(finalURL)
+	if err != nil || u == nil {
+		return false
+	}
+	finalHost := strings.ToLower(u.Hostname())
+	if finalHost == "" {
+		return false
+	}
+	return finalHost != strings.ToLower(candidate)
 }
 
 // rawProbeResult is an intermediate internal result from a single URL probe.

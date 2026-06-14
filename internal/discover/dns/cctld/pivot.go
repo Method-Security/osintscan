@@ -59,9 +59,17 @@ func PivotCcTLD(ctx context.Context, config dnsfern.DiscoverDnsCctldConfig) dnsf
 	// and also handles multi-label TLDs like "acme.co.uk" → SLD="acme".
 	dn, err := publicsuffix.Parse(config.Domain)
 	if err != nil {
-		// Fall back to splitting on the first dot.
+		// Fall back to splitting on the first dot. We must populate TLD
+		// from the remainder too — otherwise inputApex collapses to just
+		// the base label, and the later EqualFold-against-inputApex skip
+		// can't recognize the input domain itself and the sweep ends up
+		// re-discovering it as a ccTLD candidate.
 		parts := strings.SplitN(config.Domain, ".", 2)
-		dn = &publicsuffix.DomainName{SLD: parts[0]}
+		fallback := &publicsuffix.DomainName{SLD: parts[0]}
+		if len(parts) == 2 {
+			fallback.TLD = parts[1]
+		}
+		dn = fallback
 	}
 	// IDN-normalize the base label so a Unicode-spelled input (e.g.
 	// "акмe.com" with a Cyrillic "a") becomes punycode before we build
@@ -308,9 +316,13 @@ func processCandidateTLD(
 		probeResult = ProbeWeb(ctx, fqdn, config.Timeout)
 	}
 
-	// Similarity to baseline.
+	// Similarity to baseline. Skip when the probe followed redirects to a
+	// different host — the body / title we tokenized belongs to the
+	// redirect target, not the candidate. A regional subsidiary that
+	// redirects to the global site would otherwise score 1.0 against the
+	// baseline and look like impersonation.
 	var similarityPtr *float64
-	if hasBaseline && probeResult.Body != "" {
+	if hasBaseline && probeResult.Body != "" && !probeResult.RedirectedOffCandidate {
 		score := SimilarityScore(baselineBody, probeResult.Body)
 		similarityPtr = &score
 	}
