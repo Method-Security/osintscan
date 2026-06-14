@@ -292,7 +292,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 	discoverDNSSubdomainCmd := &cobra.Command{
 		Use:   "subdomain",
 		Short: "Discover subdomains for a domain",
-		Long:  `Discover subdomains for the specified domain using passive and active enumeration techniques.`,
+		Long:  `Discover subdomains for the specified domain using passive and active enumeration techniques`,
 	}
 
 	discoverDNSCmd.AddCommand(discoverDNSSubdomainCmd)
