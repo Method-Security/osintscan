@@ -154,6 +154,38 @@ func TestClassify_Unrelated(t *testing.T) {
 	assert.Equal(t, "UNRELATED", Classify(in))
 }
 
+func TestCertContainsLabel_BoundedMatch(t *testing.T) {
+	// Real subsidiary cert with the brand label as a standalone DNS label.
+	assert.True(t, certContainsLabel("CN=acme.de,O=Acme GmbH", []string{"acme.de", "www.acme.de"}, "acme"))
+	// Cert SAN that's the brand label apex itself.
+	assert.True(t, certContainsLabel("", []string{"acme.com"}, "acme"))
+	// Substring match in a longer label MUST NOT count.
+	assert.False(t, certContainsLabel("CN=acmegrid.io", []string{"acmegrid.io"}, "acme"))
+	// 3-letter brand inside an unrelated longer label.
+	assert.False(t, certContainsLabel("CN=mygoshop.com", []string{"mygoshop.com"}, "go"))
+	// Brand appears in subject CN but only as substring of a longer word.
+	assert.False(t, certContainsLabel("CN=acmesoft.example", []string{"acmesoft.example"}, "acme"))
+	// Empty label never matches.
+	assert.False(t, certContainsLabel("CN=acme.de", []string{"acme.de"}, ""))
+}
+
+func TestClassify_LookalikeCertNotMatched(t *testing.T) {
+	// A lookalike apex `acme.ru` serving a cert for an unrelated `acmegrid.io`
+	// brand must NOT classify as LIKELY_LEGIT_ALT_REGION; the substring match
+	// would have classified it that way previously.
+	in := ClassificationInput{
+		RegistrableLabel:     "acme",
+		CertSubject:          "CN=acmegrid.io",
+		CertSANs:             []string{"acmegrid.io"},
+		SimilarityToBaseline: 0.6, // > 0.5 → IMPERSONATION
+		HasBaseline:          true,
+		Title:                "Acme Login",
+		HTTPStatus:           200,
+		BodyLen:              20000,
+	}
+	assert.Equal(t, "LIKELY_IMPERSONATION", Classify(in))
+}
+
 func TestGenerateRandomLabel(t *testing.T) {
 	label, err := generateRandomLabel("example.com")
 	require.NoError(t, err)

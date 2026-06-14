@@ -105,15 +105,67 @@ func Classify(in ClassificationInput) string {
 	return "UNRELATED"
 }
 
-// certContainsLabel returns true if the subject DN or any SAN contains label.
+// certContainsLabel returns true if the subject DN or any SAN contains the
+// input's registrable label as a *standalone DNS label* — i.e. bounded by
+// the start of the string or by a non-label character (anything other than
+// ASCII letter, digit, or hyphen).
+//
+// We need this stricter check because short brand labels (3-letter brands
+// are common — "ibm", "ups", "ge") would otherwise substring-match inside
+// unrelated names: a cert for `mygoshop.com` should NOT count as
+// containing the brand `go`, and `acmegrid.io` should NOT count as
+// containing the brand `acme` (the label there is `acmegrid`, not
+// `acme`). The label-boundary check eliminates the highest-volume class
+// of LIKELY_LEGIT_ALT_REGION false positives.
 func certContainsLabel(subject string, sans []string, label string) bool {
-	if strings.Contains(strings.ToLower(subject), label) {
+	if label == "" {
+		return false
+	}
+	if containsAsLabel(strings.ToLower(subject), label) {
 		return true
 	}
 	for _, san := range sans {
-		if strings.Contains(strings.ToLower(san), label) {
+		if containsAsLabel(strings.ToLower(san), label) {
 			return true
 		}
+	}
+	return false
+}
+
+// containsAsLabel reports whether label appears in s bounded by non-label
+// characters on both sides. Label chars are ASCII letters / digits /
+// hyphens (the same character class DNS uses for hostname labels). The
+// search is byte-wise (callers lowercase the input), so this only works
+// correctly for ASCII labels; punycode-normalized input is the supported
+// case for this codepath.
+func containsAsLabel(s, label string) bool {
+	if label == "" || len(s) < len(label) {
+		return false
+	}
+	for i := 0; i+len(label) <= len(s); i++ {
+		if s[i:i+len(label)] != label {
+			continue
+		}
+		if i > 0 && isLabelByte(s[i-1]) {
+			continue
+		}
+		end := i + len(label)
+		if end < len(s) && isLabelByte(s[end]) {
+			continue
+		}
+		return true
+	}
+	return false
+}
+
+func isLabelByte(b byte) bool {
+	switch {
+	case b >= 'a' && b <= 'z':
+		return true
+	case b >= '0' && b <= '9':
+		return true
+	case b == '-':
+		return true
 	}
 	return false
 }
