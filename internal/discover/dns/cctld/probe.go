@@ -157,8 +157,13 @@ func extractTLSInfo(rawURL string, timeout time.Duration, result *rawProbeResult
 		hostPort = net.JoinHostPort(host, "443")
 	}
 
+	// A ccTLD recon probe needs to capture certs from arbitrary registries —
+	// many candidates legitimately have self-signed, expired, or hostname-
+	// mismatched certs (parked, misconfigured, lookalike-with-cheap-cert).
+	// Validating would drop most of the signal this tool exists to produce.
+	skipVerify := true
 	tlsConf := &tls.Config{
-		InsecureSkipVerify: true, //nolint:gosec // intentional for recon
+		InsecureSkipVerify: skipVerify, //nolint:gosec // intentional for recon
 		ServerName:         host,
 	}
 	dialer := &tls.Dialer{
