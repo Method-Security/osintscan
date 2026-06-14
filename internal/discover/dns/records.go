@@ -20,6 +20,10 @@ import (
 // no explicit resolvers are supplied (dnsx's defaults are UDP-only).
 var defaultTCPResolvers = []string{"1.1.1.1:53", "8.8.8.8:53", "9.9.9.9:53"}
 
+// defaultDNSTimeoutSeconds mirrors the Fern schema default for the per-query DNS
+// timeout, applied when a caller omits it so the blocking resolver call is bounded.
+const defaultDNSTimeoutSeconds = 10
+
 // normalizeDnsxResolvers converts resolver addresses (e.g. "1.1.1.1:53") to the
 // format expected by the dnsx library ("udp:1.1.1.1:53" or "tcp:1.1.1.1:53").
 // When useTCP is set and no resolvers are supplied, a TCP-prefixed default set is
@@ -244,7 +248,10 @@ func DiscoverDomainDNSRecords(ctx context.Context, config dnsfern.DiscoverDnsRec
 		svc1log.SafeParam("requested_record_types", len(config.RecordTypes)))
 
 	useTCP := config.UseTcp != nil && *config.UseTcp
-	timeoutSeconds := 0
+	// The Fern schema documents a 10s default; apply it when the caller omits a
+	// timeout so the blocking resolver query is always bounded (an explicit 0 from
+	// a caller still means "no deadline").
+	timeoutSeconds := defaultDNSTimeoutSeconds
 	if config.Timeout != nil {
 		timeoutSeconds = *config.Timeout
 	}
