@@ -56,6 +56,9 @@ func PivotCcTLD(ctx context.Context, config dnsfern.DiscoverDnsCctldConfig) dnsf
 	// Normalize the input domain: trim leading/trailing whitespace and a
 	// trailing dot so that "acme.com." and " acme.com " both parse correctly.
 	domain := strings.TrimSuffix(strings.TrimSpace(config.Domain), ".")
+	if domain == "" {
+		return buildReport(config, nil, []string{"domain is required and must not be empty"})
+	}
 
 	// Resolve the registrable label (SLD) from the input domain.
 	// publicsuffix.Parse returns a *DomainName with .SLD == "acme" for "acme.com"
@@ -84,6 +87,9 @@ func PivotCcTLD(ctx context.Context, config dnsfern.DiscoverDnsCctldConfig) dnsf
 		// Fall back to the raw lowercase label; lookups will likely fail
 		// for non-ASCII inputs but the operator still sees the attempt.
 		baseLabel = rawBase
+	}
+	if baseLabel == "" {
+		return buildReport(config, nil, []string{"could not derive base label from domain: " + domain})
 	}
 	inputApex := baseLabel
 	if dn.TLD != "" {
@@ -254,24 +260,24 @@ func processCandidateTLD(
 
 	log := svc1log.FromContext(ctx)
 
-	// Main DNS lookup first — if the name doesn't resolve there's nothing
-	// to wildcard-detect against. We pass the resolved IPs into
-	// detectCandidateWildcard so it can reuse them as the base set without
-	// a redundant apex lookup.
+	// Main A/AAAA lookup.  We pass resolved IPs into detectCandidateWildcard
+	// so it can reuse them without a redundant apex call.
+	// If the name has no A/AAAA records but does publish NS or MX (e.g. a
+	// mail-only apex domain), we still want to surface it — so we only
+	// skip immediately on a true NXDOMAIN; other errors cause a fallthrough
+	// to the NS/MX lookups below.
 	dnsCtx, cancel := withDNSDeadline(ctx, config.Timeout)
 	defer cancel()
-	ips, err := resolver.LookupHost(dnsCtx, fqdn)
-	if err != nil {
-		// NXDOMAIN or resolution failure — candidate does not exist, skip.
-		if isDNSNotFound(err) {
-			return nil, ""
-		}
-		// Transient error — record but skip.
-		return nil, "DNS resolution error for " + fqdn + ": " + err.Error()
+	ips, lookupErr := resolver.LookupHost(dnsCtx, fqdn)
+	if lookupErr != nil && isDNSNotFound(lookupErr) {
+		// True NXDOMAIN: the name does not exist in DNS at all — skip.
+		return nil, ""
 	}
+	// For any other LookupHost error ips will be nil; we continue to
+	// attempt NS/MX lookups and skip only if those also return nothing.
 
-	// Wildcard detection using the already-resolved apex IPs avoids a
-	// redundant LookupHost call on the apex FQDN.
+	// Wildcard detection is only meaningful when we have IPs to compare
+	// against. detectCandidateWildcard already guards len(baseIPs)==0.
 	wildcardDetected := detectCandidateWildcard(ctx, fqdn, ips, resolver, config.Timeout)
 
 	// Separate A and AAAA.
@@ -297,6 +303,13 @@ func processCandidateTLD(
 	nsRecords := lookupNS(ctx, fqdn, resolver, config.Timeout)
 	// Resolve MX records (with the same per-call deadline).
 	mxRecords := lookupMX(ctx, fqdn, resolver, config.Timeout)
+
+	// If the initial A/AAAA lookup failed (non-NXDOMAIN) and NS/MX also
+	// returned nothing, there is no evidence this apex domain is active —
+	// report the DNS error and skip.
+	if lookupErr != nil && len(nsRecords) == 0 && len(mxRecords) == 0 {
+		return nil, "DNS resolution error for " + fqdn + ": " + lookupErr.Error()
+	}
 
 	candidate := &dnsfern.DiscoverDnsCctldCandidate{
 		Tld:      tld,
