@@ -18,6 +18,7 @@ import (
 	// Internal
 	discover "github.com/Method-Security/osintscan/internal/discover"
 	dns "github.com/Method-Security/osintscan/internal/discover/dns"
+	cctld "github.com/Method-Security/osintscan/internal/discover/dns/cctld"
 	subdomain "github.com/Method-Security/osintscan/internal/discover/dns/subdomain"
 	subdomainpassive "github.com/Method-Security/osintscan/internal/discover/dns/subdomain/passive"
 	ip "github.com/Method-Security/osintscan/internal/discover/ip"
@@ -357,12 +358,10 @@ func (a *OsintScan) InitDiscoverCommand() {
 			}
 			allSubdomains := append(subdomains, wordlistSubdomains...)
 
-			// We no longer fail when the wordlist is empty: the ccTLD pivot
-			// (which now runs as part of the active flow) provides a default
-			// candidate set even if the bruteforce wordlist is empty. Empty
-			// subdomain output is a valid outcome — better than a hard error
-			// for an operator who explicitly opted out of wordlist brute force
-			// to do only ccTLD discovery.
+			if len(allSubdomains) == 0 {
+				a.OutputSignal.AddError(fmt.Errorf("no subdomains provided"))
+				return
+			}
 			threads, err := cmd.Flags().GetInt("threads")
 			if err != nil {
 				a.OutputSignal.AddError(err)
@@ -400,12 +399,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 					return
 				}
 			}
-			cctlds, err := cmd.Flags().GetStringSlice("cctlds")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-			config := getDiscoverDNSActiveSubdomainConfig(domain, wordlistSizeEnum, &wordlistFile, threads, maxDepth, timeout, sleep, wildcardChecks, dnsResolvers, cctlds)
+			config := getDiscoverDNSActiveSubdomainConfig(domain, wordlistSizeEnum, &wordlistFile, threads, maxDepth, timeout, sleep, wildcardChecks, dnsResolvers)
 
 			report, err := subdomain.GetDomainSubdomainsActive(cmd.Context(), allSubdomains, config)
 			if err != nil {
@@ -429,7 +423,6 @@ func (a *OsintScan) InitDiscoverCommand() {
 	discoverDNSSubdomainActiveCmd.Flags().Int("sleep", 0, "Sleep time in milliseconds between requests to avoid rate limiting")
 	discoverDNSSubdomainActiveCmd.Flags().Int("wildcard-checks", 5, "Number of random subdomain probes used to detect wildcard DNS records")
 	discoverDNSSubdomainActiveCmd.Flags().StringSlice("dns-resolvers", []string{}, "Custom DNS resolvers (e.g. 10.0.0.1).")
-	discoverDNSSubdomainActiveCmd.Flags().StringSlice("cctlds", []string{}, "Country-code TLDs to test for ccTLD pivots of the domain's registrable label (e.g. ru cn xn--p1ai). Each entry is the bare TLD label without a leading dot; Unicode and punycode are both accepted and IDN-normalized at lookup time. When empty (the default), a curated built-in list is used.")
 
 	// Mark Required Flags
 	_ = discoverDNSSubdomainActiveCmd.MarkFlagRequired("domain")
@@ -586,6 +579,85 @@ func (a *OsintScan) InitDiscoverCommand() {
 
 	// Add command to 'subdomain' command
 	discoverDNSSubdomainCmd.AddCommand(discoverDNSSubdomainPassiveCmd)
+
+	// ccTLD Command
+	discoverDNSCctldCmd := &cobra.Command{
+		Use:   "cctld",
+		Short: "Pivot across ccTLDs to discover lookalike apex domains",
+		Long:  `Permute <base>.<tld> candidates across a list or preset of country-code TLDs to discover lookalike or alt-region apex domains. Resolves DNS (A, AAAA, NS, MX) records for each candidate.`,
+		Run: func(cmd *cobra.Command, args []string) {
+			domain, err := cmd.Flags().GetString("domain")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			cctlds, err := cmd.Flags().GetStringSlice("cctlds")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			cctldsPreset, err := cmd.Flags().GetString("cctlds-preset")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			if len(cctlds) == 0 && cctldsPreset == "" {
+				a.OutputSignal.AddError(fmt.Errorf("either --cctlds or --cctlds-preset must be provided"))
+				return
+			}
+
+			threads, err := cmd.Flags().GetInt("threads")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			timeout, err := cmd.Flags().GetInt("timeout")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			dnsResolvers, err := cmd.Flags().GetStringSlice("dns-resolvers")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			for _, dnsResolver := range dnsResolvers {
+				err = utils.ValidateDNSServerAddress(dnsResolver)
+				if err != nil {
+					a.OutputSignal.AddError(fmt.Errorf("invalid DNS resolver: %w", err))
+					return
+				}
+			}
+
+			config, err := getDiscoverDNSCctldConfig(domain, cctlds, cctldsPreset, threads, timeout, dnsResolvers)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			report := cctld.PivotCcTLD(cmd.Context(), config)
+			a.OutputSignal.Content = report
+		},
+	}
+
+	// Target Flags
+	discoverDNSCctldCmd.Flags().String("domain", "", "The domain name to pivot ccTLDs from (e.g. acme.com)")
+	discoverDNSCctldCmd.Flags().StringSlice("cctlds", []string{}, "Explicit list of ccTLD labels to test (e.g. ru,cn,de)")
+	discoverDNSCctldCmd.Flags().String("cctlds-preset", "", "Named preset of ccTLDs: APT_RELEVANT, TOP50, EU27, ASEAN, ALL")
+	discoverDNSCctldCmd.Flags().Int("threads", 50, "Number of concurrent DNS probe goroutines")
+	discoverDNSCctldCmd.Flags().Int("timeout", 5000, "Per-request timeout in milliseconds for DNS probes")
+	discoverDNSCctldCmd.Flags().StringSlice("dns-resolvers", []string{}, "Custom DNS resolvers (e.g. 1.1.1.1,8.8.8.8)")
+
+	// Mark Required Flags
+	_ = discoverDNSCctldCmd.MarkFlagRequired("domain")
+
+	// Add command to 'dns' command
+	discoverDNSCmd.AddCommand(discoverDNSCctldCmd)
 
 	// Shodan Command
 	// Subcommands:
@@ -883,7 +955,7 @@ func getDiscoverDNSReverseConfig(ips []string, cidr string, dnsResolvers []strin
 }
 
 // getDiscoverDNSActiveSubdomainConfig creates and returns a configuration for active subdomain discovery
-func getDiscoverDNSActiveSubdomainConfig(domain string, wordlistSize *dnsfern.WordlistSize, wordlistFile *string, threads, maxDepth, timeout, sleep, wildcardChecks int, dnsResolvers []string, cctlds []string) dnsfern.DiscoverDnsSubdomainConfig {
+func getDiscoverDNSActiveSubdomainConfig(domain string, wordlistSize *dnsfern.WordlistSize, wordlistFile *string, threads, maxDepth, timeout, sleep, wildcardChecks int, dnsResolvers []string) dnsfern.DiscoverDnsSubdomainConfig {
 	return dnsfern.DiscoverDnsSubdomainConfig{
 		DiscoveryType: strings.ToLower(string(dnsfern.DiscoverDnsSubdomainTypeActive)),
 		Active: &dnsfern.DiscoverDnsSubdomainActiveConfig{
@@ -896,7 +968,6 @@ func getDiscoverDNSActiveSubdomainConfig(domain string, wordlistSize *dnsfern.Wo
 			Sleep:          sleep,
 			WildcardChecks: wildcardChecks,
 			DnsResolvers:   dnsResolvers,
-			Cctlds:         cctlds,
 		},
 	}
 }
@@ -979,4 +1050,28 @@ func getDiscoverIPDomainASNConfig(ips []string, cidr string, dnsResolvers []stri
 	}
 
 	return config
+}
+
+// getDiscoverDNSCctldConfig creates and returns a configuration for ccTLD pivot discovery.
+func getDiscoverDNSCctldConfig(domain string, cctlds []string, cctldsPreset string, threads int, timeout int, dnsResolvers []string) (dnsfern.DiscoverDnsCctldConfig, error) {
+	config := dnsfern.DiscoverDnsCctldConfig{
+		Domain:       domain,
+		Threads:      max(threads, 1),
+		Timeout:      timeout,
+		DnsResolvers: dnsResolvers,
+	}
+
+	if len(cctlds) > 0 {
+		config.Cctlds = cctlds
+	}
+
+	if cctldsPreset != "" {
+		preset, err := dnsfern.NewDiscoverDnsCctldPresetFromString(strings.ToUpper(cctldsPreset))
+		if err != nil {
+			return dnsfern.DiscoverDnsCctldConfig{}, fmt.Errorf("invalid --cctlds-preset value %q: %w", cctldsPreset, err)
+		}
+		config.CctldsPreset = &preset
+	}
+
+	return config, nil
 }

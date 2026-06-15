@@ -1,0 +1,42 @@
+types:
+# Enums
+  DiscoverDnsCctldPreset:
+    enum:
+      - APT_RELEVANT
+      - TOP50
+      - EU27
+      - ASEAN
+      - ALL
+
+# Candidate Details
+  DiscoverDnsCctldCandidate:
+    properties:
+      tld: string
+      fqdn: string
+      ips: optional<list<string>>
+      aaaa: optional<list<string>>
+      ns: optional<list<string>>
+      mx: optional<list<string>>
+      wildcard: boolean
+
+# Config
+  DiscoverDnsCctldConfig:
+    properties:
+      domain: string
+      cctlds: optional<list<string>>
+      cctldsPreset: optional<DiscoverDnsCctldPreset>
+      threads: integer
+      timeout: integer
+      dnsResolvers: optional<list<string>>
+
+# Result
+  DiscoverDnsCctldResult:
+    properties:
+      candidates: optional<list<DiscoverDnsCctldCandidate>>
+
+# Report
+  DiscoverDnsCctldReport:
+    properties:
+      config: DiscoverDnsCctldConfig
+      result: DiscoverDnsCctldResult
+      errors: optional<list<string>>

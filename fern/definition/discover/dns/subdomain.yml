@@ -28,7 +28,6 @@ types:
       sleep: integer
       wildcardChecks: integer
       dnsResolvers: optional<list<string>>
-      cctlds: optional<list<string>>
   DiscoverDnsSubdomainCorrelationConfig:
     properties:
       domains: list<string>
