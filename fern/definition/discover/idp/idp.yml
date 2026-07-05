@@ -4,6 +4,8 @@ types:
     properties:
       domain: string
       timeout: optional<integer>
+      httpProxy: optional<string>
+      socksProxy: optional<string>
 
 # Enums
   IdpProvider:

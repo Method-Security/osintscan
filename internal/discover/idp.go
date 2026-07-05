@@ -12,6 +12,7 @@ import (
 	"time"
 
 	idpfern "github.com/Method-Security/osintscan/generated/go/discover/idp"
+	osintConfig "github.com/Method-Security/osintscan/internal/config"
 	"github.com/Method-Security/pkg/httpclient"
 	"github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
@@ -36,7 +37,15 @@ func DiscoverIdp(ctx context.Context, config *idpfern.DiscoverIdpConfig) (*idpfe
 		timeout = time.Duration(*config.Timeout) * time.Second
 	}
 
-	client := httpclient.New(httpclient.WithTimeout(timeout))
+	proxyConfig := osintConfig.ProxyConfigFromContext(ctx)
+	if proxyConfig.HttpProxy != "" {
+		config.HttpProxy = &proxyConfig.HttpProxy
+	}
+	if proxyConfig.SocksProxy != "" {
+		config.SocksProxy = &proxyConfig.SocksProxy
+	}
+
+	client := httpclient.New(osintConfig.HTTPClientOptionsFromContext(ctx, httpclient.WithTimeout(timeout))...)
 
 	var providers []*idpfern.DiscoveredIdp
 
@@ -215,7 +224,7 @@ func queryAzureGetCredentialType(ctx context.Context, client *httpclient.Client,
 func detectM365Services(ctx context.Context, domain string, timeout time.Duration) []*idpfern.DetectedM365Service {
 	// Use a no-redirect client for service checks to avoid false positives
 	// from generic Microsoft login redirects returning 200.
-	noRedirectClient := httpclient.New(httpclient.WithTimeout(timeout), httpclient.WithMaxRedirects(0))
+	noRedirectClient := httpclient.New(osintConfig.HTTPClientOptionsFromContext(ctx, httpclient.WithTimeout(timeout), httpclient.WithMaxRedirects(0))...)
 	var services []*idpfern.DetectedM365Service
 
 	exchangeURL := fmt.Sprintf("https://outlook.office365.com/autodiscover/autodiscover.json/v1.0/%s?Protocol=ActiveSync", "user@"+domain)

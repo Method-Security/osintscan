@@ -10,6 +10,7 @@ import (
 	"net/url"
 
 	dnsfern "github.com/Method-Security/osintscan/generated/go/discover/dns"
+	osintConfig "github.com/Method-Security/osintscan/internal/config"
 	"github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
@@ -21,12 +22,38 @@ func DiscoverDomainCerts(ctx context.Context, config dnsfern.DiscoverDnsCertsCon
 
 	log.Info("Starting certificate discovery", svc1log.SafeParam("domain", config.Domain))
 
+	proxyConfig := osintConfig.ProxyConfigFromContext(ctx)
+	if proxyConfig.HttpProxy != "" {
+		config.HttpProxy = &proxyConfig.HttpProxy
+	}
+	if proxyConfig.SocksProxy != "" {
+		config.SocksProxy = &proxyConfig.SocksProxy
+	}
+
 	baseURL := "https://crt.sh/?q=%s&output=json"
 	escapedDomain := url.QueryEscape(config.Domain) // Properly escape the domain in the URL
 	apiURL := fmt.Sprintf(baseURL, escapedDomain)
 
 	// Make the HTTP request to crt.sh API
-	resp, err := http.Get(apiURL)
+	client, err := osintConfig.NewHTTPClientFromContext(ctx, true, 0)
+	if err != nil {
+		errors = append(errors, err.Error())
+		return &dnsfern.DiscoverDnsCertsReport{
+			Config: &config,
+			Result: &dnsfern.DiscoverDnsCertsResult{},
+			Errors: errors,
+		}, nil
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
+	if err != nil {
+		errors = append(errors, err.Error())
+		return &dnsfern.DiscoverDnsCertsReport{
+			Config: &config,
+			Result: &dnsfern.DiscoverDnsCertsResult{},
+			Errors: errors,
+		}, nil
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		log.Warn("Failed to query crt.sh API",
 			svc1log.SafeParam("domain", config.Domain),

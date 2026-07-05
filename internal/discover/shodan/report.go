@@ -108,6 +108,8 @@ type Response struct {
 type Report struct {
 	Query         string   `json:"query" yaml:"query"`
 	QueryType     string   `json:"query_type" yaml:"query_type"`
+	HttpProxy     *string  `json:"http_proxy,omitempty" yaml:"http_proxy,omitempty"`
+	SocksProxy    *string  `json:"socks_proxy,omitempty" yaml:"socks_proxy,omitempty"`
 	ShodanRecords []Record `json:"shodan_records" yaml:"shodan_records"`
 	Errors        []string `json:"errors" yaml:"errors"`
 }
