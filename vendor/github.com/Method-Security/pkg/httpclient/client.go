@@ -15,6 +15,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"golang.org/x/net/proxy"
 )
 
 // Client wraps http.Client with Method-specific defaults and helpers.
@@ -22,6 +24,7 @@ type Client struct {
 	httpClient     *http.Client
 	options        Options
 	defaultHeaders map[string]string
+	proxyConfigErr error
 }
 
 // Options configures the HTTP client behavior.
@@ -32,6 +35,8 @@ type Options struct {
 	TrackRedirects            bool
 	BlockCrossDomainRedirects bool
 	DefaultHeaders            map[string]string
+	HTTPProxy                 string
+	SOCKSProxy                string
 }
 
 // Option is a functional option for configuring the HTTP client.
@@ -80,6 +85,22 @@ func WithDefaultHeaders(headers map[string]string) Option {
 	}
 }
 
+// WithHTTPProxy sets an HTTP/HTTPS proxy URL for all requests.
+// The proxyURL should be in the format: http://[user:pass@]host:port
+func WithHTTPProxy(proxyURL string) Option {
+	return func(o *Options) {
+		o.HTTPProxy = proxyURL
+	}
+}
+
+// WithSOCKSProxy sets a SOCKS5 proxy URL for all requests.
+// The proxyURL should be in the format: socks5://[user:pass@]host:port
+func WithSOCKSProxy(proxyURL string) Option {
+	return func(o *Options) {
+		o.SOCKSProxy = proxyURL
+	}
+}
+
 // defaultOptions returns the default client options.
 func defaultOptions() Options {
 	return Options{
@@ -104,6 +125,8 @@ func New(opts ...Option) *Client {
 		},
 	}
 
+	proxyConfigErr := configureProxy(transport, &options)
+
 	client := &http.Client{
 		Timeout:   options.Timeout,
 		Transport: transport,
@@ -118,7 +141,63 @@ func New(opts ...Option) *Client {
 		httpClient:     client,
 		options:        options,
 		defaultHeaders: options.DefaultHeaders,
+		proxyConfigErr: proxyConfigErr,
 	}
+}
+
+// configureProxy sets up proxy configuration on the transport.
+// Supports both HTTP/HTTPS and SOCKS5 proxies.
+// If both are specified, SOCKS5 takes precedence.
+func configureProxy(transport *http.Transport, options *Options) error {
+	// SOCKS5 proxy takes precedence if both are specified
+	if options.SOCKSProxy != "" {
+		return configureSOCKS5Proxy(transport, options.SOCKSProxy)
+	}
+
+	if options.HTTPProxy != "" {
+		return configureHTTPProxy(transport, options.HTTPProxy)
+	}
+
+	return nil
+}
+
+// configureHTTPProxy configures an HTTP/HTTPS proxy.
+func configureHTTPProxy(transport *http.Transport, proxyURL string) error {
+	parsedURL, err := url.Parse(proxyURL)
+	if err != nil {
+		return fmt.Errorf("invalid HTTP proxy URL: %w", err)
+	}
+
+	transport.Proxy = http.ProxyURL(parsedURL)
+	return nil
+}
+
+func noHTTPProxy(*http.Request) (*url.URL, error) {
+	return nil, nil
+}
+
+// configureSOCKS5Proxy configures a SOCKS5 proxy.
+func configureSOCKS5Proxy(transport *http.Transport, proxyURL string) error {
+	parsedURL, err := url.Parse(proxyURL)
+	if err != nil {
+		return fmt.Errorf("invalid SOCKS5 proxy URL: %w", err)
+	}
+
+	// Create SOCKS5 dialer
+	dialer, err := proxy.FromURL(parsedURL, proxy.Direct)
+	if err != nil {
+		return fmt.Errorf("failed to create SOCKS5 dialer: %w", err)
+	}
+	contextDialer, ok := dialer.(proxy.ContextDialer)
+	if !ok {
+		return fmt.Errorf("SOCKS5 dialer does not support context-aware dialing")
+	}
+
+	// Configure transport to use SOCKS5 dialer
+	transport.Proxy = noHTTPProxy
+	transport.DialContext = contextDialer.DialContext
+
+	return nil
 }
 
 // Response wraps an HTTP response with additional metadata.
@@ -249,6 +328,10 @@ func readResponse(resp *http.Response, redirectChain []RedirectHop) (*Response, 
 
 // Do executes an HTTP request, handling redirects manually.
 func (c *Client) Do(req *http.Request) (*Response, error) {
+	if c.proxyConfigErr != nil {
+		return nil, fmt.Errorf("proxy configuration failed: %w", c.proxyConfigErr)
+	}
+
 	var redirectChain []RedirectHop
 
 	// Buffer the request body for replay on 307/308 redirects.

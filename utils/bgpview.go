@@ -11,6 +11,7 @@ import (
 	"time"
 
 	utilsfern "github.com/Method-Security/osintscan/generated/go/utils"
+	osintConfig "github.com/Method-Security/osintscan/internal/config"
 	"github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
@@ -35,6 +36,17 @@ func NewBGPViewClient() *BGPViewClient {
 		},
 		userAgent: "osintscan/1.0 (https://github.com/Method-Security/osintscan)",
 	}
+}
+
+// NewBGPViewClientFromContext creates a BGPView API client using proxy settings from context.
+func NewBGPViewClientFromContext(ctx context.Context) (*BGPViewClient, error) {
+	client := NewBGPViewClient()
+	httpClient, err := osintConfig.NewHTTPClientFromContext(ctx, true, 30*time.Second)
+	if err != nil {
+		return nil, err
+	}
+	client.httpClient = httpClient
+	return client, nil
 }
 
 // SetTimeout sets the HTTP client timeout
@@ -194,7 +206,10 @@ func (c *BGPViewClient) GetASNPrefixes(ctx context.Context, asn string) (*utilsf
 func GetASNCIDRs(ctx context.Context, asn string) ([]string, error) {
 	log := svc1log.FromContext(ctx)
 
-	client := NewBGPViewClient()
+	client, err := NewBGPViewClientFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
 
 	log.Info("Retrieving ASN CIDRs from BGPView", svc1log.SafeParam("asn", asn))
 
@@ -237,7 +252,10 @@ func GetASNCIDRs(ctx context.Context, asn string) ([]string, error) {
 func GetASNCIDRsWithTimeout(ctx context.Context, asn string, timeout time.Duration) ([]string, error) {
 	log := svc1log.FromContext(ctx)
 
-	client := NewBGPViewClient()
+	client, err := NewBGPViewClientFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
 
 	log.Info("Retrieving ASN CIDRs from BGPView with timeout",
 		svc1log.SafeParam("asn", asn),
@@ -281,7 +299,10 @@ func GetASNCIDRsWithTimeout(ctx context.Context, asn string, timeout time.Durati
 // GetASNCIDRsDetailed retrieves detailed CIDR information for a given ASN
 // Returns the full BGPView response with additional metadata
 func GetASNCIDRsDetailed(ctx context.Context, asn string) (*utilsfern.BgpViewResponse, error) {
-	client := NewBGPViewClient()
+	client, err := NewBGPViewClientFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
 	return client.GetASNPrefixes(ctx, asn)
 }
 
@@ -327,13 +348,19 @@ func ExtractCIDRsByCountry(response *utilsfern.BgpViewResponse, countryCode stri
 
 // GetASNInfo retrieves comprehensive ASN information using BGPView API
 func GetASNInfo(ctx context.Context, asn string) (*utilsfern.BgpViewResponse, error) {
-	client := NewBGPViewClient()
+	client, err := NewBGPViewClientFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
 	return client.GetASNInfo(ctx, asn)
 }
 
 // GetASNInfoWithTimeout retrieves comprehensive ASN information using BGPView API with timeout
 func GetASNInfoWithTimeout(ctx context.Context, asn string, timeout time.Duration) (*utilsfern.BgpViewResponse, error) {
-	client := NewBGPViewClient()
+	client, err := NewBGPViewClientFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
 	return client.GetASNInfoWithTimeout(ctx, asn, timeout)
 }
 

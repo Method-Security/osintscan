@@ -4,6 +4,8 @@ types:
     properties:
       asn: string
       timeout: optional<integer>
+      httpProxy: optional<string>
+      socksProxy: optional<string>
   DiscoverASNLookup:
     properties:
       asn: string

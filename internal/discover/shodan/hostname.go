@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 
+	osintConfig "github.com/Method-Security/osintscan/internal/config"
 	"github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
@@ -35,7 +36,7 @@ func QueryShodanHostStrictHostnameMatch(ctx context.Context, apiKey string, quer
 		svc1log.SafeParam("query", query),
 		svc1log.SafeParam("hostname_filter", hostname))
 
-	records, unmarshalErrors, err := queryShodanHost(apiKey, query)
+	records, unmarshalErrors, err := queryShodanHost(ctx, apiKey, query)
 	if err != nil {
 		log.Warn("Shodan query failed",
 			svc1log.SafeParam("query", query),
@@ -48,11 +49,18 @@ func QueryShodanHostStrictHostnameMatch(ctx context.Context, apiKey string, quer
 
 	filteredRecords := filterShodanRecordsByHostname(records, hostname)
 
+	proxyConfig := osintConfig.ProxyConfigFromContext(ctx)
 	report := Report{
 		Query:         query,
 		QueryType:     "QueryShodanHostStrictHostnameMatch",
 		ShodanRecords: filteredRecords,
 		Errors:        errors,
+	}
+	if proxyConfig.HttpProxy != "" {
+		report.HttpProxy = &proxyConfig.HttpProxy
+	}
+	if proxyConfig.SocksProxy != "" {
+		report.SocksProxy = &proxyConfig.SocksProxy
 	}
 
 	log.Info("Completed Shodan hostname query",

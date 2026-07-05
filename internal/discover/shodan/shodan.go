@@ -2,11 +2,14 @@
 package shodan
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"time"
+
+	osintConfig "github.com/Method-Security/osintscan/internal/config"
 )
 
 // UnmarshalJSON customizes the time unmarshalling for shodanTime.
@@ -23,9 +26,17 @@ func (ct *shodanTime) UnmarshalJSON(b []byte) (err error) {
 
 // queryShodanHost queries the Shodan API for hosts matching the given query string.
 // Returns a slice of Record structs, any per-record unmarshal warnings, or a fatal error.
-func queryShodanHost(apiKey string, query string) ([]Record, []string, error) {
+func queryShodanHost(ctx context.Context, apiKey string, query string) ([]Record, []string, error) {
 	url := fmt.Sprintf("https://api.shodan.io/shodan/host/search?key=%s&query=%s", apiKey, query)
-	resp, err := http.Get(url)
+	client, err := osintConfig.NewHTTPClientFromContext(ctx, true, 0)
+	if err != nil {
+		return nil, nil, err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, nil, err
 	}

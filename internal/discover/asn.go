@@ -6,6 +6,7 @@ import (
 
 	asnfern "github.com/Method-Security/osintscan/generated/go/discover/asn"
 	utilsfern "github.com/Method-Security/osintscan/generated/go/utils"
+	osintConfig "github.com/Method-Security/osintscan/internal/config"
 	"github.com/Method-Security/osintscan/utils"
 	"github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
@@ -16,6 +17,14 @@ func GetASNInfo(ctx context.Context, config *asnfern.DiscoverAsnConfig) (*asnfer
 	errors := []string{}
 
 	log.Info("Starting ASN information lookup via BGPView", svc1log.SafeParam("asn", config.Asn))
+
+	proxyConfig := osintConfig.ProxyConfigFromContext(ctx)
+	if proxyConfig.HttpProxy != "" {
+		config.HttpProxy = &proxyConfig.HttpProxy
+	}
+	if proxyConfig.SocksProxy != "" {
+		config.SocksProxy = &proxyConfig.SocksProxy
+	}
 
 	// Initialize lookup with the input ASN
 	lookup := &asnfern.DiscoverAsnLookup{
