@@ -1,6 +1,6 @@
 module github.com/Method-Security/osintscan
 
-go 1.26.3
+go 1.26.4
 
 require (
 	github.com/Method-Security/pkg v0.1.0
