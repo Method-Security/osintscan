@@ -22,6 +22,7 @@ types:
       domain: string
       wordlistSize: optional<WordlistSize>
       wordlistFile: optional<string>
+      randomizeList: boolean
       threads: integer
       maxDepth: integer
       timeout: integer

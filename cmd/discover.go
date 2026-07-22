@@ -27,8 +27,6 @@ import (
 	shodan "github.com/Method-Security/osintscan/internal/discover/shodan"
 	"github.com/spf13/cobra"
 
-	// Configs
-	"github.com/Method-Security/osintscan/configs"
 	// Utils
 	"github.com/Method-Security/osintscan/utils"
 )
@@ -327,6 +325,11 @@ func (a *OsintScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
+			randomizeList, err := cmd.Flags().GetBool("randomize-list")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
 
 			var wordlistSubdomains []string
 			var wordlistSizeEnum *dnsfern.WordlistSize
@@ -347,13 +350,10 @@ func (a *OsintScan) InitDiscoverCommand() {
 				}
 				wordlistSizeEnum = &wordlistSizeEnumValue
 
-				embeddedPath := subdomain.GetDiscoverDNSSubdomainActiveWordlistEmbeddedPath(wordlistSize)
-				if embeddedPath != "" {
-					wordlistSubdomains, err = configs.ReadLines(embeddedPath)
-					if err != nil {
-						a.OutputSignal.AddError(err)
-						return
-					}
+				wordlistSubdomains, err = subdomain.GetDiscoverDNSSubdomainActiveWordlist(wordlistSize, randomizeList)
+				if err != nil {
+					a.OutputSignal.AddError(err)
+					return
 				}
 			}
 			allSubdomains := append(subdomains, wordlistSubdomains...)
@@ -399,7 +399,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 					return
 				}
 			}
-			config := getDiscoverDNSActiveSubdomainConfig(domain, wordlistSizeEnum, &wordlistFile, threads, maxDepth, timeout, sleep, wildcardChecks, dnsResolvers)
+			config := getDiscoverDNSActiveSubdomainConfig(domain, wordlistSizeEnum, &wordlistFile, randomizeList, threads, maxDepth, timeout, sleep, wildcardChecks, dnsResolvers)
 
 			report, err := subdomain.GetDomainSubdomainsActive(cmd.Context(), allSubdomains, config)
 			if err != nil {
@@ -417,6 +417,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 	discoverDNSSubdomainActiveCmd.Flags().StringSlice("subdomains", []string{}, "A list of subdomain names to test during discovery")
 	discoverDNSSubdomainActiveCmd.Flags().String("wordlist-size", "SMALL", "The size of the in-built wordlist to use for discovery")
 	discoverDNSSubdomainActiveCmd.Flags().String("wordlist-file", "", "The file containing the wordlist to use for discovery")
+	discoverDNSSubdomainActiveCmd.Flags().Bool("randomize-list", false, "Select random entries from the largest in-built wordlist while preserving the requested wordlist size")
 	discoverDNSSubdomainActiveCmd.Flags().Int("threads", 100, "Number of parallel threads to use for discovery")
 	discoverDNSSubdomainActiveCmd.Flags().Int("max-depth", 1, "Maximum recursion depth for subdomain discovery")
 	discoverDNSSubdomainActiveCmd.Flags().Int("timeout", 65, "Maximum time (in minutes) to spend on subdomain discovery")
@@ -955,13 +956,14 @@ func getDiscoverDNSReverseConfig(ips []string, cidr string, dnsResolvers []strin
 }
 
 // getDiscoverDNSActiveSubdomainConfig creates and returns a configuration for active subdomain discovery
-func getDiscoverDNSActiveSubdomainConfig(domain string, wordlistSize *dnsfern.WordlistSize, wordlistFile *string, threads, maxDepth, timeout, sleep, wildcardChecks int, dnsResolvers []string) dnsfern.DiscoverDnsSubdomainConfig {
+func getDiscoverDNSActiveSubdomainConfig(domain string, wordlistSize *dnsfern.WordlistSize, wordlistFile *string, randomizeList bool, threads, maxDepth, timeout, sleep, wildcardChecks int, dnsResolvers []string) dnsfern.DiscoverDnsSubdomainConfig {
 	return dnsfern.DiscoverDnsSubdomainConfig{
 		DiscoveryType: strings.ToLower(string(dnsfern.DiscoverDnsSubdomainTypeActive)),
 		Active: &dnsfern.DiscoverDnsSubdomainActiveConfig{
 			Domain:         domain,
 			WordlistSize:   wordlistSize,
 			WordlistFile:   wordlistFile,
+			RandomizeList:  randomizeList,
 			Threads:        threads,
 			MaxDepth:       maxDepth,
 			Timeout:        timeout,

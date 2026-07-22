@@ -2,7 +2,9 @@ package subdomain
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
+	"math/big"
 	"net"
 	"sort"
 	"strings"
@@ -12,12 +14,16 @@ import (
 
 	// Generated
 	dnsfern "github.com/Method-Security/osintscan/generated/go/discover/dns"
+	// Configs
+	"github.com/Method-Security/osintscan/configs"
 	// Utils
 	"github.com/Method-Security/osintscan/utils"
 	// External
 	"github.com/miekg/dns"
 	"github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
+
+const largestActiveWordlistSize = "LARGE"
 
 // GetDomainSubdomainsActive performs active (bruteforce) subdomain discovery for a given domain.
 // Returns a report containing all discovered subdomains and any errors encountered.
@@ -368,4 +374,51 @@ func GetDiscoverDNSSubdomainActiveWordlistEmbeddedPath(wordlistSize string) stri
 	}
 
 	return wordlistPaths[wordlistSize]
+}
+
+// GetDiscoverDNSSubdomainActiveWordlist returns the built-in wordlist entries for a requested size.
+// When randomizeList is set, smaller sizes are sampled from the largest built-in list without replacement.
+func GetDiscoverDNSSubdomainActiveWordlist(wordlistSize string, randomizeList bool) ([]string, error) {
+	wordlistPath := GetDiscoverDNSSubdomainActiveWordlistEmbeddedPath(wordlistSize)
+	if wordlistPath == "" {
+		return nil, fmt.Errorf("unsupported active DNS wordlist size %q", wordlistSize)
+	}
+
+	wordlistEntries, err := configs.ReadLines(wordlistPath)
+	if err != nil {
+		return nil, err
+	}
+	if !randomizeList || wordlistSize == largestActiveWordlistSize {
+		return wordlistEntries, nil
+	}
+
+	largestWordlistPath := GetDiscoverDNSSubdomainActiveWordlistEmbeddedPath(largestActiveWordlistSize)
+	largestWordlistEntries, err := configs.ReadLines(largestWordlistPath)
+	if err != nil {
+		return nil, err
+	}
+
+	return selectRandomEntries(largestWordlistEntries, len(wordlistEntries))
+}
+
+func selectRandomEntries(entries []string, count int) ([]string, error) {
+	if count < 0 || count > len(entries) {
+		return nil, fmt.Errorf("cannot select %d entries from list of size %d", count, len(entries))
+	}
+	if count == len(entries) {
+		return append([]string(nil), entries...), nil
+	}
+
+	shuffledEntries := append([]string(nil), entries...)
+	for i := 0; i < count; i++ {
+		remaining := len(shuffledEntries) - i
+		randomOffset, err := rand.Int(rand.Reader, big.NewInt(int64(remaining)))
+		if err != nil {
+			return nil, fmt.Errorf("failed to select random wordlist entry: %w", err)
+		}
+		randomIndex := i + int(randomOffset.Int64())
+		shuffledEntries[i], shuffledEntries[randomIndex] = shuffledEntries[randomIndex], shuffledEntries[i]
+	}
+
+	return shuffledEntries[:count], nil
 }
