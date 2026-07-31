@@ -251,7 +251,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 				return
 			}
 			if len(ips) == 0 && cidr == "" {
-				a.OutputSignal.AddError(fmt.Errorf("either --ips or --cidr must be provided"))
+				a.OutputSignal.AddError(fmt.Errorf("either --ip-addresses or --cidr must be provided"))
 				return
 			}
 
@@ -851,7 +851,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 
 			// Validate that either ip or cidr is provided
 			if len(ips) == 0 && cidr == "" {
-				a.OutputSignal.AddError(fmt.Errorf("either --ips or --cidr must be provided"))
+				a.OutputSignal.AddError(fmt.Errorf("either --ip-addresses or --cidr must be provided"))
 				return
 			}
 
