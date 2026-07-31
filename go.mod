@@ -1,23 +1,23 @@
 module github.com/Method-Security/osintscan
 
-go 1.26.4
+go 1.26.5
 
 require (
-	github.com/Method-Security/pkg v0.1.0
+	github.com/Method-Security/pkg v0.1.1
 	github.com/google/uuid v1.6.0
-	github.com/miekg/dns v1.1.68
+	github.com/miekg/dns v1.1.72
 	github.com/owasp-amass/amass/v4 v4.2.0
 	github.com/owasp-amass/config v0.1.4
 	github.com/owasp-amass/open-asset-model v0.2.0
-	github.com/palantir/pkg/datetime v1.2.0
-	github.com/palantir/witchcraft-go-logging v1.61.0
+	github.com/palantir/pkg/datetime v1.4.0
+	github.com/palantir/witchcraft-go-logging v1.70.0
 	github.com/projectdiscovery/dnsx v1.2.2
 	github.com/projectdiscovery/gologger v1.1.54
 	github.com/projectdiscovery/subfinder/v2 v2.9.0
 	github.com/spf13/cobra v1.9.1
 	github.com/stretchr/testify v1.11.1
 	github.com/weppos/publicsuffix-go v0.40.3-0.20250708083804-25ff8f86d8b3
-	golang.org/x/net v0.56.0
+	golang.org/x/net v0.57.0
 )
 
 require (
@@ -68,7 +68,7 @@ require (
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/dsnet/compress v0.0.2-0.20230904184137-39efe44ab707 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
-	github.com/fatih/color v1.18.0 // indirect
+	github.com/fatih/color v1.19.0 // indirect
 	github.com/gaissmai/bart v0.24.0 // indirect
 	github.com/geziyor/geziyor v0.0.0-20240812061556-229b8ca83ac1 // indirect
 	github.com/glebarez/go-sqlite v1.22.0 // indirect
@@ -105,8 +105,8 @@ require (
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/lufia/plan9stats v0.0.0-20250317134145-8bc96cf8fc35 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
-	github.com/mattn/go-colorable v0.1.14 // indirect
-	github.com/mattn/go-isatty v0.0.20 // indirect
+	github.com/mattn/go-colorable v0.1.15 // indirect
+	github.com/mattn/go-isatty v0.0.22 // indirect
 	github.com/mattn/go-runewidth v0.0.16 // indirect
 	github.com/mholt/archives v0.1.0 // indirect
 	github.com/microcosm-cc/bluemonday v1.0.27 // indirect
@@ -121,15 +121,15 @@ require (
 	github.com/owasp-amass/asset-db v0.3.3 // indirect
 	github.com/owasp-amass/resolve v0.6.21 // indirect
 	github.com/palantir/pkg v1.1.0 // indirect
-	github.com/palantir/pkg/bytesbuffers v1.2.0 // indirect
-	github.com/palantir/pkg/safejson v1.1.0 // indirect
-	github.com/palantir/pkg/safelong v1.2.0 // indirect
-	github.com/palantir/pkg/safeyaml v1.1.0 // indirect
-	github.com/palantir/pkg/transform v1.1.0 // indirect
-	github.com/palantir/pkg/uuid v1.2.0 // indirect
-	github.com/palantir/witchcraft-go-error v1.41.0 // indirect
-	github.com/palantir/witchcraft-go-params v1.38.0 // indirect
-	github.com/palantir/witchcraft-go-tracing v1.40.0 // indirect
+	github.com/palantir/pkg/bytesbuffers v1.3.0 // indirect
+	github.com/palantir/pkg/safejson v1.2.0 // indirect
+	github.com/palantir/pkg/safelong v1.3.0 // indirect
+	github.com/palantir/pkg/safeyaml v1.2.0 // indirect
+	github.com/palantir/pkg/transform v1.2.0 // indirect
+	github.com/palantir/pkg/uuid v1.3.0 // indirect
+	github.com/palantir/witchcraft-go-error v1.46.0 // indirect
+	github.com/palantir/witchcraft-go-params v1.42.0 // indirect
+	github.com/palantir/witchcraft-go-tracing v1.44.0 // indirect
 	github.com/pierrec/lz4/v4 v4.1.22 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
@@ -189,18 +189,17 @@ require (
 	go.etcd.io/bbolt v1.4.2 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/ratelimit v0.3.0 // indirect
-	go.uber.org/zap v1.27.0 // indirect
 	go4.org v0.0.0-20230225012048-214862532bf5 // indirect
-	golang.org/x/crypto v0.53.0 // indirect
+	golang.org/x/crypto v0.54.0 // indirect
 	golang.org/x/exp v0.0.0-20250819193227-8b4c13bb791b // indirect
-	golang.org/x/mod v0.36.0 // indirect
+	golang.org/x/mod v0.37.0 // indirect
 	golang.org/x/oauth2 v0.30.0 // indirect
-	golang.org/x/sync v0.21.0 // indirect
-	golang.org/x/sys v0.46.0 // indirect
-	golang.org/x/term v0.44.0 // indirect
-	golang.org/x/text v0.38.0 // indirect
+	golang.org/x/sync v0.22.0 // indirect
+	golang.org/x/sys v0.47.0 // indirect
+	golang.org/x/term v0.45.0 // indirect
+	golang.org/x/text v0.40.0 // indirect
 	golang.org/x/time v0.12.0 // indirect
-	golang.org/x/tools v0.45.0 // indirect
+	golang.org/x/tools v0.47.0 // indirect
 	google.golang.org/protobuf v1.34.2 // indirect
 	gopkg.in/djherbis/times.v1 v1.3.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
