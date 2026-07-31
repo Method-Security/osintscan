@@ -119,6 +119,10 @@ func New(opts ...Option) *Client {
 	}
 
 	transport := &http.Transport{
+		// Force HTTP/2 negotiation over ALPN. Setting a custom TLSClientConfig
+		// otherwise disables Go's automatic HTTP/2 upgrade, so this flag is
+		// required to keep HTTP/2 enabled.
+		ForceAttemptHTTP2: true,
 		TLSClientConfig: &tls.Config{
 			MinVersion:         tls.VersionTLS12,
 			InsecureSkipVerify: !options.VerifyTLS, //nolint:gosec // configurable by caller

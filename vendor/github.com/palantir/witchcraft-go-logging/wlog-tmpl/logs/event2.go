@@ -16,7 +16,7 @@ package logs
 
 import (
 	"github.com/palantir/pkg/safejson"
-	"github.com/palantir/witchcraft-go-logging/conjure/witchcraft/api/logging"
+	"github.com/palantir/witchcraft-go-logging/conjure/witchcraft-logging-api/witchcraft/api/logging"
 	"github.com/palantir/witchcraft-go-logging/wlog-tmpl/logentryformatter"
 )
 
@@ -41,7 +41,7 @@ func (r *evt2LogTyper) NewFormatter(tmpl string, params ...logentryformatter.Par
 	return logentryformatter.New(r.parseLogEntry, tmpl, newParams...)
 }
 
-func (r *evt2LogTyper) parseLogEntry(lineJSON []byte, substitute bool) (interface{}, error) {
+func (r *evt2LogTyper) parseLogEntry(lineJSON []byte, substitute bool) (any, error) {
 	var res logging.EventLogV2
 	if err := safejson.Unmarshal(lineJSON, &res); err != nil {
 		return nil, err
