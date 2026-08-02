@@ -28,6 +28,7 @@ type Source struct {
 	timeTaken time.Duration
 	errors    atomic.Int32
 	results   atomic.Int32
+	requests  atomic.Int32
 	skipped   bool
 }
 
@@ -65,6 +66,7 @@ func (s *Source) Run(ctx context.Context, domain string, session *subscraping.Se
 	results := make(chan subscraping.Result)
 	s.errors.Store(0)
 	s.results.Store(0)
+	s.requests.Store(0)
 
 	// Waitgroup for subsources
 	var wg sync.WaitGroup
@@ -104,9 +106,14 @@ func (s *Source) HasRecursiveSupport() bool {
 	return true
 }
 
+// KeyRequirement indicates that we need an API key
+func (s *Source) KeyRequirement() subscraping.KeyRequirement {
+	return subscraping.RequiredKey
+}
+
 // NeedsKey indicates that we need an API key
 func (s *Source) NeedsKey() bool {
-	return true
+	return s.KeyRequirement() == subscraping.RequiredKey
 }
 
 // AddApiKeys provides us with the API key(s)
@@ -119,6 +126,7 @@ func (s *Source) Statistics() subscraping.Statistics {
 	return subscraping.Statistics{
 		Errors:    int(s.errors.Load()),
 		Results:   int(s.results.Load()),
+		Requests:  int(s.requests.Load()),
 		TimeTaken: s.timeTaken,
 		Skipped:   s.skipped,
 	}
@@ -139,6 +147,7 @@ func (s *Source) runSubsource(ctx context.Context, domain string, session *subsc
 
 	// Request
 	requestURL := fmt.Sprintf("%s%s?%s%s&summarize=host&summary_context=%s&summary_limit=%d", baseURL, epConfig.endpoint, epConfig.param, url.QueryEscape(domain), epConfig.context, summaryLimit)
+	s.requests.Add(1)
 	resp, err := session.Get(ctx, requestURL, "", headers)
 	if err != nil {
 		// HTTP 204 is not an error from the Driftnet API
@@ -176,17 +185,24 @@ func (s *Source) runSubsource(ctx context.Context, domain string, session *subsc
 	}
 
 	for subdomain := range summary.Summary.Values {
-		// We can get certificate results which aren't actually subdomains of the target domain. Skip them.
+		select {
+		case <-ctx.Done():
+			wg.Done()
+			return
+		default:
+		}
 		if !strings.HasSuffix(subdomain, "."+domain) {
 			continue
 		}
 
-		// Avoid returning the same result more than once from the same source (can happen as we are using multiple endpoints)
 		if _, present := dedupe.LoadOrStore(strings.ToLower(subdomain), true); !present {
-			results <- subscraping.Result{
-				Source: s.Name(), Type: subscraping.Subdomain, Value: subdomain,
+			select {
+			case <-ctx.Done():
+				wg.Done()
+				return
+			case results <- subscraping.Result{Source: s.Name(), Type: subscraping.Subdomain, Value: subdomain}:
+				s.results.Add(1)
 			}
-			s.results.Add(1)
 		}
 	}
 

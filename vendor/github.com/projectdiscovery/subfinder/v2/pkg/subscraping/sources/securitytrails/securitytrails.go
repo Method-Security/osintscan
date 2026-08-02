@@ -31,6 +31,7 @@ type Source struct {
 	timeTaken time.Duration
 	errors    int
 	results   int
+	requests  int
 	skipped   bool
 }
 
@@ -39,6 +40,7 @@ func (s *Source) Run(ctx context.Context, domain string, session *subscraping.Se
 	results := make(chan subscraping.Result)
 	s.errors = 0
 	s.results = 0
+	s.requests = 0
 
 	go func() {
 		defer func(startTime time.Time) {
@@ -56,18 +58,26 @@ func (s *Source) Run(ctx context.Context, domain string, session *subscraping.Se
 		headers := map[string]string{"Content-Type": "application/json", "APIKEY": randomApiKey}
 
 		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
 			var resp *http.Response
 			var err error
 
 			if scrollId == "" {
 				var requestBody = fmt.Appendf(nil, `{"query":"apex_domain='%s'"}`, domain)
+				s.requests++
 				resp, err = session.Post(ctx, "https://api.securitytrails.com/v1/domains/list?include_ips=false&scroll=true", "",
 					headers, bytes.NewReader(requestBody))
 			} else {
+				s.requests++
 				resp, err = session.Get(ctx, fmt.Sprintf("https://api.securitytrails.com/v1/scroll/%s", scrollId), "", headers)
 			}
 
 			if err != nil && ptr.Safe(resp).StatusCode == 403 {
+				s.requests++
 				resp, err = session.Get(ctx, fmt.Sprintf("https://api.securitytrails.com/v1/domain/%s/subdomains", domain), "", headers)
 			}
 
@@ -90,11 +100,20 @@ func (s *Source) Run(ctx context.Context, domain string, session *subscraping.Se
 			session.DiscardHTTPResponse(resp)
 
 			for _, record := range securityTrailsResponse.Records {
-				results <- subscraping.Result{Source: s.Name(), Type: subscraping.Subdomain, Value: record.Hostname}
-				s.results++
+				select {
+				case <-ctx.Done():
+					return
+				case results <- subscraping.Result{Source: s.Name(), Type: subscraping.Subdomain, Value: record.Hostname}:
+					s.results++
+				}
 			}
 
 			for _, subdomain := range securityTrailsResponse.Subdomains {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+				}
 				if strings.HasSuffix(subdomain, ".") {
 					subdomain += domain
 				} else {
@@ -128,8 +147,12 @@ func (s *Source) HasRecursiveSupport() bool {
 	return true
 }
 
+func (s *Source) KeyRequirement() subscraping.KeyRequirement {
+	return subscraping.RequiredKey
+}
+
 func (s *Source) NeedsKey() bool {
-	return true
+	return s.KeyRequirement() == subscraping.RequiredKey
 }
 
 func (s *Source) AddApiKeys(keys []string) {
@@ -142,5 +165,6 @@ func (s *Source) Statistics() subscraping.Statistics {
 		Results:   s.results,
 		TimeTaken: s.timeTaken,
 		Skipped:   s.skipped,
+		Requests:  s.requests,
 	}
 }

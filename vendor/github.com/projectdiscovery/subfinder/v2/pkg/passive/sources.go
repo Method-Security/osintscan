@@ -26,31 +26,38 @@ import (
 	"github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/dnsdb"
 	"github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/dnsdumpster"
 	"github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/dnsrepo"
+	"github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/domainsproject"
 	"github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/driftnet"
-	"github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/facebook"
 	"github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/fofa"
 	"github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/fullhunt"
 	"github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/github"
 	"github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/hackertarget"
 	"github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/hudsonrock"
-	"github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/hunter"
 	"github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/intelx"
 	"github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/leakix"
+	"github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/merklemap"
 	"github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/netlas"
+	"github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/onyphe"
+	"github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/profundis"
 	"github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/pugrecon"
 	"github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/quake"
 	"github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/rapiddns"
+	"github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/reconeer"
 	"github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/redhuntlabs"
 	"github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/robtex"
 	"github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/rsecloud"
 	"github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/securitytrails"
 	"github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/shodan"
 	"github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/sitedossier"
+	"github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/submd"
+	"github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/thc"
 	"github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/threatbook"
 	"github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/threatcrowd"
+	"github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/urlscan"
 	"github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/virustotal"
 	"github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/waybackarchive"
 	"github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/whoisxmlapi"
+	"github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/windvane"
 	"github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/zoomeyeapi"
 	mapsutil "github.com/projectdiscovery/utils/maps"
 )
@@ -60,6 +67,7 @@ var AllSources = [...]subscraping.Source{
 	&anubis.Source{},
 	&bevigil.Source{},
 	&bufferover.Source{},
+	&builtwith.Source{},
 	&c99.Source{},
 	&censys.Source{},
 	&certspotter.Source{},
@@ -67,22 +75,29 @@ var AllSources = [...]subscraping.Source{
 	&chinaz.Source{},
 	&commoncrawl.Source{},
 	&crtsh.Source{},
+	&digitalyama.Source{},
 	&digitorus.Source{},
 	&dnsdb.Source{},
 	&dnsdumpster.Source{},
 	&dnsrepo.Source{},
+	&domainsproject.Source{},
 	&driftnet.Source{},
 	&fofa.Source{},
 	&fullhunt.Source{},
 	&github.Source{},
 	&hackertarget.Source{},
-	&hunter.Source{},
+	&hudsonrock.Source{},
 	&intelx.Source{},
-	&netlas.Source{},
 	&leakix.Source{},
-	&quake.Source{},
+	&merklemap.Source{},
+	&netlas.Source{},
+	&onyphe.Source{},
+	&profundis.Source{},
 	&pugrecon.Source{},
+	&quake.Source{},
 	&rapiddns.Source{},
+	// &reconcloud.Source{}, // failing due to cloudflare bot protection
+	&reconeer.Source{},
 	&redhuntlabs.Source{},
 	// &riddler.Source{}, // failing due to cloudfront protection
 	&robtex.Source{},
@@ -90,18 +105,17 @@ var AllSources = [...]subscraping.Source{
 	&securitytrails.Source{},
 	&shodan.Source{},
 	&sitedossier.Source{},
+	&thc.Source{},
 	&threatbook.Source{},
 	&threatcrowd.Source{},
+	// &threatminer.Source{}, // failing  api
+	&urlscan.Source{},
 	&virustotal.Source{},
 	&waybackarchive.Source{},
 	&whoisxmlapi.Source{},
+	&windvane.Source{},
 	&zoomeyeapi.Source{},
-	&facebook.Source{},
-	// &threatminer.Source{}, // failing  api
-	// &reconcloud.Source{}, // failing due to cloudflare bot protection
-	&builtwith.Source{},
-	&hudsonrock.Source{},
-	&digitalyama.Source{},
+	&submd.Source{},
 }
 
 var sourceWarnings = mapsutil.NewSyncLockMap[string, string](
@@ -172,9 +186,9 @@ func New(sourceNames, excludedSourceNames []string, useAllSources, useSourcesSup
 		}
 	}
 
-	// TODO: Consider refactoring this to avoid potential duplication issues
 	for _, source := range sources {
-		if source.NeedsKey() {
+		keyReq := source.KeyRequirement()
+		if keyReq == subscraping.RequiredKey || keyReq == subscraping.OptionalKey {
 			if apiKey := os.Getenv(fmt.Sprintf("%s_API_KEY", strings.ToUpper(source.Name()))); apiKey != "" {
 				source.AddApiKeys([]string{apiKey})
 			}

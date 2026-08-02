@@ -29,6 +29,7 @@ type Source struct {
 	timeTaken time.Duration
 	errors    int
 	results   int
+	requests  int
 }
 
 // Run function returns all subdomains found with the service
@@ -36,6 +37,7 @@ func (s *Source) Run(ctx context.Context, domain string, session *subscraping.Se
 	results := make(chan subscraping.Result)
 	s.errors = 0
 	s.results = 0
+	s.requests = 0
 
 	go func() {
 		defer func(startTime time.Time) {
@@ -54,7 +56,10 @@ func (s *Source) Run(ctx context.Context, domain string, session *subscraping.Se
 }
 
 func (s *Source) getSubdomainsFromSQL(ctx context.Context, domain string, session *subscraping.Session, results chan subscraping.Result) int {
-	db, err := sql.Open("postgres", "host=crt.sh user=guest dbname=certwatch sslmode=disable binary_parameters=yes")
+	// connect_timeout: limits connection establishment time (in seconds)
+	// statement_timeout: limits query execution time (in milliseconds)
+	connStr := fmt.Sprintf("host=crt.sh user=guest dbname=certwatch sslmode=disable binary_parameters=yes connect_timeout=%d statement_timeout=%d", session.Timeout, session.Timeout*1000)
+	db, err := sql.Open("postgres", connStr)
 	if err != nil {
 		results <- subscraping.Result{Source: s.Name(), Type: subscraping.Error, Error: err}
 		s.errors++
@@ -114,8 +119,12 @@ func (s *Source) getSubdomainsFromSQL(ctx context.Context, domain string, sessio
 
 	var count int
 	var data string
-	// Parse all the rows getting subdomains
 	for rows.Next() {
+		select {
+		case <-ctx.Done():
+			return count
+		default:
+		}
 		err := rows.Scan(&data)
 		if err != nil {
 			results <- subscraping.Result{Source: s.Name(), Type: subscraping.Error, Error: err}
@@ -127,8 +136,12 @@ func (s *Source) getSubdomainsFromSQL(ctx context.Context, domain string, sessio
 		for subdomain := range strings.SplitSeq(data, "\n") {
 			for _, value := range session.Extractor.Extract(subdomain) {
 				if value != "" {
-					results <- subscraping.Result{Source: s.Name(), Type: subscraping.Subdomain, Value: value}
-					s.results++
+					select {
+					case <-ctx.Done():
+						return count
+					case results <- subscraping.Result{Source: s.Name(), Type: subscraping.Subdomain, Value: value}:
+						s.results++
+					}
 				}
 			}
 		}
@@ -137,6 +150,7 @@ func (s *Source) getSubdomainsFromSQL(ctx context.Context, domain string, sessio
 }
 
 func (s *Source) getSubdomainsFromHTTP(ctx context.Context, domain string, session *subscraping.Session, results chan subscraping.Result) bool {
+	s.requests++
 	resp, err := session.SimpleGet(ctx, fmt.Sprintf("https://crt.sh/?q=%%25.%s&output=json", domain))
 	if err != nil {
 		results <- subscraping.Result{Source: s.Name(), Type: subscraping.Error, Error: err}
@@ -157,11 +171,20 @@ func (s *Source) getSubdomainsFromHTTP(ctx context.Context, domain string, sessi
 	session.DiscardHTTPResponse(resp)
 
 	for _, subdomain := range subdomains {
+		select {
+		case <-ctx.Done():
+			return true
+		default:
+		}
 		for sub := range strings.SplitSeq(subdomain.NameValue, "\n") {
 			for _, value := range session.Extractor.Extract(sub) {
 				if value != "" {
-					results <- subscraping.Result{Source: s.Name(), Type: subscraping.Subdomain, Value: value}
-					s.results++
+					select {
+					case <-ctx.Done():
+						return true
+					case results <- subscraping.Result{Source: s.Name(), Type: subscraping.Subdomain, Value: value}:
+						s.results++
+					}
 				}
 			}
 		}
@@ -183,8 +206,12 @@ func (s *Source) HasRecursiveSupport() bool {
 	return true
 }
 
+func (s *Source) KeyRequirement() subscraping.KeyRequirement {
+	return subscraping.NoKey
+}
+
 func (s *Source) NeedsKey() bool {
-	return false
+	return s.KeyRequirement() == subscraping.RequiredKey
 }
 
 func (s *Source) AddApiKeys(_ []string) {
@@ -195,6 +222,7 @@ func (s *Source) Statistics() subscraping.Statistics {
 	return subscraping.Statistics{
 		Errors:    s.errors,
 		Results:   s.results,
+		Requests:  s.requests,
 		TimeTaken: s.timeTaken,
 	}
 }

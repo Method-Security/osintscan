@@ -57,6 +57,9 @@ type Options struct {
 	WithZTLS                 bool
 	SNIName                  string
 	OnBeforeDial             func(hostname, IP, port string)
+	// OnValidateTarget is called after network policy validation and before dialing.
+	// If it returns an error, the target is considered invalid.
+	OnValidateTarget         func(hostname, IP, port string) error
 	OnInvalidTarget          func(hostname, IP, port string)
 	OnDialCallback           func(hostname, IP string)
 	DisableZtlsFallback      bool
@@ -68,6 +71,26 @@ type Options struct {
 	// optional max temporary errors to mark as permanent
 	MaxTemporaryErrors              int
 	MaxTemporaryToPermanentDuration time.Duration
+
+	// ConnectionCacheExpiry is the duration after which a cached connection
+	// expires.
+	//
+	// Default is [DefaultConnExpiry].
+	ConnectionCacheExpiry time.Duration
+
+	// MaxResolverEntries limits the number of resolvers read from the resolvers
+	// file.
+	//
+	// Default is [DefaultMaxResolverEntries].
+	// Use -1 for unlimited entries.
+	MaxResolverEntries int
+
+	// Ndots enforces the resolv.conf(5) ndots: threshold for treating a name
+	// as absolute before search domains are appended (see
+	// https://man7.org/linux/man-pages/man5/resolv.conf.5.html).
+	//
+	// Default is [DefaultNdots].
+	Ndots int
 }
 
 // DefaultOptions of the cache
@@ -76,7 +99,7 @@ var DefaultOptions = Options{
 	MaxRetries:                      5,
 	HostsFile:                       true,
 	ResolversFile:                   true,
-	CacheType:                       Disk,
+	CacheType:                       Memory,
 	DialerTimeout:                   10 * time.Second,
 	DialerKeepAlive:                 10 * time.Second,
 	MaxTemporaryErrors:              30,

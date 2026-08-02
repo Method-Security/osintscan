@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"time"
 
 	jsoniter "github.com/json-iterator/go"
@@ -43,6 +42,7 @@ type Source struct {
 	timeTaken time.Duration
 	errors    int
 	results   int
+	requests  int
 	skipped   bool
 }
 
@@ -56,6 +56,7 @@ func (s *Source) Run(ctx context.Context, domain string, session *subscraping.Se
 	results := make(chan subscraping.Result)
 	s.errors = 0
 	s.results = 0
+	s.requests = 0
 
 	go func() {
 		defer func(startTime time.Time) {
@@ -85,6 +86,7 @@ func (s *Source) Run(ctx context.Context, domain string, session *subscraping.Se
 			return
 		}
 
+		s.requests++
 		resp, err := session.SimplePost(ctx, searchURL, "application/json", bytes.NewBuffer(body))
 		if err != nil {
 			results <- subscraping.Result{Source: s.Name(), Type: subscraping.Error, Error: err}
@@ -107,6 +109,12 @@ func (s *Source) Run(ctx context.Context, domain string, session *subscraping.Se
 		resultsURL := fmt.Sprintf("https://%s/phonebook/search/result?k=%s&id=%s&limit=10000", randomApiKey.host, randomApiKey.key, response.ID)
 		status := 0
 		for status == 0 || status == 3 {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
+			s.requests++
 			resp, err = session.Get(ctx, resultsURL, "", nil)
 			if err != nil {
 				results <- subscraping.Result{Source: s.Name(), Type: subscraping.Error, Error: err}
@@ -122,22 +130,16 @@ func (s *Source) Run(ctx context.Context, domain string, session *subscraping.Se
 				session.DiscardHTTPResponse(resp)
 				return
 			}
-
-			_, err = io.ReadAll(resp.Body)
-			if err != nil {
-				results <- subscraping.Result{Source: s.Name(), Type: subscraping.Error, Error: err}
-				s.errors++
-				session.DiscardHTTPResponse(resp)
-				return
-			}
 			session.DiscardHTTPResponse(resp)
 
 			status = response.Status
 			for _, hostname := range response.Selectors {
-				results <- subscraping.Result{
-					Source: s.Name(), Type: subscraping.Subdomain, Value: hostname.Selectvalue,
+				select {
+				case <-ctx.Done():
+					return
+				case results <- subscraping.Result{Source: s.Name(), Type: subscraping.Subdomain, Value: hostname.Selectvalue}:
+					s.results++
 				}
-				s.results++
 			}
 		}
 	}()
@@ -158,8 +160,12 @@ func (s *Source) HasRecursiveSupport() bool {
 	return false
 }
 
+func (s *Source) KeyRequirement() subscraping.KeyRequirement {
+	return subscraping.RequiredKey
+}
+
 func (s *Source) NeedsKey() bool {
-	return true
+	return s.KeyRequirement() == subscraping.RequiredKey
 }
 
 func (s *Source) AddApiKeys(keys []string) {
@@ -172,6 +178,7 @@ func (s *Source) Statistics() subscraping.Statistics {
 	return subscraping.Statistics{
 		Errors:    s.errors,
 		Results:   s.results,
+		Requests:  s.requests,
 		TimeTaken: s.timeTaken,
 		Skipped:   s.skipped,
 	}

@@ -25,9 +25,15 @@ func (c *Client) Do(req *Request) (*http.Response, error) {
 	var resp *http.Response
 	var err error
 
-	// Create a main context that will be used as the main timeout
-	mainCtx, cancel := context.WithTimeout(context.Background(), c.options.Timeout)
-	defer cancel()
+	// Create a main context that will be used as the main timeout. A zero or
+	// negative timeout means no overall deadline (otherwise WithTimeout would
+	// create an already-expired context and abort before the first retry).
+	mainCtx := context.Background()
+	if c.options.Timeout > 0 {
+		var cancel context.CancelFunc
+		mainCtx, cancel = context.WithTimeout(context.Background(), c.options.Timeout)
+		defer cancel()
+	}
 
 	retryMax := c.options.RetryMax
 	if ctxRetryMax := req.Context().Value(RETRY_MAX); ctxRetryMax != nil {
@@ -36,6 +42,7 @@ func (c *Client) Do(req *Request) (*http.Response, error) {
 		}
 	}
 
+retryLoop:
 	for i := 0; ; i++ {
 		// request body can be read multiple times
 		// hence no need to rewind it
@@ -105,17 +112,20 @@ func (c *Client) Do(req *Request) (*http.Response, error) {
 		// If the context is cancelled however, return.
 		wait := c.Backoff(c.options.RetryWaitMin, c.options.RetryWaitMax, i, resp)
 
-		// Exit if the main context or the request context is done
-		// Otherwise, wait for the duration and try again.
-		// use label to explicitly specify what to break
-	selectstatement:
+		// Wait for the backoff period, but stop early if either the overall
+		// timeout (mainCtx) or the request context is done. A timer is used
+		// instead of time.After so it is released immediately on early exit
+		// rather than lingering for the full backoff duration.
+		timer := time.NewTimer(wait)
 		select {
 		case <-mainCtx.Done():
-			break selectstatement
+			timer.Stop()
+			break retryLoop
 		case <-req.Context().Done():
+			timer.Stop()
 			c.closeIdleConnections()
 			return nil, req.Context().Err()
-		case <-time.After(wait):
+		case <-timer.C:
 		}
 	}
 
@@ -127,7 +137,7 @@ func (c *Client) Do(req *Request) (*http.Response, error) {
 	// By default, we close the response body and return an error without
 	// returning the response
 	if resp != nil {
-		resp.Body.Close()
+		_ = resp.Body.Close()
 	}
 	c.closeIdleConnections()
 	return nil, fmt.Errorf("%s %s giving up after %d attempts: %w", req.Method, req.URL, retryMax+1, err)
@@ -139,7 +149,7 @@ func (c *Client) drainBody(req *Request, resp *http.Response) {
 	if err != nil {
 		req.Metrics.DrainErrors++
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 }
 
 const closeConnectionsCounter = 100
@@ -151,6 +161,7 @@ func (c *Client) closeIdleConnections() {
 		} else {
 			c.requestCounter.Store(0)
 			c.HTTPClient.CloseIdleConnections()
+			c.HTTPClient2.CloseIdleConnections()
 		}
 	}
 }
@@ -247,5 +258,5 @@ func (c *Client) wrapContextWithTrace(req *Request) {
 	}
 	req.TraceInfo = traceInfo
 
-	req.Request = req.Request.WithContext(httptrace.WithClientTrace(req.Request.Context(), trace))
+	req.Request = req.Request.WithContext(httptrace.WithClientTrace(req.Context(), trace))
 }

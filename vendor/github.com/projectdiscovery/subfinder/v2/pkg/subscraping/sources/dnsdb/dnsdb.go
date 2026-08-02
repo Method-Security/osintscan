@@ -43,6 +43,7 @@ type Source struct {
 	timeTaken time.Duration
 	errors    int
 	results   uint64
+	requests  int
 	skipped   bool
 }
 
@@ -51,6 +52,7 @@ func (s *Source) Run(ctx context.Context, domain string, session *subscraping.Se
 	results := make(chan subscraping.Result)
 	s.errors = 0
 	s.results = 0
+	s.requests = 0
 
 	go func() {
 		defer func(startTime time.Time) {
@@ -70,6 +72,7 @@ func (s *Source) Run(ctx context.Context, domain string, session *subscraping.Se
 			"Accept":    "application/x-ndjson",
 		}
 
+		s.requests++
 		offsetMax, err := getMaxOffset(ctx, session, headers)
 		if err != nil {
 			results <- subscraping.Result{Source: sourceName, Type: subscraping.Error, Error: err}
@@ -85,8 +88,14 @@ func (s *Source) Run(ctx context.Context, domain string, session *subscraping.Se
 		queryParams.Add("swclient", "subfinder")
 
 		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
 			url := urlTemplate + queryParams.Encode()
 
+			s.requests++
 			resp, err := session.Get(ctx, url, "", headers)
 			if err != nil {
 				results <- subscraping.Result{Source: sourceName, Type: subscraping.Error, Error: err}
@@ -98,6 +107,12 @@ func (s *Source) Run(ctx context.Context, domain string, session *subscraping.Se
 			var respCond string
 			reader := bufio.NewReader(resp.Body)
 			for {
+				select {
+				case <-ctx.Done():
+					session.DiscardHTTPResponse(resp)
+					return
+				default:
+				}
 				n, err := reader.ReadBytes('\n')
 				if err == io.EOF {
 					break
@@ -117,21 +132,18 @@ func (s *Source) Run(ctx context.Context, domain string, session *subscraping.Se
 					return
 				}
 
-				// Condition is a scalar enum of string values: {“begin”, “ongoing”, “succeeded”, “limited”, “failed”}.
-				// "begin" will be the initiating Condition, this can be safely ignored. The data of interest will be in
-				// objects with Condition "" or "ongoing". Conditions "succeeded", "limited", and "failed" are terminating conditions.
-				// See https://www.domaintools.com/resources/user-guides/farsight-streaming-api-framing-protocol-documentation/
-				// for more details
 				respCond = response.Condition
 				if respCond == "" || respCond == "ongoing" {
 					if response.Obj.Name != "" {
-						results <- subscraping.Result{
-							Source: sourceName, Type: subscraping.Subdomain, Value: strings.TrimSuffix(response.Obj.Name, "."),
+						select {
+						case <-ctx.Done():
+							session.DiscardHTTPResponse(resp)
+							return
+						case results <- subscraping.Result{Source: sourceName, Type: subscraping.Subdomain, Value: strings.TrimSuffix(response.Obj.Name, ".")}:
+							s.results++
 						}
-						s.results++
 					}
 				} else if respCond != "begin" {
-					// if the respCond is not "", "ongoing", or "begin", then it is a terminating condition, so break out of the loop
 					break
 				}
 			}
@@ -175,8 +187,12 @@ func (s *Source) HasRecursiveSupport() bool {
 	return true
 }
 
+func (s *Source) KeyRequirement() subscraping.KeyRequirement {
+	return subscraping.RequiredKey
+}
+
 func (s *Source) NeedsKey() bool {
-	return true
+	return s.KeyRequirement() == subscraping.RequiredKey
 }
 
 func (s *Source) AddApiKeys(keys []string) {
@@ -187,6 +203,7 @@ func (s *Source) Statistics() subscraping.Statistics {
 	return subscraping.Statistics{
 		Errors:    s.errors,
 		Results:   int(s.results),
+		Requests:  s.requests,
 		TimeTaken: s.timeTaken,
 		Skipped:   s.skipped,
 	}

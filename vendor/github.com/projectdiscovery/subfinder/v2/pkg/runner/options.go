@@ -15,6 +15,7 @@ import (
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/subfinder/v2/pkg/passive"
 	"github.com/projectdiscovery/subfinder/v2/pkg/resolve"
+	"github.com/projectdiscovery/subfinder/v2/pkg/subscraping"
 	envutil "github.com/projectdiscovery/utils/env"
 	fileutil "github.com/projectdiscovery/utils/file"
 	folderutil "github.com/projectdiscovery/utils/folder"
@@ -223,16 +224,20 @@ func (options *Options) loadProvidersFrom(location string) {
 
 func listSources(options *Options) {
 	gologger.Info().Msgf("Current list of available sources. [%d]\n", len(passive.AllSources))
-	gologger.Info().Msgf("Sources marked with an * need key(s) or token(s) to work.\n")
+	gologger.Info().Msgf("Sources marked with an * require key(s) or token(s) to work.\n")
+	gologger.Info().Msgf("Sources marked with a ~ optionally support key(s) for better results.\n")
 	gologger.Info().Msgf("You can modify %s to configure your keys/tokens.\n\n", options.ProviderConfig)
 
 	for _, source := range passive.AllSources {
-		message := "%s\n"
 		sourceName := source.Name()
-		if source.NeedsKey() {
-			message = "%s *\n"
+		switch source.KeyRequirement() {
+		case subscraping.RequiredKey:
+			gologger.Silent().Msgf("%s *\n", sourceName)
+		case subscraping.OptionalKey:
+			gologger.Silent().Msgf("%s ~\n", sourceName)
+		default:
+			gologger.Silent().Msgf("%s\n", sourceName)
 		}
-		gologger.Silent().Msgf(message, sourceName)
 	}
 }
 
@@ -260,4 +265,5 @@ var defaultRateLimits = []string{
 	// "gitlab=2/s",
 	"github=83/m",
 	"hudsonrock=5/s",
+	"urlscan=1/s",
 }

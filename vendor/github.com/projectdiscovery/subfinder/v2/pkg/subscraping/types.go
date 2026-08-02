@@ -16,7 +16,8 @@ const (
 )
 
 type CustomRateLimit struct {
-	Custom mapsutil.SyncLockMap[string, uint]
+	Custom         mapsutil.SyncLockMap[string, uint]
+	CustomDuration mapsutil.SyncLockMap[string, time.Duration]
 }
 
 // BasicAuth request's Authorization header
@@ -28,10 +29,20 @@ type BasicAuth struct {
 // Statistics contains statistics about the scraping process
 type Statistics struct {
 	TimeTaken time.Duration
+	Requests  int
 	Errors    int
 	Results   int
 	Skipped   bool
 }
+
+// KeyRequirement represents the API key requirement level for a source
+type KeyRequirement int
+
+const (
+	NoKey KeyRequirement = iota
+	OptionalKey
+	RequiredKey
+)
 
 // Source is an interface inherited by each passive source
 type Source interface {
@@ -52,7 +63,11 @@ type Source interface {
 	// not just root domains.
 	HasRecursiveSupport() bool
 
-	// NeedsKey returns true if the source requires an API key
+	// KeyRequirement returns the API key requirement level for this source
+	KeyRequirement() KeyRequirement
+
+	// NeedsKey returns true if the source requires an API key.
+	// Deprecated: Use KeyRequirement() instead for more granular control.
 	NeedsKey() bool
 
 	AddApiKeys([]string)
@@ -75,6 +90,8 @@ type Session struct {
 	Client *http.Client
 	// Rate limit instance
 	MultiRateLimiter *ratelimit.MultiLimiter
+	// Timeout is the timeout in seconds for requests
+	Timeout int
 }
 
 // Result is a result structure returned by a source

@@ -23,6 +23,9 @@ type Source struct {
 	timeTaken time.Duration
 	results   int
 	errors    int
+	requests  int
+	apiKeys   []string
+	skipped   bool
 }
 
 // Run function returns all subdomains found with the service
@@ -30,6 +33,7 @@ func (s *Source) Run(ctx context.Context, domain string, session *subscraping.Se
 	results := make(chan subscraping.Result)
 	s.errors = 0
 	s.results = 0
+	s.requests = 0
 
 	go func() {
 		defer func(startTime time.Time) {
@@ -37,7 +41,15 @@ func (s *Source) Run(ctx context.Context, domain string, session *subscraping.Se
 			close(results)
 		}(time.Now())
 
-		resp, err := session.SimpleGet(ctx, fmt.Sprintf("https://otx.alienvault.com/api/v1/indicators/domain/%s/passive_dns", domain))
+		randomApiKey := subscraping.PickRandom(s.apiKeys, s.Name())
+		if randomApiKey == "" {
+			s.skipped = true
+			return
+		}
+
+		s.requests++
+		resp, err := session.Get(ctx, fmt.Sprintf("https://otx.alienvault.com/api/v1/indicators/domain/%s/passive_dns", domain), "",
+			map[string]string{"Authorization": "Bearer " + randomApiKey})
 		if err != nil && resp == nil {
 			results <- subscraping.Result{Source: s.Name(), Type: subscraping.Error, Error: err}
 			s.errors++
@@ -64,8 +76,12 @@ func (s *Source) Run(ctx context.Context, domain string, session *subscraping.Se
 		}
 
 		for _, record := range response.PassiveDNS {
-			results <- subscraping.Result{Source: s.Name(), Type: subscraping.Subdomain, Value: record.Hostname}
-			s.results++
+			select {
+			case <-ctx.Done():
+				return
+			case results <- subscraping.Result{Source: s.Name(), Type: subscraping.Subdomain, Value: record.Hostname}:
+				s.results++
+			}
 		}
 	}()
 
@@ -85,18 +101,24 @@ func (s *Source) HasRecursiveSupport() bool {
 	return true
 }
 
-func (s *Source) NeedsKey() bool {
-	return false
+func (s *Source) KeyRequirement() subscraping.KeyRequirement {
+	return subscraping.RequiredKey
 }
 
-func (s *Source) AddApiKeys(_ []string) {
-	// no key needed
+func (s *Source) NeedsKey() bool {
+	return s.KeyRequirement() == subscraping.RequiredKey
+}
+
+func (s *Source) AddApiKeys(keys []string) {
+	s.apiKeys = keys
 }
 
 func (s *Source) Statistics() subscraping.Statistics {
 	return subscraping.Statistics{
 		Errors:    s.errors,
 		Results:   s.results,
+		Requests:  s.requests,
 		TimeTaken: s.timeTaken,
+		Skipped:   s.skipped,
 	}
 }

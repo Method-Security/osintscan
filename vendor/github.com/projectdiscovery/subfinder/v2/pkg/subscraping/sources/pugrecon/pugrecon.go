@@ -32,6 +32,7 @@ type Source struct {
 	timeTaken time.Duration
 	errors    int
 	results   int
+	requests  int
 	skipped   bool
 }
 
@@ -40,6 +41,7 @@ func (s *Source) Run(ctx context.Context, domain string, session *subscraping.Se
 	results := make(chan subscraping.Result)
 	s.errors = 0
 	s.results = 0
+	s.requests = 0
 
 	go func() {
 		defer func(startTime time.Time) {
@@ -71,6 +73,7 @@ func (s *Source) Run(ctx context.Context, domain string, session *subscraping.Se
 		}
 
 		apiURL := "https://pugrecon.com/api/v1/domains"
+		s.requests++
 		resp, err := session.HTTPRequest(ctx, http.MethodPost, apiURL, "", headers, bodyReader, subscraping.BasicAuth{}) // Use HTTPRequest for full header control
 		if err != nil {
 			results <- subscraping.Result{Source: s.Name(), Type: subscraping.Error, Error: err}
@@ -106,10 +109,12 @@ func (s *Source) Run(ctx context.Context, domain string, session *subscraping.Se
 		}
 
 		for _, subdomain := range response.Results {
-			results <- subscraping.Result{
-				Source: s.Name(), Type: subscraping.Subdomain, Value: subdomain.Name,
+			select {
+			case <-ctx.Done():
+				return
+			case results <- subscraping.Result{Source: s.Name(), Type: subscraping.Subdomain, Value: subdomain.Name}:
+				s.results++
 			}
-			s.results++
 		}
 	}()
 
@@ -131,9 +136,14 @@ func (s *Source) HasRecursiveSupport() bool {
 	return false
 }
 
+// KeyRequirement returns the API key requirement level for this source.
+func (s *Source) KeyRequirement() subscraping.KeyRequirement {
+	return subscraping.RequiredKey
+}
+
 // NeedsKey returns true as this source requires an API key.
 func (s *Source) NeedsKey() bool {
-	return true
+	return s.KeyRequirement() == subscraping.RequiredKey
 }
 
 // AddApiKeys adds the API keys for the source.
@@ -148,5 +158,6 @@ func (s *Source) Statistics() subscraping.Statistics {
 		Results:   s.results,
 		TimeTaken: s.timeTaken,
 		Skipped:   s.skipped,
+		Requests:  s.requests,
 	}
 }

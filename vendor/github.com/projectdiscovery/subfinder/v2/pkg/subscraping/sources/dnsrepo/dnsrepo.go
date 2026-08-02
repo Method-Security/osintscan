@@ -17,6 +17,7 @@ type Source struct {
 	timeTaken time.Duration
 	errors    int
 	results   int
+	requests  int
 	skipped   bool
 }
 
@@ -28,6 +29,7 @@ func (s *Source) Run(ctx context.Context, domain string, session *subscraping.Se
 	results := make(chan subscraping.Result)
 	s.errors = 0
 	s.results = 0
+	s.requests = 0
 
 	go func() {
 		defer func(startTime time.Time) {
@@ -50,6 +52,7 @@ func (s *Source) Run(ctx context.Context, domain string, session *subscraping.Se
 		token := randomApiInfo[0]
 		apiKey := randomApiInfo[1]
 
+		s.requests++
 		resp, err := session.Get(ctx, fmt.Sprintf("https://dnsarchive.net/api/?apikey=%s&search=%s", apiKey, domain), "", map[string]string{"X-API-Access": token})
 		if err != nil {
 			results <- subscraping.Result{Source: s.Name(), Type: subscraping.Error, Error: err}
@@ -74,10 +77,12 @@ func (s *Source) Run(ctx context.Context, domain string, session *subscraping.Se
 			return
 		}
 		for _, sub := range result {
-			results <- subscraping.Result{
-				Source: s.Name(), Type: subscraping.Subdomain, Value: strings.TrimSuffix(sub.Domain, "."),
+			select {
+			case <-ctx.Done():
+				return
+			case results <- subscraping.Result{Source: s.Name(), Type: subscraping.Subdomain, Value: strings.TrimSuffix(sub.Domain, ".")}:
+				s.results++
 			}
-			s.results++
 		}
 
 	}()
@@ -98,8 +103,12 @@ func (s *Source) HasRecursiveSupport() bool {
 	return false
 }
 
+func (s *Source) KeyRequirement() subscraping.KeyRequirement {
+	return subscraping.RequiredKey
+}
+
 func (s *Source) NeedsKey() bool {
-	return true
+	return s.KeyRequirement() == subscraping.RequiredKey
 }
 
 func (s *Source) AddApiKeys(keys []string) {
@@ -110,6 +119,7 @@ func (s *Source) Statistics() subscraping.Statistics {
 	return subscraping.Statistics{
 		Errors:    s.errors,
 		Results:   s.results,
+		Requests:  s.requests,
 		TimeTaken: s.timeTaken,
 		Skipped:   s.skipped,
 	}
