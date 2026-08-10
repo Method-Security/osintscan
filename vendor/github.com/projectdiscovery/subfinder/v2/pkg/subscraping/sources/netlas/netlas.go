@@ -34,12 +34,16 @@ type DomainsCountResponse struct {
 	Count int `json:"count"`
 }
 
+// Community-tier download cap; see #1765.
+const communityDownloadCap = 200
+
 // Source is the passive scraping agent
 type Source struct {
 	apiKeys   []string
 	timeTaken time.Duration
 	errors    int
 	results   int
+	requests  int
 	skipped   bool
 }
 
@@ -47,6 +51,7 @@ func (s *Source) Run(ctx context.Context, domain string, session *subscraping.Se
 	results := make(chan subscraping.Result)
 	s.errors = 0
 	s.results = 0
+	s.requests = 0
 
 	go func() {
 		defer func(startTime time.Time) {
@@ -63,6 +68,7 @@ func (s *Source) Run(ctx context.Context, domain string, session *subscraping.Se
 
 		// Pick an API key
 		randomApiKey := subscraping.PickRandom(s.apiKeys, s.Name())
+		s.requests++
 		resp1, err := session.HTTPRequest(ctx, http.MethodGet, countUrl, "", map[string]string{
 			"accept":    "application/json",
 			"X-API-Key": randomApiKey,
@@ -71,10 +77,7 @@ func (s *Source) Run(ctx context.Context, domain string, session *subscraping.Se
 		if err != nil {
 			results <- subscraping.Result{Source: s.Name(), Type: subscraping.Error, Error: err}
 			s.errors++
-			return
-		} else if resp1.StatusCode != 200 {
-			results <- subscraping.Result{Source: s.Name(), Type: subscraping.Error, Error: fmt.Errorf("request rate limited with status code %d", resp1.StatusCode)}
-			s.errors++
+			session.DiscardHTTPResponse(resp1)
 			return
 		}
 		defer func() {
@@ -86,7 +89,7 @@ func (s *Source) Run(ctx context.Context, domain string, session *subscraping.Se
 
 		body, err := io.ReadAll(resp1.Body)
 		if err != nil {
-			results <- subscraping.Result{Source: s.Name(), Type: subscraping.Error, Error: fmt.Errorf("error reading ressponse body")}
+			results <- subscraping.Result{Source: s.Name(), Type: subscraping.Error, Error: fmt.Errorf("error reading response body")}
 			s.errors++
 			return
 		}
@@ -108,7 +111,7 @@ func (s *Source) Run(ctx context.Context, domain string, session *subscraping.Se
 			"q":           query,
 			"fields":      []string{"*"},
 			"source_type": "include",
-			"size":        domainsCount.Count,
+			"size":        min(domainsCount.Count, communityDownloadCap),
 		}
 		jsonRequestBody, err := json.Marshal(requestBody)
 		if err != nil {
@@ -120,6 +123,7 @@ func (s *Source) Run(ctx context.Context, domain string, session *subscraping.Se
 		// Pick an API key
 		randomApiKey = subscraping.PickRandom(s.apiKeys, s.Name())
 
+		s.requests++
 		resp2, err := session.HTTPRequest(ctx, http.MethodPost, apiUrl, "", map[string]string{
 			"accept":       "application/json",
 			"X-API-Key":    randomApiKey,
@@ -127,6 +131,7 @@ func (s *Source) Run(ctx context.Context, domain string, session *subscraping.Se
 		if err != nil {
 			results <- subscraping.Result{Source: s.Name(), Type: subscraping.Error, Error: err}
 			s.errors++
+			session.DiscardHTTPResponse(resp2)
 			return
 		}
 		defer func() {
@@ -135,15 +140,10 @@ func (s *Source) Run(ctx context.Context, domain string, session *subscraping.Se
 				s.errors++
 			}
 		}()
+
 		body, err = io.ReadAll(resp2.Body)
 		if err != nil {
-			results <- subscraping.Result{Source: s.Name(), Type: subscraping.Error, Error: fmt.Errorf("error reading ressponse body")}
-			s.errors++
-			return
-		}
-
-		if resp2.StatusCode == 429 {
-			results <- subscraping.Result{Source: s.Name(), Type: subscraping.Error, Error: fmt.Errorf("request rate limited with status code %d", resp2.StatusCode)}
+			results <- subscraping.Result{Source: s.Name(), Type: subscraping.Error, Error: fmt.Errorf("error reading response body")}
 			s.errors++
 			return
 		}
@@ -158,10 +158,12 @@ func (s *Source) Run(ctx context.Context, domain string, session *subscraping.Se
 		}
 
 		for _, item := range data {
-			results <- subscraping.Result{
-				Source: s.Name(), Type: subscraping.Subdomain, Value: item.Data.Domain,
+			select {
+			case <-ctx.Done():
+				return
+			case results <- subscraping.Result{Source: s.Name(), Type: subscraping.Subdomain, Value: item.Data.Domain}:
+				s.results++
 			}
-			s.results++
 		}
 
 	}()
@@ -182,8 +184,12 @@ func (s *Source) HasRecursiveSupport() bool {
 	return false
 }
 
+func (s *Source) KeyRequirement() subscraping.KeyRequirement {
+	return subscraping.RequiredKey
+}
+
 func (s *Source) NeedsKey() bool {
-	return true
+	return s.KeyRequirement() == subscraping.RequiredKey
 }
 
 func (s *Source) AddApiKeys(keys []string) {
@@ -194,6 +200,7 @@ func (s *Source) Statistics() subscraping.Statistics {
 	return subscraping.Statistics{
 		Errors:    s.errors,
 		Results:   s.results,
+		Requests:  s.requests,
 		TimeTaken: s.timeTaken,
 		Skipped:   s.skipped,
 	}

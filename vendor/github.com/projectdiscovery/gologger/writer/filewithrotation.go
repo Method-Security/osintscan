@@ -3,6 +3,7 @@
 package writer
 
 import (
+	"compress/gzip"
 	"errors"
 	"fmt"
 	"io"
@@ -12,10 +13,30 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mholt/archives"
+	"github.com/djherbis/times"
 	"github.com/projectdiscovery/gologger/levels"
-	"gopkg.in/djherbis/times.v1"
 )
+
+// Compression is the minimal interface used to compress rotated log files.
+// It is intentionally small (only what gologger needs) so the package does not
+// depend on a full multi-format archive library for what is effectively gzip.
+type Compression interface {
+	// Extension returns the file extension for the compressed file (e.g. ".gz").
+	Extension() string
+	// OpenWriter wraps w with a compressing writer.
+	OpenWriter(w io.Writer) (io.WriteCloser, error)
+}
+
+// GzipCompression compresses rotated logs using the standard library compress/gzip.
+type GzipCompression struct{}
+
+// Extension returns the gzip file extension.
+func (GzipCompression) Extension() string { return ".gz" }
+
+// OpenWriter returns a gzip writer wrapping w.
+func (GzipCompression) OpenWriter(w io.Writer) (io.WriteCloser, error) {
+	return gzip.NewWriter(w), nil
+}
 
 func init() {
 	// Set default dir to current directory + /logs
@@ -28,7 +49,7 @@ func init() {
 	// Current logfile name is "processname.log"
 	DefaultFileWithRotationOptions.FileName = fmt.Sprintf("%s.log", filepath.Base(os.Args[0]))
 	DefaultFileWithRotationOptions.BackupTimeFormat = "2006-01-02T15-04-05"
-	DefaultFileWithRotationOptions.ArchiveFormat = archives.Gz{}
+	DefaultFileWithRotationOptions.ArchiveFormat = GzipCompression{}
 }
 
 // FileWithRotation is a concurrent output writer to a file with rotation.
@@ -48,7 +69,7 @@ type FileWithRotationOptions struct {
 	Compress         bool
 	MaxSize          int
 	BackupTimeFormat string
-	ArchiveFormat    archives.Compression
+	ArchiveFormat    Compression
 	// Helpers
 	RotateEachHour bool
 	RotateEachDay  bool
@@ -139,7 +160,7 @@ func (w *FileWithRotation) checkAndRotate() {
 // Close and flushes the logger
 func (w *FileWithRotation) Close() {
 	_ = w.logFile.Sync()
-	w.logFile.Close()
+	_ = w.logFile.Close()
 }
 
 func (w *FileWithRotation) newLoggerSync() (err error) {
@@ -196,13 +217,17 @@ func (w *FileWithRotation) renameAndCompressLogs() {
 			if err != nil {
 				return
 			}
-			defer in.Close()
+			defer func() {
+				_ = in.Close()
+			}()
 
 			out, err := os.Create(filename + w.options.ArchiveFormat.Extension())
 			if err != nil {
 				return
 			}
-			defer out.Close()
+			defer func() {
+				_ = out.Close()
+			}()
 
 			writer, err := w.options.ArchiveFormat.OpenWriter(out)
 			if err != nil {
@@ -213,8 +238,8 @@ func (w *FileWithRotation) renameAndCompressLogs() {
 				if err != nil {
 					_ = os.RemoveAll(out.Name())
 				}
+				_ = writer.Close()
 			}()
-			defer writer.Close()
 
 			_, err = io.Copy(writer, in)
 			if err != nil {
@@ -243,5 +268,5 @@ func getChangeTime(filename string) (time.Time, error) {
 		return t.ChangeTime(), nil
 	}
 
-	return timeNow, errors.New("No change time")
+	return timeNow, errors.New("no change time")
 }

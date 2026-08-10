@@ -23,6 +23,7 @@ type Source struct {
 	timeTaken time.Duration
 	errors    int
 	results   int
+	requests  int
 }
 
 // Run queries the ThreatCrowd API for the given domain and returns found subdomains.
@@ -30,6 +31,7 @@ func (s *Source) Run(ctx context.Context, domain string, session *subscraping.Se
 	results := make(chan subscraping.Result)
 	s.errors = 0
 	s.results = 0
+	s.requests = 0
 
 	go func(startTime time.Time) {
 		defer func() {
@@ -45,6 +47,7 @@ func (s *Source) Run(ctx context.Context, domain string, session *subscraping.Se
 			return
 		}
 
+		s.requests++
 		resp, err := session.Client.Do(req)
 		if err != nil {
 			results <- subscraping.Result{Source: s.Name(), Type: subscraping.Error, Error: err}
@@ -80,8 +83,12 @@ func (s *Source) Run(ctx context.Context, domain string, session *subscraping.Se
 
 		for _, subdomain := range tcResponse.Subdomains {
 			if subdomain != "" {
-				results <- subscraping.Result{Source: s.Name(), Type: subscraping.Subdomain, Value: subdomain}
-				s.results++
+				select {
+				case <-ctx.Done():
+					return
+				case results <- subscraping.Result{Source: s.Name(), Type: subscraping.Subdomain, Value: subdomain}:
+					s.results++
+				}
 			}
 		}
 	}(time.Now())
@@ -104,9 +111,14 @@ func (s *Source) HasRecursiveSupport() bool {
 	return false
 }
 
+// KeyRequirement returns the API key requirement level for this source.
+func (s *Source) KeyRequirement() subscraping.KeyRequirement {
+	return subscraping.NoKey
+}
+
 // NeedsKey indicates if the source requires an API key.
 func (s *Source) NeedsKey() bool {
-	return false
+	return s.KeyRequirement() == subscraping.RequiredKey
 }
 
 // AddApiKeys is a no-op since ThreatCrowd does not require an API key.
@@ -118,5 +130,6 @@ func (s *Source) Statistics() subscraping.Statistics {
 		Errors:    s.errors,
 		Results:   s.results,
 		TimeTaken: s.timeTaken,
+		Requests:  s.requests,
 	}
 }

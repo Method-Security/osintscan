@@ -300,10 +300,6 @@ func BoringGREASEECH() *GREASEEncryptedClientHelloExtension {
 				KdfId:  dicttls.HKDF_SHA256,
 				AeadId: dicttls.AEAD_AES_128_GCM,
 			},
-			{
-				KdfId:  dicttls.HKDF_SHA256,
-				AeadId: dicttls.AEAD_CHACHA20_POLY1305,
-			},
 		},
 		CandidatePayloadLens: []uint16{128, 160, 192, 224}, // +16: 144, 176, 208, 240
 	}

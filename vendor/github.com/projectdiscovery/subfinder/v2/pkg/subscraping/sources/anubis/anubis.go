@@ -17,6 +17,7 @@ type Source struct {
 	timeTaken time.Duration
 	errors    int
 	results   int
+	requests  int
 }
 
 // Run function returns all subdomains found with the service
@@ -24,6 +25,7 @@ func (s *Source) Run(ctx context.Context, domain string, session *subscraping.Se
 	results := make(chan subscraping.Result)
 	s.errors = 0
 	s.results = 0
+	s.requests = 0
 
 	go func() {
 		defer func(startTime time.Time) {
@@ -31,6 +33,7 @@ func (s *Source) Run(ctx context.Context, domain string, session *subscraping.Se
 			close(results)
 		}(time.Now())
 
+		s.requests++
 		resp, err := session.SimpleGet(ctx, fmt.Sprintf("https://jonlu.ca/anubis/subdomains/%s", domain))
 		if err != nil {
 			results <- subscraping.Result{Source: s.Name(), Type: subscraping.Error, Error: err}
@@ -56,8 +59,12 @@ func (s *Source) Run(ctx context.Context, domain string, session *subscraping.Se
 		session.DiscardHTTPResponse(resp)
 
 		for _, record := range subdomains {
-			results <- subscraping.Result{Source: s.Name(), Type: subscraping.Subdomain, Value: record}
-			s.results++
+			select {
+			case <-ctx.Done():
+				return
+			case results <- subscraping.Result{Source: s.Name(), Type: subscraping.Subdomain, Value: record}:
+				s.results++
+			}
 		}
 
 	}()
@@ -78,8 +85,12 @@ func (s *Source) HasRecursiveSupport() bool {
 	return false
 }
 
+func (s *Source) KeyRequirement() subscraping.KeyRequirement {
+	return subscraping.NoKey
+}
+
 func (s *Source) NeedsKey() bool {
-	return false
+	return s.KeyRequirement() == subscraping.RequiredKey
 }
 
 func (s *Source) AddApiKeys(_ []string) {
@@ -90,6 +101,7 @@ func (s *Source) Statistics() subscraping.Statistics {
 	return subscraping.Statistics{
 		Errors:    s.errors,
 		Results:   s.results,
+		Requests:  s.requests,
 		TimeTaken: s.timeTaken,
 	}
 }

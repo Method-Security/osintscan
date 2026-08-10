@@ -4,15 +4,12 @@
 // Package art summarizes the functions and inverse functions
 // for mapping between a prefix and a baseIndex.
 //
+//	can inline IdxToPfx with cost 37
+//	can inline IdxToRange with cost 68
+//	can inline NetMask with cost 14
 //	can inline OctetToIdx with cost 5
-//	can inline PfxToIdx with cost 10
-//	can inline IdxToPfx with cost 30
-//	can inline IdxToRange with cost 54
 //	can inline PfxBits with cost 21
-//	can inline NetMask with cost 7
-//
-// Please read the ART paper ./doc/artlookup.pdf
-// to understand the baseIndex algorithm.
+//	can inline PfxToIdx with cost 17
 package art
 
 import "math/bits"
@@ -31,22 +28,42 @@ import "math/bits"
 //		                          ^ << 3      ^
 //		                 + -----------------------
 //		                               0b0000_1101 = 13
+//
+// Panics if `pfxLen > 7`.
 func PfxToIdx(octet, pfxLen uint8) uint8 {
+	if pfxLen > 7 {
+		panic("PfxToIdx: invalid pfxLen > 7")
+	}
 	return octet>>(8-pfxLen) + 1<<pfxLen
 }
 
-// OctetToIdx maps octet/8 prefixes to numbers. The return values range from 256 to 511.
-// OctetToIdx is a special case of PfxToIdx.
-func OctetToIdx(octet uint8) uint {
-	return uint(octet) + 256
+// OctetToIdx maps octet/8 prefixes from [256..511] => [128..255] to start
+// with the parent (>>1) in the complete binary tree.
+//
+// Same formula as PfxToIdx, but for octet/8 and a shift (>>1).
+//
+//	octet>>(8-pfxLen) + 1<<pfxLen
+//	     octet>>(8-8) + 1<<8
+//	            octet + 256
+//
+//	got to parent idx:
+//	    (octet+256)>>1 == octet>>1 + 128
+func OctetToIdx(octet uint8) uint8 {
+	return octet>>1 + 128
 }
 
 // IdxToPfx returns the octet and prefix len of baseIdx.
-// It's the inverse to pfxToIdx256.
+// It's the inverse to PfxToIdx.
 func IdxToPfx(idx uint8) (octet, pfxLen uint8) {
+	if idx == 0 {
+		panic("IdxToPfx: invalid idx 0")
+	}
 	// The prefix length corresponds to the number of leading bits in idx.
 	// bits.Len8 returns the number of bits needed to represent idx as binary,
 	// so we subtract 1 to recover the prefix length (which is always >= 0).
+	// Invariant: idx==0 is invalid
+
+	//nolint:gosec  //G115: integer overflow conversion int -> uint8 (gosec)
 	pfxLen = uint8(bits.Len8(idx)) - 1
 
 	// Compute the number of bits to shift back to obtain the original octet.
@@ -58,7 +75,7 @@ func IdxToPfx(idx uint8) (octet, pfxLen uint8) {
 	// Shift the masked prefix bits back to their original position.
 	octet = (idx & mask) << shiftBits
 
-	return
+	return octet, pfxLen
 }
 
 // PfxBits returns the bit position of a prefix represented by a base index at a given trie depth.
@@ -78,10 +95,11 @@ func PfxBits(depth int, idx uint8) uint8 {
 	// subtract 1 to get the actual prefix length used in this stride
 	pfxLenInStride := bits.Len8(idx) - 1
 
-	// Each trie level represents 8 bits (an octet)
+	// Each trie level represents 8 bits (an octet), max depth is 16
 	baseBits := depth << 3 // same as depth * 8
 
-	// Total prefix length in bits = full bytes before + prefix bits in this byte
+	// Total prefix length in bits, [0..128]
+	//nolint:gosec   // G115: integer overflow conversion int -> uint8
 	return uint8(baseBits + pfxLenInStride)
 }
 
@@ -109,7 +127,7 @@ func IdxToRange(idx uint8) (first, last uint8) {
 	// This gives the maximum octet value that still matches the prefix.
 	last = first | ^NetMask(pfxLen)
 
-	return
+	return first, last
 }
 
 // NetMask returns an 8-bit left-aligned network mask for the given number of prefix bits.
@@ -121,12 +139,16 @@ func IdxToRange(idx uint8) (first, last uint8) {
 //	bits = 2  -> 0b11000000
 //	bits = 3  -> 0b11100000
 //	...
-//	bits = 8  -> 0b11111111
+//	bits = 8 -> 0b11111111
 //
 // This mask is used to extract or identify the fixed (prefix) portion of an octet.
 // The rightmost (8 - bits) bits are cleared (set to zero), and the upper 'bits' are set to 1.
 func NetMask(bits uint8) uint8 {
+	if bits > 8 {
+		panic("NetMask: invalid bits > 8")
+	}
+
 	// Use a full 8-bit mask and shift left to clear trailing (host) bits.
-	// Convert 'bits' to uint16 to avoid overflow in shift for bits == 8.
-	return 0b11111111 << (8 - uint16(bits))
+	// Shifts 0..8 on a uint8 are well-defined; safe for bits in [0..8].
+	return ^uint8(0) << (8 - bits)
 }

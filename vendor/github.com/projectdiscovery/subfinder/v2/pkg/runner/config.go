@@ -8,6 +8,7 @@ import (
 
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/subfinder/v2/pkg/passive"
+	"github.com/projectdiscovery/subfinder/v2/pkg/subscraping"
 	fileutil "github.com/projectdiscovery/utils/file"
 )
 
@@ -25,7 +26,8 @@ func createProviderConfigYAML(configFilePath string) error {
 
 	sourcesRequiringApiKeysMap := make(map[string][]string)
 	for _, source := range passive.AllSources {
-		if source.NeedsKey() {
+		keyReq := source.KeyRequirement()
+		if keyReq == subscraping.RequiredKey || keyReq == subscraping.OptionalKey {
 			sourceName := strings.ToLower(source.Name())
 			sourcesRequiringApiKeysMap[sourceName] = []string{}
 		}
@@ -46,7 +48,7 @@ func UnmarshalFrom(file string) error {
 	for _, source := range passive.AllSources {
 		sourceName := strings.ToLower(source.Name())
 		apiKeys := sourceApiKeysMap[sourceName]
-		if source.NeedsKey() && apiKeys != nil && len(apiKeys) > 0 {
+		if len(apiKeys) > 0 {
 			gologger.Debug().Msgf("API key(s) found for %s.", sourceName)
 			source.AddApiKeys(apiKeys)
 		}

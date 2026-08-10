@@ -23,9 +23,8 @@ github.com/Mzack9999/go-http-digest-auth-client
 # github.com/PuerkitoBio/goquery v1.10.0
 ## explicit; go 1.23
 github.com/PuerkitoBio/goquery
-# github.com/STARRY-S/zip v0.2.1
-## explicit; go 1.22.2
-github.com/STARRY-S/zip
+# github.com/STARRY-S/zip v0.2.3
+## explicit; go 1.23
 # github.com/VividCortex/ewma v1.2.0
 ## explicit; go 1.12
 github.com/VividCortex/ewma
@@ -72,26 +71,10 @@ github.com/benbjohnson/clock
 github.com/beorn7/perks/quantile
 # github.com/bodgit/plumbing v1.3.0
 ## explicit; go 1.13
-github.com/bodgit/plumbing
-# github.com/bodgit/sevenzip v1.6.0
-## explicit; go 1.19
-github.com/bodgit/sevenzip
-github.com/bodgit/sevenzip/internal/aes7z
-github.com/bodgit/sevenzip/internal/bcj2
-github.com/bodgit/sevenzip/internal/bra
-github.com/bodgit/sevenzip/internal/brotli
-github.com/bodgit/sevenzip/internal/bzip2
-github.com/bodgit/sevenzip/internal/deflate
-github.com/bodgit/sevenzip/internal/delta
-github.com/bodgit/sevenzip/internal/lz4
-github.com/bodgit/sevenzip/internal/lzma
-github.com/bodgit/sevenzip/internal/lzma2
-github.com/bodgit/sevenzip/internal/pool
-github.com/bodgit/sevenzip/internal/util
-github.com/bodgit/sevenzip/internal/zstd
+# github.com/bodgit/sevenzip v1.6.1
+## explicit; go 1.21
 # github.com/bodgit/windows v1.0.1
 ## explicit; go 1.13
-github.com/bodgit/windows
 # github.com/caffix/netmap v0.2.5
 ## explicit; go 1.19
 github.com/caffix/netmap
@@ -219,6 +202,9 @@ github.com/davecgh/go-spew/spew
 # github.com/dimchansky/utfbom v1.1.1
 ## explicit
 github.com/dimchansky/utfbom
+# github.com/djherbis/times v1.6.0
+## explicit; go 1.16
+github.com/djherbis/times
 # github.com/dlclark/regexp2 v1.11.5
 ## explicit; go 1.13
 github.com/dlclark/regexp2
@@ -228,27 +214,34 @@ github.com/dlclark/regexp2/syntax
 github.com/docker/go-units
 # github.com/dsnet/compress v0.0.2-0.20230904184137-39efe44ab707
 ## explicit; go 1.9
-github.com/dsnet/compress
 github.com/dsnet/compress/brotli
-github.com/dsnet/compress/bzip2
-github.com/dsnet/compress/bzip2/internal/sais
 github.com/dsnet/compress/internal
 github.com/dsnet/compress/internal/errors
-github.com/dsnet/compress/internal/prefix
 # github.com/dustin/go-humanize v1.0.1
 ## explicit; go 1.16
 github.com/dustin/go-humanize
+# github.com/ebitengine/purego v0.10.0
+## explicit; go 1.18
+github.com/ebitengine/purego
+github.com/ebitengine/purego/internal/cgo
+github.com/ebitengine/purego/internal/fakecgo
+github.com/ebitengine/purego/internal/strings
+github.com/ebitengine/purego/internal/xreflect
 # github.com/fatih/color v1.19.0
 ## explicit; go 1.25.0
 github.com/fatih/color
-# github.com/gaissmai/bart v0.24.0
-## explicit; go 1.23.0
+# github.com/gaissmai/bart v0.28.0
+## explicit; go 1.24.0
 github.com/gaissmai/bart
 github.com/gaissmai/bart/internal/allot
 github.com/gaissmai/bart/internal/art
 github.com/gaissmai/bart/internal/bitset
 github.com/gaissmai/bart/internal/lpm
+github.com/gaissmai/bart/internal/nodes
 github.com/gaissmai/bart/internal/sparse
+github.com/gaissmai/bart/internal/tests/golden
+github.com/gaissmai/bart/internal/tests/random
+github.com/gaissmai/bart/internal/value
 # github.com/geziyor/geziyor v0.0.0-20240812061556-229b8ca83ac1
 ## explicit; go 1.15
 github.com/geziyor/geziyor
@@ -325,9 +318,6 @@ github.com/hashicorp/errwrap
 github.com/hashicorp/go-multierror
 # github.com/hashicorp/golang-lru/v2 v2.0.7
 ## explicit; go 1.18
-github.com/hashicorp/golang-lru/v2
-github.com/hashicorp/golang-lru/v2/internal
-github.com/hashicorp/golang-lru/v2/simplelru
 # github.com/inconshreveable/mousetrap v1.1.0
 ## explicit; go 1.18
 github.com/inconshreveable/mousetrap
@@ -367,26 +357,21 @@ github.com/josharian/intern
 # github.com/json-iterator/go v1.1.12
 ## explicit; go 1.12
 github.com/json-iterator/go
-# github.com/klauspost/compress v1.18.0
-## explicit; go 1.22
+# github.com/klauspost/compress v1.18.2
+## explicit; go 1.23
 github.com/klauspost/compress
 github.com/klauspost/compress/flate
 github.com/klauspost/compress/fse
 github.com/klauspost/compress/gzip
 github.com/klauspost/compress/huff0
 github.com/klauspost/compress/internal/cpuinfo
-github.com/klauspost/compress/internal/godebug
 github.com/klauspost/compress/internal/le
-github.com/klauspost/compress/internal/race
 github.com/klauspost/compress/internal/snapref
-github.com/klauspost/compress/s2
-github.com/klauspost/compress/zip
 github.com/klauspost/compress/zlib
 github.com/klauspost/compress/zstd
 github.com/klauspost/compress/zstd/internal/xxhash
 # github.com/klauspost/pgzip v1.2.6
 ## explicit
-github.com/klauspost/pgzip
 # github.com/lib/pq v1.10.9
 ## explicit; go 1.13
 github.com/lib/pq
@@ -394,7 +379,9 @@ github.com/lib/pq/oid
 github.com/lib/pq/scram
 # github.com/logrusorgru/aurora v2.0.3+incompatible
 ## explicit
-github.com/logrusorgru/aurora
+# github.com/logrusorgru/aurora/v4 v4.0.0
+## explicit; go 1.19
+github.com/logrusorgru/aurora/v4
 # github.com/lucasb-eyer/go-colorful v1.2.0
 ## explicit; go 1.12
 github.com/lucasb-eyer/go-colorful
@@ -416,9 +403,8 @@ github.com/mattn/go-isatty
 # github.com/mattn/go-runewidth v0.0.16
 ## explicit; go 1.9
 github.com/mattn/go-runewidth
-# github.com/mholt/archives v0.1.0
-## explicit; go 1.22.2
-github.com/mholt/archives
+# github.com/mholt/archives v0.1.5
+## explicit; go 1.24.0
 # github.com/microcosm-cc/bluemonday v1.0.27
 ## explicit; go 1.19
 github.com/microcosm-cc/bluemonday
@@ -452,9 +438,8 @@ github.com/munnerz/goautoneg
 # github.com/ncruces/go-strftime v0.1.9
 ## explicit; go 1.17
 github.com/ncruces/go-strftime
-# github.com/nwaples/rardecode/v2 v2.0.0-beta.4.0.20241112120701-034e449c6e78
-## explicit; go 1.16
-github.com/nwaples/rardecode/v2
+# github.com/nwaples/rardecode/v2 v2.2.2
+## explicit; go 1.21
 # github.com/owasp-amass/amass/v4 v4.2.0
 ## explicit; go 1.19
 github.com/owasp-amass/amass/v4/datasrcs
@@ -530,13 +515,8 @@ github.com/palantir/witchcraft-go-params
 # github.com/palantir/witchcraft-go-tracing v1.44.0
 ## explicit; go 1.26.0
 github.com/palantir/witchcraft-go-tracing/wtracing
-# github.com/pierrec/lz4/v4 v4.1.22
-## explicit; go 1.14
-github.com/pierrec/lz4/v4
-github.com/pierrec/lz4/v4/internal/lz4block
-github.com/pierrec/lz4/v4/internal/lz4errors
-github.com/pierrec/lz4/v4/internal/lz4stream
-github.com/pierrec/lz4/v4/internal/xxh32
+# github.com/pierrec/lz4/v4 v4.1.23
+## explicit; go 1.17
 # github.com/pkg/errors v0.9.1
 ## explicit
 github.com/pkg/errors
@@ -549,17 +529,17 @@ github.com/power-devops/perfstat
 # github.com/projectdiscovery/blackrock v0.0.1
 ## explicit; go 1.18
 github.com/projectdiscovery/blackrock
-# github.com/projectdiscovery/cdncheck v1.1.24
-## explicit; go 1.21
+# github.com/projectdiscovery/cdncheck v1.2.44
+## explicit; go 1.24.0
 github.com/projectdiscovery/cdncheck
 # github.com/projectdiscovery/chaos-client v0.5.2
 ## explicit; go 1.21
 github.com/projectdiscovery/chaos-client/pkg/chaos
-# github.com/projectdiscovery/dnsx v1.2.2
-## explicit; go 1.21
+# github.com/projectdiscovery/dnsx v1.3.0
+## explicit; go 1.25.0
 github.com/projectdiscovery/dnsx/libs/dnsx
-# github.com/projectdiscovery/fastdialer v0.4.1
-## explicit; go 1.22.0
+# github.com/projectdiscovery/fastdialer v0.5.13
+## explicit; go 1.25.0
 github.com/projectdiscovery/fastdialer/fastdialer
 github.com/projectdiscovery/fastdialer/fastdialer/ja3/impersonate
 github.com/projectdiscovery/fastdialer/fastdialer/metafiles
@@ -567,35 +547,35 @@ github.com/projectdiscovery/fastdialer/fastdialer/utils
 # github.com/projectdiscovery/goflags v0.1.74
 ## explicit; go 1.21
 github.com/projectdiscovery/goflags
-# github.com/projectdiscovery/gologger v1.1.54
-## explicit; go 1.22.2
+# github.com/projectdiscovery/gologger v1.1.71
+## explicit; go 1.24.0
 github.com/projectdiscovery/gologger
 github.com/projectdiscovery/gologger/formatter
 github.com/projectdiscovery/gologger/levels
 github.com/projectdiscovery/gologger/writer
-# github.com/projectdiscovery/hmap v0.0.90
-## explicit; go 1.22.0
+# github.com/projectdiscovery/hmap v0.0.101
+## explicit; go 1.24.0
 github.com/projectdiscovery/hmap/store/cache
 github.com/projectdiscovery/hmap/store/disk
 github.com/projectdiscovery/hmap/store/hybrid
 # github.com/projectdiscovery/machineid v0.0.0-20250715113114-c77eb3567582
 ## explicit; go 1.21
 github.com/projectdiscovery/machineid
-# github.com/projectdiscovery/networkpolicy v0.1.16
-## explicit; go 1.23.0
+# github.com/projectdiscovery/networkpolicy v0.1.42
+## explicit; go 1.24.0
 github.com/projectdiscovery/networkpolicy
-# github.com/projectdiscovery/ratelimit v0.0.81
-## explicit; go 1.21
+# github.com/projectdiscovery/ratelimit v0.0.88
+## explicit; go 1.24.0
 github.com/projectdiscovery/ratelimit
-# github.com/projectdiscovery/retryabledns v1.0.102
-## explicit; go 1.22.0
+# github.com/projectdiscovery/retryabledns v1.0.115
+## explicit; go 1.24.0
 github.com/projectdiscovery/retryabledns
 github.com/projectdiscovery/retryabledns/doh
 github.com/projectdiscovery/retryabledns/hostsfile
-# github.com/projectdiscovery/retryablehttp-go v1.0.115
-## explicit; go 1.24.0
+# github.com/projectdiscovery/retryablehttp-go v1.3.18
+## explicit; go 1.25.0
 github.com/projectdiscovery/retryablehttp-go
-# github.com/projectdiscovery/subfinder/v2 v2.9.0
+# github.com/projectdiscovery/subfinder/v2 v2.14.0
 ## explicit; go 1.24.0
 github.com/projectdiscovery/subfinder/v2/pkg/passive
 github.com/projectdiscovery/subfinder/v2/pkg/resolve
@@ -618,33 +598,40 @@ github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/digitorus
 github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/dnsdb
 github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/dnsdumpster
 github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/dnsrepo
+github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/domainsproject
 github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/driftnet
-github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/facebook
 github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/fofa
 github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/fullhunt
 github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/github
 github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/hackertarget
 github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/hudsonrock
-github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/hunter
 github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/intelx
 github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/leakix
+github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/merklemap
 github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/netlas
+github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/onyphe
+github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/profundis
 github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/pugrecon
 github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/quake
 github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/rapiddns
+github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/reconeer
 github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/redhuntlabs
 github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/robtex
 github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/rsecloud
 github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/securitytrails
 github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/shodan
 github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/sitedossier
+github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/submd
+github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/thc
 github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/threatbook
 github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/threatcrowd
+github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/urlscan
 github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/virustotal
 github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/waybackarchive
 github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/whoisxmlapi
+github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/windvane
 github.com/projectdiscovery/subfinder/v2/pkg/subscraping/sources/zoomeyeapi
-# github.com/projectdiscovery/utils v0.4.21
+# github.com/projectdiscovery/utils v0.11.1
 ## explicit; go 1.24.0
 github.com/projectdiscovery/utils/consts
 github.com/projectdiscovery/utils/context
@@ -652,10 +639,8 @@ github.com/projectdiscovery/utils/conversion
 github.com/projectdiscovery/utils/crypto
 github.com/projectdiscovery/utils/env
 github.com/projectdiscovery/utils/errkit
-github.com/projectdiscovery/utils/errors
 github.com/projectdiscovery/utils/file
 github.com/projectdiscovery/utils/folder
-github.com/projectdiscovery/utils/generic
 github.com/projectdiscovery/utils/http
 github.com/projectdiscovery/utils/ip
 github.com/projectdiscovery/utils/log
@@ -693,7 +678,7 @@ github.com/prometheus/common/model
 github.com/prometheus/procfs
 github.com/prometheus/procfs/internal/fs
 github.com/prometheus/procfs/internal/util
-# github.com/refraction-networking/utls v1.8.0
+# github.com/refraction-networking/utls v1.8.2
 ## explicit; go 1.24
 github.com/refraction-networking/utls
 github.com/refraction-networking/utls/dicttls
@@ -727,22 +712,22 @@ github.com/rubenv/sql-migrate/sqlparse
 github.com/saintfish/chardet
 # github.com/shirou/gopsutil/v3 v3.24.5
 ## explicit; go 1.18
-github.com/shirou/gopsutil/v3/common
-github.com/shirou/gopsutil/v3/cpu
-github.com/shirou/gopsutil/v3/internal/common
-github.com/shirou/gopsutil/v3/mem
-github.com/shirou/gopsutil/v3/net
-github.com/shirou/gopsutil/v3/process
+# github.com/shirou/gopsutil/v4 v4.26.3
+## explicit; go 1.24.0
+github.com/shirou/gopsutil/v4/common
+github.com/shirou/gopsutil/v4/cpu
+github.com/shirou/gopsutil/v4/internal/common
+github.com/shirou/gopsutil/v4/mem
+github.com/shirou/gopsutil/v4/net
+github.com/shirou/gopsutil/v4/process
 # github.com/shoenig/go-m1cpu v0.1.6
 ## explicit; go 1.20
-github.com/shoenig/go-m1cpu
-# github.com/sorairolake/lzip-go v0.3.5
+# github.com/sorairolake/lzip-go v0.3.8
 ## explicit; go 1.22
-github.com/sorairolake/lzip-go
-# github.com/spf13/cobra v1.9.1
+# github.com/spf13/cobra v1.10.2
 ## explicit; go 1.15
 github.com/spf13/cobra
-# github.com/spf13/pflag v1.0.7
+# github.com/spf13/pflag v1.0.9
 ## explicit; go 1.12
 github.com/spf13/pflag
 # github.com/stretchr/testify v1.11.1
@@ -769,7 +754,6 @@ github.com/syndtr/goleveldb/leveldb/util
 github.com/temoto/robotstxt
 # github.com/therootcompany/xz v1.0.1
 ## explicit; go 1.15
-github.com/therootcompany/xz
 # github.com/tidwall/btree v1.8.1
 ## explicit; go 1.20
 github.com/tidwall/btree
@@ -795,11 +779,11 @@ github.com/tidwall/rtred/base
 # github.com/tidwall/tinyqueue v0.1.1
 ## explicit; go 1.15
 github.com/tidwall/tinyqueue
-# github.com/tklauser/go-sysconf v0.3.15
-## explicit; go 1.23.0
+# github.com/tklauser/go-sysconf v0.3.16
+## explicit; go 1.24.0
 github.com/tklauser/go-sysconf
-# github.com/tklauser/numcpus v0.10.0
-## explicit; go 1.23.0
+# github.com/tklauser/numcpus v0.11.0
+## explicit; go 1.24.0
 github.com/tklauser/numcpus
 # github.com/tomnomnom/linkheader v0.0.0-20250811210735-e5fe3b51442e
 ## explicit; go 1.13
@@ -809,12 +793,8 @@ github.com/tomnomnom/linkheader
 github.com/tylertreat/BoomFilters
 # github.com/ulikunitz/xz v0.5.15
 ## explicit; go 1.12
-github.com/ulikunitz/xz
-github.com/ulikunitz/xz/internal/hash
-github.com/ulikunitz/xz/internal/xlog
-github.com/ulikunitz/xz/lzma
-# github.com/weppos/publicsuffix-go v0.40.3-0.20250708083804-25ff8f86d8b3
-## explicit; go 1.23.0
+# github.com/weppos/publicsuffix-go v0.50.3
+## explicit; go 1.24.0
 github.com/weppos/publicsuffix-go/publicsuffix
 # github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e
 ## explicit; go 1.19
@@ -882,8 +862,6 @@ go.uber.org/multierr
 go.uber.org/ratelimit
 # go4.org v0.0.0-20230225012048-214862532bf5
 ## explicit; go 1.13
-go4.org/readerutil
-go4.org/syncutil
 # golang.org/x/crypto v0.54.0
 ## explicit; go 1.25.0
 golang.org/x/crypto/blake2b
@@ -1032,7 +1010,6 @@ google.golang.org/protobuf/runtime/protoimpl
 google.golang.org/protobuf/types/known/timestamppb
 # gopkg.in/djherbis/times.v1 v1.3.0
 ## explicit
-gopkg.in/djherbis/times.v1
 # gopkg.in/yaml.v2 v2.4.0
 ## explicit; go 1.15
 gopkg.in/yaml.v2

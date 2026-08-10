@@ -27,6 +27,7 @@ type Source struct {
 	timeTaken time.Duration
 	errors    int
 	results   int
+	requests  int
 	skipped   bool
 }
 
@@ -35,6 +36,7 @@ func (s *Source) Run(ctx context.Context, domain string, session *subscraping.Se
 	results := make(chan subscraping.Result)
 	s.errors = 0
 	s.results = 0
+	s.requests = 0
 
 	go func() {
 		defer func(startTime time.Time) {
@@ -55,6 +57,7 @@ func (s *Source) Run(ctx context.Context, domain string, session *subscraping.Se
 }
 
 func (s *Source) getData(ctx context.Context, sourceURL string, apiKey string, session *subscraping.Session, results chan subscraping.Result) {
+	s.requests++
 	resp, err := session.Get(ctx, sourceURL, "", map[string]string{"x-api-key": apiKey})
 
 	if err != nil && resp == nil {
@@ -96,8 +99,12 @@ func (s *Source) getData(ctx context.Context, sourceURL string, apiKey string, s
 
 	for _, subdomain := range subdomains {
 		for _, value := range session.Extractor.Extract(subdomain) {
-			results <- subscraping.Result{Source: s.Name(), Type: subscraping.Subdomain, Value: value}
-			s.results++
+			select {
+			case <-ctx.Done():
+				return
+			case results <- subscraping.Result{Source: s.Name(), Type: subscraping.Subdomain, Value: value}:
+				s.results++
+			}
 		}
 	}
 }
@@ -115,8 +122,12 @@ func (s *Source) HasRecursiveSupport() bool {
 	return true
 }
 
+func (s *Source) KeyRequirement() subscraping.KeyRequirement {
+	return subscraping.RequiredKey
+}
+
 func (s *Source) NeedsKey() bool {
-	return true
+	return s.KeyRequirement() == subscraping.RequiredKey
 }
 
 func (s *Source) AddApiKeys(keys []string) {
@@ -127,6 +138,7 @@ func (s *Source) Statistics() subscraping.Statistics {
 	return subscraping.Statistics{
 		Errors:    s.errors,
 		Results:   s.results,
+		Requests:  s.requests,
 		TimeTaken: s.timeTaken,
 		Skipped:   s.skipped,
 	}
