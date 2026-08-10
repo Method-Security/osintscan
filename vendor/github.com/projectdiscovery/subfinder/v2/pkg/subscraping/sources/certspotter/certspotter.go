@@ -22,6 +22,7 @@ type Source struct {
 	timeTaken time.Duration
 	errors    int
 	results   int
+	requests  int
 	skipped   bool
 }
 
@@ -30,6 +31,7 @@ func (s *Source) Run(ctx context.Context, domain string, session *subscraping.Se
 	results := make(chan subscraping.Result)
 	s.errors = 0
 	s.results = 0
+	s.requests = 0
 
 	go func() {
 		defer func(startTime time.Time) {
@@ -46,6 +48,7 @@ func (s *Source) Run(ctx context.Context, domain string, session *subscraping.Se
 		headers := map[string]string{"Authorization": "Bearer " + randomApiKey}
 		cookies := ""
 
+		s.requests++
 		resp, err := session.Get(ctx, fmt.Sprintf("https://api.certspotter.com/v1/issuances?domain=%s&include_subdomains=true&expand=dns_names", domain), cookies, headers)
 		if err != nil {
 			results <- subscraping.Result{Source: s.Name(), Type: subscraping.Error, Error: err}
@@ -66,20 +69,29 @@ func (s *Source) Run(ctx context.Context, domain string, session *subscraping.Se
 
 		for _, cert := range response {
 			for _, subdomain := range cert.DNSNames {
-				results <- subscraping.Result{Source: s.Name(), Type: subscraping.Subdomain, Value: subdomain}
-				s.results++
+				select {
+				case <-ctx.Done():
+					return
+				case results <- subscraping.Result{Source: s.Name(), Type: subscraping.Subdomain, Value: subdomain}:
+					s.results++
+				}
 			}
 		}
 
-		// if the number of responses is zero, close the channel and return.
 		if len(response) == 0 {
 			return
 		}
 
 		id := response[len(response)-1].ID
 		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
 			reqURL := fmt.Sprintf("https://api.certspotter.com/v1/issuances?domain=%s&include_subdomains=true&expand=dns_names&after=%s", domain, id)
 
+			s.requests++
 			resp, err := session.Get(ctx, reqURL, cookies, headers)
 			if err != nil {
 				results <- subscraping.Result{Source: s.Name(), Type: subscraping.Error, Error: err}
@@ -103,8 +115,12 @@ func (s *Source) Run(ctx context.Context, domain string, session *subscraping.Se
 
 			for _, cert := range response {
 				for _, subdomain := range cert.DNSNames {
-					results <- subscraping.Result{Source: s.Name(), Type: subscraping.Subdomain, Value: subdomain}
-					s.results++
+					select {
+					case <-ctx.Done():
+						return
+					case results <- subscraping.Result{Source: s.Name(), Type: subscraping.Subdomain, Value: subdomain}:
+						s.results++
+					}
 				}
 			}
 
@@ -128,8 +144,12 @@ func (s *Source) HasRecursiveSupport() bool {
 	return true
 }
 
+func (s *Source) KeyRequirement() subscraping.KeyRequirement {
+	return subscraping.RequiredKey
+}
+
 func (s *Source) NeedsKey() bool {
-	return true
+	return s.KeyRequirement() == subscraping.RequiredKey
 }
 
 func (s *Source) AddApiKeys(keys []string) {
@@ -140,6 +160,7 @@ func (s *Source) Statistics() subscraping.Statistics {
 	return subscraping.Statistics{
 		Errors:    s.errors,
 		Results:   s.results,
+		Requests:  s.requests,
 		TimeTaken: s.timeTaken,
 		Skipped:   s.skipped,
 	}

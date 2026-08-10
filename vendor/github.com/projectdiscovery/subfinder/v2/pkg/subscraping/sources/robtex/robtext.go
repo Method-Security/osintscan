@@ -62,6 +62,11 @@ func (s *Source) Run(ctx context.Context, domain string, session *subscraping.Se
 		}
 
 		for _, result := range ips {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
 			if result.Rrtype == addrRecord || result.Rrtype == iPv6AddrRecord {
 				domains, err := enumerate(ctx, session, fmt.Sprintf("%s/reverse/%s?key=%s", baseURL, result.Rrdata, randomApiKey), headers)
 				if err != nil {
@@ -70,8 +75,12 @@ func (s *Source) Run(ctx context.Context, domain string, session *subscraping.Se
 					return
 				}
 				for _, result := range domains {
-					results <- subscraping.Result{Source: s.Name(), Type: subscraping.Subdomain, Value: result.Rrdata}
-					s.results++
+					select {
+					case <-ctx.Done():
+						return
+					case results <- subscraping.Result{Source: s.Name(), Type: subscraping.Subdomain, Value: result.Rrdata}:
+						s.results++
+					}
 				}
 			}
 		}
@@ -122,8 +131,12 @@ func (s *Source) HasRecursiveSupport() bool {
 	return false
 }
 
+func (s *Source) KeyRequirement() subscraping.KeyRequirement {
+	return subscraping.RequiredKey
+}
+
 func (s *Source) NeedsKey() bool {
-	return true
+	return s.KeyRequirement() == subscraping.RequiredKey
 }
 
 func (s *Source) AddApiKeys(keys []string) {

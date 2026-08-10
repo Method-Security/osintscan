@@ -29,6 +29,7 @@ type Source struct {
 	timeTaken time.Duration
 	errors    int
 	results   int
+	requests  int
 }
 
 // Run function returns all subdomains found with the service
@@ -36,6 +37,7 @@ func (s *Source) Run(ctx context.Context, domain string, session *subscraping.Se
 	results := make(chan subscraping.Result)
 	s.errors = 0
 	s.results = 0
+	s.requests = 0
 
 	go func() {
 		defer func(startTime time.Time) {
@@ -54,7 +56,10 @@ func (s *Source) Run(ctx context.Context, domain string, session *subscraping.Se
 }
 
 func (s *Source) getSubdomainsFromSQL(ctx context.Context, domain string, session *subscraping.Session, results chan subscraping.Result) int {
-	db, err := sql.Open("postgres", "host=crt.sh user=guest dbname=certwatch sslmode=disable binary_parameters=yes")
+	// connect_timeout: limits connection establishment time (in seconds)
+	// statement_timeout: limits query execution time (in milliseconds)
+	connStr := fmt.Sprintf("host=crt.sh user=guest dbname=certwatch sslmode=disable binary_parameters=yes connect_timeout=%d statement_timeout=%d", session.Timeout, session.Timeout*1000)
+	db, err := sql.Open("postgres", connStr)
 	if err != nil {
 		results <- subscraping.Result{Source: s.Name(), Type: subscraping.Error, Error: err}
 		s.errors++
@@ -74,38 +79,21 @@ func (s *Source) getSubdomainsFromSQL(ctx context.Context, domain string, sessio
 		}
 	}
 
-	query := fmt.Sprintf(`WITH ci AS (
-				SELECT min(sub.CERTIFICATE_ID) ID,
-					min(sub.ISSUER_CA_ID) ISSUER_CA_ID,
-					array_agg(DISTINCT sub.NAME_VALUE) NAME_VALUES,
-					x509_commonName(sub.CERTIFICATE) COMMON_NAME,
-					x509_notBefore(sub.CERTIFICATE) NOT_BEFORE,
-					x509_notAfter(sub.CERTIFICATE) NOT_AFTER,
-					encode(x509_serialNumber(sub.CERTIFICATE), 'hex') SERIAL_NUMBER
-					FROM (SELECT *
-							FROM certificate_and_identities cai
-							WHERE plainto_tsquery('certwatch', $1) @@ identities(cai.CERTIFICATE)
-								AND cai.NAME_VALUE ILIKE ('%%' || $1 || '%%')
-								%s
-						) sub
-					GROUP BY sub.CERTIFICATE
-			)
-			SELECT array_to_string(ci.NAME_VALUES, chr(10)) NAME_VALUE
-				FROM ci
-						LEFT JOIN LATERAL (
-							SELECT min(ctle.ENTRY_TIMESTAMP) ENTRY_TIMESTAMP
-								FROM ct_log_entry ctle
-								WHERE ctle.CERTIFICATE_ID = ci.ID
-						) le ON TRUE,
-					ca
-				WHERE ci.ISSUER_CA_ID = ca.ID
-				ORDER BY le.ENTRY_TIMESTAMP DESC NULLS LAST;`, limitClause)
+	// We only consume NAME_VALUE downstream, so query for that directly instead
+	// of joining ct_log_entry / running x509_* parsers on every certificate.
+	// See https://github.com/projectdiscovery/subfinder/issues/1773.
+	query := fmt.Sprintf(`SELECT DISTINCT cai.NAME_VALUE
+				FROM certificate_and_identities cai
+				WHERE plainto_tsquery('certwatch', $1) @@ identities(cai.CERTIFICATE)
+					AND cai.NAME_VALUE ILIKE ('%%' || $1 || '%%')
+				%s;`, limitClause)
 	rows, err := db.QueryContext(ctx, query, domain)
 	if err != nil {
 		results <- subscraping.Result{Source: s.Name(), Type: subscraping.Error, Error: err}
 		s.errors++
 		return 0
 	}
+	defer rows.Close() //nolint:errcheck
 	if err := rows.Err(); err != nil {
 		results <- subscraping.Result{Source: s.Name(), Type: subscraping.Error, Error: err}
 		s.errors++
@@ -114,8 +102,12 @@ func (s *Source) getSubdomainsFromSQL(ctx context.Context, domain string, sessio
 
 	var count int
 	var data string
-	// Parse all the rows getting subdomains
 	for rows.Next() {
+		select {
+		case <-ctx.Done():
+			return count
+		default:
+		}
 		err := rows.Scan(&data)
 		if err != nil {
 			results <- subscraping.Result{Source: s.Name(), Type: subscraping.Error, Error: err}
@@ -127,8 +119,12 @@ func (s *Source) getSubdomainsFromSQL(ctx context.Context, domain string, sessio
 		for subdomain := range strings.SplitSeq(data, "\n") {
 			for _, value := range session.Extractor.Extract(subdomain) {
 				if value != "" {
-					results <- subscraping.Result{Source: s.Name(), Type: subscraping.Subdomain, Value: value}
-					s.results++
+					select {
+					case <-ctx.Done():
+						return count
+					case results <- subscraping.Result{Source: s.Name(), Type: subscraping.Subdomain, Value: value}:
+						s.results++
+					}
 				}
 			}
 		}
@@ -137,6 +133,7 @@ func (s *Source) getSubdomainsFromSQL(ctx context.Context, domain string, sessio
 }
 
 func (s *Source) getSubdomainsFromHTTP(ctx context.Context, domain string, session *subscraping.Session, results chan subscraping.Result) bool {
+	s.requests++
 	resp, err := session.SimpleGet(ctx, fmt.Sprintf("https://crt.sh/?q=%%25.%s&output=json", domain))
 	if err != nil {
 		results <- subscraping.Result{Source: s.Name(), Type: subscraping.Error, Error: err}
@@ -157,11 +154,20 @@ func (s *Source) getSubdomainsFromHTTP(ctx context.Context, domain string, sessi
 	session.DiscardHTTPResponse(resp)
 
 	for _, subdomain := range subdomains {
+		select {
+		case <-ctx.Done():
+			return true
+		default:
+		}
 		for sub := range strings.SplitSeq(subdomain.NameValue, "\n") {
 			for _, value := range session.Extractor.Extract(sub) {
 				if value != "" {
-					results <- subscraping.Result{Source: s.Name(), Type: subscraping.Subdomain, Value: value}
-					s.results++
+					select {
+					case <-ctx.Done():
+						return true
+					case results <- subscraping.Result{Source: s.Name(), Type: subscraping.Subdomain, Value: value}:
+						s.results++
+					}
 				}
 			}
 		}
@@ -183,8 +189,12 @@ func (s *Source) HasRecursiveSupport() bool {
 	return true
 }
 
+func (s *Source) KeyRequirement() subscraping.KeyRequirement {
+	return subscraping.NoKey
+}
+
 func (s *Source) NeedsKey() bool {
-	return false
+	return s.KeyRequirement() == subscraping.RequiredKey
 }
 
 func (s *Source) AddApiKeys(_ []string) {
@@ -195,6 +205,7 @@ func (s *Source) Statistics() subscraping.Statistics {
 	return subscraping.Statistics{
 		Errors:    s.errors,
 		Results:   s.results,
+		Requests:  s.requests,
 		TimeTaken: s.timeTaken,
 	}
 }

@@ -37,8 +37,22 @@ var (
 	// errGotConnection has already been established
 	ErrInflightCancel       = errkit.New("context cancelled before establishing connection")
 	ErrNoIPs                = errkit.New("no ips provided in dialWrap")
-	ExpireConnAfter         = time.Duration(5) * time.Second
 	ErrPortClosedOrFiltered = errkit.New("port closed or filtered").SetKind(errkit.ErrKindNetworkPermanent)
+
+	// ExpireConnAfter is the default duration after which a cached connection
+	// expires.
+	//
+	// Deprecated: use [DefaultConnExpiry] instead.
+	ExpireConnAfter = time.Duration(5) * time.Second
+)
+
+const (
+	// DefaultConnExpiry is the default duration after which a cached
+	// connection expires.
+	//
+	// This is used when Options.ConnectionCacheExpiry is not set.
+	// Use the SetExpireConnAfter method to adjust.
+	DefaultConnExpiry = time.Duration(10) * time.Second
 )
 
 // dialResult represents the result of a dial operation
@@ -61,6 +75,9 @@ type DialWrap struct {
 	network string
 	address string
 	port    string
+
+	// expireConnAfter is the duration after which a cached connection expires.
+	expireConnAfter time.Duration
 
 	// all connections blocks until a first connection is established
 	// subsequent calls will behave upon first result
@@ -95,6 +112,7 @@ func NewDialWrap(dialer *net.Dialer, ips []string, network, address, port string
 		ipv4:                     ipv4,
 		ipv6:                     ipv6,
 		ips:                      valid,
+		expireConnAfter:          DefaultConnExpiry,
 		completedFirstConnection: &atomic.Bool{},
 		busyFirstConnection:      &atomic.Bool{},
 		network:                  network,
@@ -119,7 +137,7 @@ func (d *DialWrap) DialContext(ctx context.Context, _ string, _ string) (net.Con
 		if res.Conn != nil {
 			// check expiry
 			if res.expiry.Before(time.Now()) {
-				res.Conn.Close()
+				_ = res.Close()
 				return d.dial(ctx)
 			}
 			return res.Conn, nil
@@ -203,7 +221,8 @@ func (d *DialWrap) hasCompletedFirstConnection(ctx context.Context) chan struct{
 }
 
 // dialAllParallel connects to all the given addresses in parallel, returning
-// the first successful connection, or the first error.
+// immediately when the first successful connection is established.
+// Remaining dial attempts are canceled to avoid unnecessary delays.
 func (d *DialWrap) dialAllParallel(ctx context.Context) ([]*dialResult, error) {
 	// check / adjust deadline
 	deadline := d.deadline(ctx, time.Now())
@@ -214,61 +233,70 @@ func (d *DialWrap) dialAllParallel(ctx context.Context) ([]*dialResult, error) {
 			ctx = subCtx
 		}
 	}
-	rec := make(chan *dialResult, len(d.ipv4)+len(d.ipv6))
 
-	wg := &sync.WaitGroup{}
+	dialCtx, dialCancel := context.WithCancel(ctx)
+	defer dialCancel()
 
-	go func() {
-		defer close(rec)
-		defer wg.Wait()
-		for _, ip := range d.ips {
-			wg.Add(1)
-			go func(ipx net.IP) {
-				defer wg.Done()
-				select {
-				case <-ctx.Done():
-					rec <- &dialResult{error: errkit.Append(ErrInflightCancel, ctx.Err())}
-				default:
-					c, err := d.dialer.DialContext(ctx, d.network, net.JoinHostPort(ipx.String(), d.port))
-					rec <- &dialResult{Conn: c, error: err, expiry: time.Now().Add(ExpireConnAfter)}
-				}
-			}(ip)
-		}
-	}()
+	numIPs := len(d.ipv4) + len(d.ipv6)
+	rec := make(chan *dialResult, numIPs)
 
-	conns := []*dialResult{}
-	errs := []*dialResult{}
-
-	for result := range rec {
-		if result.Conn != nil {
-			conns = append(conns, result)
-		} else {
-			if !errkit.Is(result.error, ErrInflightCancel) {
-				errs = append(errs, result)
+	for _, ip := range d.ips {
+		go func(ipx net.IP) {
+			select {
+			case <-dialCtx.Done():
+				rec <- &dialResult{error: errkit.Append(ErrInflightCancel, dialCtx.Err())}
+			default:
+				c, err := d.dialer.DialContext(dialCtx, d.network, net.JoinHostPort(ipx.String(), d.port))
+				rec <- &dialResult{Conn: c, error: err, expiry: time.Now().Add(d.expireConnAfter)}
 			}
+		}(ip)
+	}
+
+	var conns []*dialResult
+	var errs []*dialResult
+	received := 0
+
+	for received < numIPs {
+		select {
+		case result := <-rec:
+			received++
+			if result.Conn != nil {
+				conns = append(conns, result)
+
+				dialCancel()
+				go func() {
+					for i := received; i < numIPs; i++ {
+						if r := <-rec; r.Conn != nil {
+							_ = r.Close()
+						}
+					}
+				}()
+
+				return conns, nil
+			} else {
+				if !errkit.Is(result.error, ErrInflightCancel) && !errkit.Is(result.error, context.Canceled) {
+					errs = append(errs, result)
+				}
+			}
+		case <-ctx.Done():
+			return nil, errkit.Append(ErrInflightCancel, ctx.Err())
 		}
 	}
 
-	if len(conns) > 0 {
-		return conns, nil
-	}
-	if len(conns) == 0 && len(errs) == 0 {
-		// this means all connections were cancelled before we could establish a connection
+	if len(errs) == 0 {
 		return nil, ErrInflightCancel
 	}
 
-	// this could be improved to check for permanent errors
-	// and blacklist those ips permanently
 	var finalErr error
 	for _, v := range errs {
 		finalErr = errkit.Append(finalErr, v.error)
 	}
-	// if this is the case then most likely the port is closed or filtered
-	// so return appropriate error
+
+	// If not inflight cancel then it is a permanent error (port closed/filtered)
 	if !errkit.Is(finalErr, ErrInflightCancel) {
-		// if it not inflight cancel then it is a permanent error
 		return nil, errkit.Append(ErrPortClosedOrFiltered, finalErr)
 	}
+
 	return nil, finalErr
 }
 
@@ -352,7 +380,7 @@ func (d *DialWrap) dialParallel(ctx context.Context, primaries, fallbacks []net.
 		case results <- dialResult{Conn: c, error: err, primary: primary, done: true}:
 		case <-returned:
 			if c != nil {
-				c.Close()
+				_ = c.Close()
 			}
 		}
 	}
@@ -457,4 +485,14 @@ func (d *DialWrap) SetFirstConnectionDuration(dur time.Duration) {
 	defer d.mu.Unlock()
 
 	d.firstConnectionDuration = dur
+}
+
+// SetExpireConnAfter sets the duration after which a cached connection expires.
+// If dur is 0, [DefaultConnExpiry] is used.
+func (d *DialWrap) SetExpireConnAfter(dur time.Duration) {
+	if dur == 0 {
+		dur = DefaultConnExpiry
+	}
+
+	d.expireConnAfter = dur
 }

@@ -82,7 +82,7 @@ func Wrap(err error, message string) error {
 	}
 	x := &ErrorX{}
 	parseError(x, err)
-	x.Msgf("%s", message)
+	x.Msg(message)
 	return x
 }
 
@@ -148,7 +148,7 @@ func WithMessage(err error, message string) error {
 	}
 	x := &ErrorX{}
 	parseError(x, err)
-	x.Msgf("%s", message)
+	x.Msg(message)
 	return x
 }
 
@@ -207,6 +207,26 @@ func With(err error, args ...any) error {
 	x.init()
 	parseError(x, err)
 	x.record.Add(args...)
+	return x
+}
+
+// WithAttr adds extra attributes to the error using slog.Attr
+//
+//	err = errkit.WithAttr(err, slog.String("resource", domain))
+//	err = errkit.WithAttr(err, slog.Int("port", 80), slog.String("protocol", "tcp"))
+func WithAttr(err error, attrs ...slog.Attr) error {
+	if err == nil {
+		return nil
+	}
+	if len(attrs) == 0 {
+		return err
+	}
+	x := &ErrorX{}
+	x.init()
+	parseError(x, err)
+	for _, attr := range attrs {
+		x.record.Add(attr)
+	}
 	return x
 }
 

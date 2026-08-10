@@ -18,6 +18,7 @@ type Source struct {
 	timeTaken time.Duration
 	errors    int
 	results   int
+	requests  int
 }
 
 // Run function returns all subdomains found with the service
@@ -25,6 +26,7 @@ func (s *Source) Run(ctx context.Context, domain string, session *subscraping.Se
 	results := make(chan subscraping.Result)
 	s.errors = 0
 	s.results = 0
+	s.requests = 0
 
 	go func() {
 		defer func(startTime time.Time) {
@@ -32,6 +34,7 @@ func (s *Source) Run(ctx context.Context, domain string, session *subscraping.Se
 			close(results)
 		}(time.Now())
 
+		s.requests++
 		resp, err := session.SimpleGet(ctx, fmt.Sprintf("https://certificatedetails.com/%s", domain))
 		// the 404 page still contains around 100 subdomains - https://github.com/projectdiscovery/subfinder/issues/774
 		if err != nil && ptr.Safe(resp).StatusCode != http.StatusNotFound {
@@ -50,16 +53,23 @@ func (s *Source) Run(ctx context.Context, domain string, session *subscraping.Se
 
 		scanner := bufio.NewScanner(resp.Body)
 		for scanner.Scan() {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
 			line := scanner.Text()
 			if line == "" {
 				continue
 			}
 			subdomains := session.Extractor.Extract(line)
 			for _, subdomain := range subdomains {
-				results <- subscraping.Result{
-					Source: s.Name(), Type: subscraping.Subdomain, Value: strings.TrimPrefix(subdomain, "."),
+				select {
+				case <-ctx.Done():
+					return
+				case results <- subscraping.Result{Source: s.Name(), Type: subscraping.Subdomain, Value: strings.TrimPrefix(subdomain, ".")}:
+					s.results++
 				}
-				s.results++
 			}
 		}
 	}()
@@ -80,8 +90,12 @@ func (s *Source) HasRecursiveSupport() bool {
 	return true
 }
 
+func (s *Source) KeyRequirement() subscraping.KeyRequirement {
+	return subscraping.NoKey
+}
+
 func (s *Source) NeedsKey() bool {
-	return false
+	return s.KeyRequirement() == subscraping.RequiredKey
 }
 
 func (s *Source) AddApiKeys(_ []string) {
@@ -92,6 +106,7 @@ func (s *Source) Statistics() subscraping.Statistics {
 	return subscraping.Statistics{
 		Errors:    s.errors,
 		Results:   s.results,
+		Requests:  s.requests,
 		TimeTaken: s.timeTaken,
 	}
 }

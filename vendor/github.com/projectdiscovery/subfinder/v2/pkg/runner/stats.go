@@ -2,19 +2,18 @@ package runner
 
 import (
 	"fmt"
-	"sort"
+	"maps"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/subfinder/v2/pkg/subscraping"
-	"golang.org/x/exp/maps"
 )
 
 func printStatistics(stats map[string]subscraping.Statistics) {
 
-	sources := maps.Keys(stats)
-	sort.Strings(sources)
+	sources := slices.Sorted(maps.Keys(stats))
 
 	var lines []string
 	var skipped []string
@@ -24,12 +23,12 @@ func printStatistics(stats map[string]subscraping.Statistics) {
 		if sourceStats.Skipped {
 			skipped = append(skipped, fmt.Sprintf(" %s", source))
 		} else {
-			lines = append(lines, fmt.Sprintf(" %-20s %-10s %10d %10d", source, sourceStats.TimeTaken.Round(time.Millisecond).String(), sourceStats.Results, sourceStats.Errors))
+			lines = append(lines, fmt.Sprintf(" %-20s %-10s %10d %10d %10d", source, sourceStats.TimeTaken.Round(time.Millisecond).String(), sourceStats.Results, sourceStats.Requests, sourceStats.Errors))
 		}
 	}
 
 	if len(lines) > 0 {
-		gologger.Print().Msgf("\n Source               Duration      Results     Errors\n%s\n", strings.Repeat("─", 56))
+		gologger.Print().Msgf("\n Source               Duration      Results   Requests     Errors\n%s\n", strings.Repeat("─", 68))
 		gologger.Print().Msg(strings.Join(lines, "\n"))
 		gologger.Print().Msgf("\n")
 	}

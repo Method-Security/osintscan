@@ -16,14 +16,16 @@ type Source struct {
 	timeTaken time.Duration
 	errors    int
 	results   int
+	requests  int
 	skipped   bool
 }
 
 // Run function returns all subdomains found with the service
-func (s *Source) Run(_ context.Context, domain string, _ *subscraping.Session) <-chan subscraping.Result {
+func (s *Source) Run(ctx context.Context, domain string, _ *subscraping.Session) <-chan subscraping.Result {
 	results := make(chan subscraping.Result)
 	s.errors = 0
 	s.results = 0
+	s.requests = 0
 
 	go func() {
 		defer func(startTime time.Time) {
@@ -38,9 +40,15 @@ func (s *Source) Run(_ context.Context, domain string, _ *subscraping.Session) <
 		}
 
 		chaosClient := chaos.New(randomApiKey)
+		s.requests++
 		for result := range chaosClient.GetSubdomains(&chaos.SubdomainsRequest{
 			Domain: domain,
 		}) {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
 			if result.Error != nil {
 				results <- subscraping.Result{Source: s.Name(), Type: subscraping.Error, Error: result.Error}
 				s.errors++
@@ -69,8 +77,12 @@ func (s *Source) HasRecursiveSupport() bool {
 	return false
 }
 
+func (s *Source) KeyRequirement() subscraping.KeyRequirement {
+	return subscraping.RequiredKey
+}
+
 func (s *Source) NeedsKey() bool {
-	return true
+	return s.KeyRequirement() == subscraping.RequiredKey
 }
 
 func (s *Source) AddApiKeys(keys []string) {
@@ -81,6 +93,7 @@ func (s *Source) Statistics() subscraping.Statistics {
 	return subscraping.Statistics{
 		Errors:    s.errors,
 		Results:   s.results,
+		Requests:  s.requests,
 		TimeTaken: s.timeTaken,
 		Skipped:   s.skipped,
 	}

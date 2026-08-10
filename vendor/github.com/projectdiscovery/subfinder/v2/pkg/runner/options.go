@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -15,6 +16,7 @@ import (
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/subfinder/v2/pkg/passive"
 	"github.com/projectdiscovery/subfinder/v2/pkg/resolve"
+	"github.com/projectdiscovery/subfinder/v2/pkg/subscraping"
 	envutil "github.com/projectdiscovery/utils/env"
 	fileutil "github.com/projectdiscovery/utils/file"
 	folderutil "github.com/projectdiscovery/utils/folder"
@@ -68,6 +70,11 @@ type Options struct {
 	filterRegexes      []*regexp.Regexp
 	ResultCallback     OnResultCallback // OnResult callback
 	DisableUpdateCheck bool             // DisableUpdateCheck disable update checking
+
+	// MaxResults limits the number of results requested per source.
+	// A value of 0 (default) means no limit. Only sources that paginate
+	// honor this (currently virustotal), to help stay within API quotas.
+	MaxResults int `yaml:"max-results,omitempty"`
 }
 
 // OnResultCallback (hostResult)
@@ -127,6 +134,7 @@ func ParseOptions() *Options {
 		flagSet.BoolVarP(&options.RemoveWildcard, "active", "nW", false, "display active subdomains only"),
 		flagSet.StringVar(&options.Proxy, "proxy", "", "http proxy to use with subfinder"),
 		flagSet.BoolVarP(&options.ExcludeIps, "exclude-ip", "ei", false, "exclude IPs from the list of domains"),
+		flagSet.IntVarP(&options.MaxResults, "max-results", "mr", 0, "limit the number of results per source (0 = unlimited; honored by paginating sources such as virustotal)"),
 	)
 
 	flagSet.CreateGroup("debug", "Debug",
@@ -134,7 +142,7 @@ func ParseOptions() *Options {
 		flagSet.BoolVar(&options.Version, "version", false, "show version of subfinder"),
 		flagSet.BoolVar(&options.Verbose, "v", false, "show verbose output"),
 		flagSet.BoolVarP(&options.NoColor, "no-color", "nc", false, "disable color in output"),
-		flagSet.BoolVarP(&options.ListSources, "list-sources", "ls", false, "list all available sources"),
+		flagSet.BoolVarP(&options.ListSources, "list-sources", "ls", false, "list all available sources (-oJ for JSON)"),
 		flagSet.BoolVar(&options.Statistics, "stats", false, "report source statistics"),
 	)
 
@@ -221,18 +229,46 @@ func (options *Options) loadProvidersFrom(location string) {
 	}
 }
 
+var keyRequirementLabels = map[subscraping.KeyRequirement]string{
+	subscraping.NoKey:       "none",
+	subscraping.RequiredKey: "required",
+	subscraping.OptionalKey: "optional",
+}
+
 func listSources(options *Options) {
+	// With -oJ, emit one JSON object per source so tooling can select sources
+	// by property instead of parsing the human-readable markers.
+	if options.JSON {
+		encoder := json.NewEncoder(options.Output)
+		for _, source := range passive.AllSources {
+			err := encoder.Encode(struct {
+				Name           string `json:"name"`
+				Default        bool   `json:"default"`
+				Recursive      bool   `json:"recursive"`
+				KeyRequirement string `json:"keyRequirement"`
+			}{source.Name(), source.IsDefault(), source.HasRecursiveSupport(), keyRequirementLabels[source.KeyRequirement()]})
+			if err != nil {
+				gologger.Fatal().Msgf("Could not write sources as JSON: %s\n", err)
+			}
+		}
+		return
+	}
+
 	gologger.Info().Msgf("Current list of available sources. [%d]\n", len(passive.AllSources))
-	gologger.Info().Msgf("Sources marked with an * need key(s) or token(s) to work.\n")
+	gologger.Info().Msgf("Sources marked with an * require key(s) or token(s) to work.\n")
+	gologger.Info().Msgf("Sources marked with a ~ optionally support key(s) for better results.\n")
 	gologger.Info().Msgf("You can modify %s to configure your keys/tokens.\n\n", options.ProviderConfig)
 
 	for _, source := range passive.AllSources {
-		message := "%s\n"
 		sourceName := source.Name()
-		if source.NeedsKey() {
-			message = "%s *\n"
+		switch source.KeyRequirement() {
+		case subscraping.RequiredKey:
+			gologger.Silent().Msgf("%s *\n", sourceName)
+		case subscraping.OptionalKey:
+			gologger.Silent().Msgf("%s ~\n", sourceName)
+		default:
+			gologger.Silent().Msgf("%s\n", sourceName)
 		}
-		gologger.Silent().Msgf(message, sourceName)
 	}
 }
 
@@ -260,4 +296,5 @@ var defaultRateLimits = []string{
 	// "gitlab=2/s",
 	"github=83/m",
 	"hudsonrock=5/s",
+	"urlscan=1/s",
 }

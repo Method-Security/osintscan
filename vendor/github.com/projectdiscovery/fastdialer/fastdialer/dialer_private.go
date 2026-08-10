@@ -6,9 +6,11 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"os"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -64,7 +66,7 @@ func (d *dialOptions) logAddress() string {
 
 func (d *Dialer) dial(ctx context.Context, opts *dialOptions) (conn net.Conn, err error) {
 	// add global timeout to context
-	ctx, cancel := context.WithTimeoutCause(ctx, d.options.DialerTimeout, ErrDialTimeout)
+	ctx, cancel := context.WithTimeoutCause(ctx, d.GetTimeout(), ErrDialTimeout)
 	defer cancel()
 
 	var hostname, port, fixedIP string
@@ -114,7 +116,6 @@ func (d *Dialer) dial(ctx context.Context, opts *dialOptions) (conn net.Conn, er
 			cacheData, err, _ := d.resolutionsGroup.Do(hostname, func() (interface{}, error) {
 				return d.GetDNSData(hostname)
 			})
-
 			if cacheData == nil {
 				return nil, ResolveHostError
 			}
@@ -122,19 +123,35 @@ func (d *Dialer) dial(ctx context.Context, opts *dialOptions) (conn net.Conn, er
 			if err != nil || len(data.A)+len(data.AAAA) == 0 {
 				return nil, NoAddressFoundError
 			}
-			IPS = append(IPS, append(data.A, data.AAAA...)...)
+			IPS = append(IPS, data.A...)
+			IPS = append(IPS, data.AAAA...)
 		}
 
 		filteredIPs := []string{}
 
+		portInt, _ := strconv.Atoi(port)
+
 		// filter valid/invalid ips
 		for _, ip := range IPS {
-			// check if we have allow/deny list
 			if !d.networkpolicy.Validate(ip) {
 				if d.options.OnInvalidTarget != nil {
 					d.options.OnInvalidTarget(hostname, ip, port)
 				}
 				continue
+			}
+			if !d.validatePort(portInt) {
+				if d.options.OnInvalidTarget != nil {
+					d.options.OnInvalidTarget(hostname, ip, port)
+				}
+				continue
+			}
+			if d.options.OnValidateTarget != nil {
+				if err := d.options.OnValidateTarget(hostname, ip, port); err != nil {
+					if d.options.OnInvalidTarget != nil {
+						d.options.OnInvalidTarget(hostname, ip, port)
+					}
+					continue
+				}
 			}
 			if d.options.OnBeforeDial != nil {
 				d.options.OnBeforeDial(hostname, ip, port)
@@ -166,6 +183,7 @@ func (d *Dialer) dial(ctx context.Context, opts *dialOptions) (conn net.Conn, er
 		if err != nil {
 			return nil, errkit.Wrap(err, "could not create dialwrap")
 		}
+		dw.SetExpireConnAfter(d.options.ConnectionCacheExpiry)
 		if err = d.dialCache.Set(opts.connHash(), dw); err != nil {
 			return nil, errkit.Wrap(err, "could not set dialwrap")
 		}
@@ -241,9 +259,13 @@ func (d *Dialer) dialIPS(ctx context.Context, l4 l4dialer, opts *dialOptions) (c
 				return nil, d.handleDialError(err, opts)
 			}
 			TlsConn := tls.Client(l4Conn, tlsconfigCopy)
+			handshakeDoneCancel := closeAfterTimeout(d.GetTimeout(), TlsConn)
 			if err := TlsConn.HandshakeContext(ctx); err != nil {
+				handshakeDoneCancel()
+				_ = TlsConn.Close()
 				return nil, errkit.Wrap(err, "could not tls handshake")
 			}
+			handshakeDoneCancel()
 			conn = TlsConn
 		} else {
 			nativeConn, err := l4.DialContext(ctx, opts.network, hostPort)
@@ -259,20 +281,25 @@ func (d *Dialer) dialIPS(ctx context.Context, l4 l4dialer, opts *dialOptions) (c
 				CipherSuites:       tlsconfigCopy.CipherSuites,
 			}
 			var uTLSConn *utls.UConn
-			if opts.impersonateStrategy == impersonate.Random {
+			switch opts.impersonateStrategy {
+			case impersonate.Random:
 				uTLSConn = utls.UClient(nativeConn, uTLSConfig, utls.HelloRandomized)
-			} else if opts.impersonateStrategy == impersonate.Custom {
+			case impersonate.Custom:
 				uTLSConn = utls.UClient(nativeConn, uTLSConfig, utls.HelloCustom)
 				clientHelloSpec := utls.ClientHelloSpec(ptrutil.Safe(opts.impersonateIdentity))
 				if err := uTLSConn.ApplyPreset(&clientHelloSpec); err != nil {
 					return nil, err
 				}
-			} else if opts.impersonateStrategy == impersonate.Chrome {
+			case impersonate.Chrome:
 				uTLSConn = utls.UClient(nativeConn, uTLSConfig, utls.HelloChrome_106_Shuffle)
 			}
+			handshakeDoneCancel := closeAfterTimeout(d.GetTimeout(), uTLSConn)
 			if err := uTLSConn.Handshake(); err != nil {
+				handshakeDoneCancel()
+				_ = uTLSConn.Close()
 				return nil, err
 			}
+			handshakeDoneCancel()
 			conn = uTLSConn
 		}
 	} else if opts.shouldUseZTLS {
@@ -292,6 +319,9 @@ func (d *Dialer) dialIPS(ctx context.Context, l4 l4dialer, opts *dialOptions) (c
 		}
 		ztlsConn := ztls.Client(l4Conn, ztlsconfigCopy)
 		_, err = ctxutil.ExecFuncWithTwoReturns(ctx, func() (bool, error) {
+			handshakeDoneCancel := closeAfterTimeout(d.GetTimeout(), ztlsConn)
+			defer handshakeDoneCancel()
+
 			// run this in goroutine as select since this does not support context
 			return true, ztlsConn.Handshake()
 		})
@@ -314,7 +344,7 @@ func (d *Dialer) dialIPS(ctx context.Context, l4 l4dialer, opts *dialOptions) (c
 				}
 				connectionCh <- conn
 			}()
-			// using timer as time.After is not recovered gy GC
+			// using timer as time.After is not recovered by GC
 			dialerTime := time.NewTimer(d.options.DialerTimeout)
 			defer dialerTime.Stop()
 			select {
@@ -331,7 +361,7 @@ func (d *Dialer) dialIPS(ctx context.Context, l4 l4dialer, opts *dialOptions) (c
 	}
 	// fallback to ztls  in case of handshake error with chrome ciphers
 	// ztls fallback can either be disabled by setting env variable DISABLE_ZTLS_FALLBACK=true or by setting DisableZtlsFallback=true in options
-	if err != nil && !errkit.Is(err, os.ErrDeadlineExceeded) && !(d.options.DisableZtlsFallback && disableZTLSFallback) {
+	if err != nil && !errkit.Is(err, os.ErrDeadlineExceeded) && !(d.options.DisableZtlsFallback && disableZTLSFallback) { //nolint
 		var ztlsconfigCopy *ztls.Config
 		if opts.shouldUseZTLS {
 			ztlsconfigCopy = opts.ztlsconfig.Clone()
@@ -354,7 +384,11 @@ func (d *Dialer) dialIPS(ctx context.Context, l4 l4dialer, opts *dialOptions) (c
 			return nil, d.handleDialError(err, opts)
 		}
 		ztlsConn := ztls.Client(l4Conn, ztlsconfigCopy)
+
 		_, err = ctxutil.ExecFuncWithTwoReturns(ctx, func() (bool, error) {
+			handshakeDoneCancel := closeAfterTimeout(d.GetTimeout(), ztlsConn)
+			defer handshakeDoneCancel()
+
 			// run this in goroutine as select since this does not support context
 			return true, ztlsConn.Handshake()
 		})
@@ -373,7 +407,7 @@ func (d *Dialer) handleDialError(err error, opts *dialOptions) error {
 		return nil
 	}
 	errx := errkit.FromError(err)
-	errx = errx.SetAttr(slog.Any("address", opts.logAddress()))
+	errx = errx.SetAttr(slog.Any("address", opts.logAddress())) //nolint (ref https://github.com/projectdiscovery/utils/issues/657)
 
 	if errx.Kind() == errkit.ErrKindUnknown {
 		if errx.Cause() != nil && strings.Contains(errx.Cause().Error(), "i/o timeout") {
@@ -398,4 +432,45 @@ func (d *Dialer) handleDialError(err error, opts *dialOptions) error {
 		}
 	}
 	return errx
+}
+
+// closeAfterTimeout closes the sockets after the given duration unless the returned cancel function is called
+func closeAfterTimeout(d time.Duration, c ...io.Closer) context.CancelFunc {
+	ctx, cancel := context.WithTimeout(context.Background(), d)
+	handshakeDoneCtx, handshakeDoneCancel := context.WithCancel(context.Background())
+	go func() {
+		select {
+		case <-ctx.Done():
+			for _, cl := range c {
+				_ = cl.Close()
+			}
+			return
+		case <-handshakeDoneCtx.Done():
+			return
+		}
+	}()
+
+	ctxDone := func() {
+		handshakeDoneCancel()
+		cancel()
+	}
+
+	return ctxDone
+}
+
+func (d *Dialer) validatePort(port int) bool {
+	for _, p := range d.options.DenyPortList {
+		if p == port {
+			return false
+		}
+	}
+	if len(d.options.AllowPortList) > 0 {
+		for _, p := range d.options.AllowPortList {
+			if p == port {
+				return true
+			}
+		}
+		return false
+	}
+	return true
 }
