@@ -1,4 +1,4 @@
-package dns
+package takeover
 
 import (
 	"context"
@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/Method-Security/osintscan/configs"
-	dnsfern "github.com/Method-Security/osintscan/generated/go/pentest/dns"
+	dnsfern "github.com/Method-Security/osintscan/generated/go/discover/dns"
 	"github.com/Method-Security/osintscan/internal/config"
 )
 

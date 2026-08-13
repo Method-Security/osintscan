@@ -15,7 +15,6 @@ func main() {
 	osintscan := cmd.NewOsintScan(version)
 	osintscan.InitRootCommand()
 	osintscan.InitDiscoverCommand()
-	osintscan.InitPentestCommand()
 
 	if err := osintscan.RootCmd.Execute(); err != nil {
 		os.Exit(1)

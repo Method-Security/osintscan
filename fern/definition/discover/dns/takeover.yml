@@ -11,7 +11,7 @@ types:
       nxDomain: boolean
       service: string
   # Config for a domain takeover check
-  PentestDomainTakeoverConfig:
+  DiscoverDomainTakeoverConfig:
     properties:
       targets: list<string>
       targetFiles: optional<list<string>>
@@ -41,11 +41,11 @@ types:
       returnsNXDomain: boolean
       response: optional<DomainTakeoverResponse>
       hostingServices: optional<list<HostingService>>
-  PentestDomainTakeoverResult:
+  DiscoverDomainTakeoverResult:
     properties:
       domainTakeovers: optional<list<DomainTakeover>>
-  PentestDomainTakeoverReport:
+  DiscoverDomainTakeoverReport:
     properties:
-      config: PentestDomainTakeoverConfig
-      result: PentestDomainTakeoverResult
+      config: DiscoverDomainTakeoverConfig
+      result: DiscoverDomainTakeoverResult
       errors: optional<list<string>>
