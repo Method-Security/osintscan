@@ -50,9 +50,6 @@ osintscan discover dns subdomain passive --domain example.com
 # Check for CDN usage
 osintscan discover cdn --domain example.com
 
-# Perform DNS zone transfer enumeration
-osintscan enumerate dns zonetransfer --domains example.com
-
 # Test for subdomain takeover vulnerabilities
 osintscan pentest dns takeover --targets subdomain.example.com
 
