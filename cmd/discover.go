@@ -95,6 +95,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 	//   - active
 	//   - correlation
 	//   - passive
+	// - takeover
 	discoverDNSCmd := &cobra.Command{
 		Use:   "dns",
 		Short: "Gather intelligence on DNS services and assets",
