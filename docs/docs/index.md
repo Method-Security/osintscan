@@ -4,7 +4,6 @@ osintscan offers a variety of techniques that allow security teams to leverage o
 
 - [Discover](./discover.md)
 - [Enumerate](./enumerate.md)
-- [Pentest](./pentest.md)
 
 
 ## Top Level Flags
@@ -25,8 +24,7 @@ Flags:
 osintscan provides the following main commands:
 
 - **discover**: Perform various discovery scans to gather OSINT data including DNS, ASN, CDN, IP, and Shodan intelligence
-- **enumerate**: Perform various enumeration scans to actively gather information such as DNS zone transfers
-- **pentest**: Perform various pentest scans to identify vulnerabilities such as DNS takeover
+- **enumerate**: Actively enumerate deeper detail about discovered assets, such as subdomain takeover exposure
 - **completion**: Generate autocompletion scripts for various shells
 - **help**: Get help about any command
 - **version**: Display version information

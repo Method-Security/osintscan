@@ -16,7 +16,6 @@ func main() {
 	osintscan.InitRootCommand()
 	osintscan.InitDiscoverCommand()
 	osintscan.InitEnumerateCommand()
-	osintscan.InitPentestCommand()
 
 	if err := osintscan.RootCmd.Execute(); err != nil {
 		os.Exit(1)

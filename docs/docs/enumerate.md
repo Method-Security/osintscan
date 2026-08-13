@@ -1,6 +1,6 @@
 # Enumerate
 
-The `osintscan enumerate` command performs active enumeration techniques to gather detailed information from discovered targets.
+The `osintscan enumerate` command actively gathers deeper detail about assets found during discovery.
 
 ## Usage
 ```bash
@@ -9,7 +9,7 @@ osintscan enumerate [command]
 
 ## Available Commands
 
-- **dns**: Active DNS enumeration techniques including zone transfers
+- **dns**: Active DNS enumeration, including subdomain takeover detection
 
 ## Commands
 
@@ -17,29 +17,32 @@ osintscan enumerate [command]
 
 Subcommands for active DNS enumeration.
 
-#### Zone Transfer
+#### Takeover
 
-Attempt DNS zone transfers (AXFR) to enumerate all DNS records if the server allows it.
+Detect DNS records that may be vulnerable to subdomain takeover.
+
+This detects a claimable record; it does not claim it. The CNAME lookup and the HTTP request both go to the third-party provider the record dangles at, never to infrastructure the target still controls.
 
 ##### Usage
 ```bash
-osintscan enumerate dns zone-transfer --zones example.com
-osintscan enumerate dns zone-transfer --zones example.com --target-nameservers 10.0.0.1
+osintscan enumerate dns takeover --targets https://example.com,subdomain.example.com
 ```
 
 ##### Help Text
 ```bash
-Attempt DNS zone transfers (AXFR) for the specified zones to enumerate all DNS records, if the server allows it. This can reveal all subdomains and records
+Analyze the provided targets to identify DNS records that may be vulnerable to subdomain takeover attacks, using known fingerprints and heuristics.
 
 Usage:
-  osintscan enumerate dns zone-transfer [flags]
+  osintscan enumerate dns takeover [flags]
 
 Flags:
-      --dns-resolvers strings       DNS resolvers for NS lookups (e.g. 10.0.0.1).
-  -h, --help                        help for zone-transfer
-      --target-nameservers strings  Nameserver IPs to attempt AXFR against directly, bypassing NS record lookup (e.g. 10.0.0.1)
-      --timeout int                 Timeout in seconds for each zone transfer request (default 360)
-      --zones strings               Zone FQDNs to test for unauthorized zone transfers (e.g. example.com)
+      --fingerprints-file string   Path to the JSON file containing service fingerprints for takeover detection
+  -h, --help                       help for takeover
+      --successful-only            Show only confirmed successful takeovers in the results
+      --target-files strings       File paths containing lists of targets to analyze for takeover vulnerabilities
+      --targets strings            A list of URLs or domains to analyze for takeover vulnerabilities
+      --timeout int                Timeout in seconds for each takeover check request (default 180)
+      --verify-tls                 Verify TLS certificates when making HTTPS requests during takeover analysis
 
 Global Flags:
   -o, --output string        Output format (signal, json, yaml). Default value is signal (default "signal")

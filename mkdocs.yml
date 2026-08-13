@@ -16,7 +16,6 @@ nav:
       - Capabilities:
         - Discover: docs/discover.md
         - Enumerate: docs/enumerate.md
-        - Pentest: docs/pentest.md
   - Contributing:
       - How to contribute: community/community.md
       - Development:
