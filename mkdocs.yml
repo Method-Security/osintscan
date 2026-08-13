@@ -15,6 +15,7 @@ nav:
       - Overview: docs/index.md
       - Capabilities:
         - Discover: docs/discover.md
+        - Enumerate: docs/enumerate.md
   - Contributing:
       - How to contribute: community/community.md
       - Development:

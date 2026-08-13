@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/Method-Security/osintscan/configs"
-	dnsfern "github.com/Method-Security/osintscan/generated/go/discover/dns"
+	dnsfern "github.com/Method-Security/osintscan/generated/go/enumerate/dns"
 	"github.com/Method-Security/osintscan/internal/config"
 )
 

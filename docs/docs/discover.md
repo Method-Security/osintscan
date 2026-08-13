@@ -144,7 +144,6 @@ osintscan discover dns [command]
 - **forward**: Perform forward DNS lookups
 - **reverse**: Perform reverse DNS lookups on IPs/CIDRs
 - **subdomain**: Subdomain discovery (active, correlation, passive)
-- **takeover**: Detect DNS records vulnerable to subdomain takeover
 
 #### Certs
 
@@ -363,42 +362,6 @@ Flags:
       --recursive-depth int       Recursive discovery depth (0=none, 1=re-scan discovered domains, 2=two levels deep, etc.) (default 1)
       --requests-per-second int   Maximum number of requests per second to send to the DNS resolvers
       --threads int               Number of concurrent threads for scanning (default 50)
-
-Global Flags:
-  -o, --output string        Output format (signal, json, yaml). Default value is signal (default "signal")
-  -f, --output-file string   Path to output file. If blank, will output to STDOUT
-  -q, --quiet                Suppress output
-  -v, --verbose              Verbose output
-```
-
-#### Takeover
-
-Detect DNS records that may be vulnerable to subdomain takeover.
-
-This detects a claimable record; it does not claim it. The CNAME lookup and the
-HTTP request both go to the third-party provider the record dangles at, never to
-infrastructure the target still controls.
-
-##### Usage
-```bash
-osintscan discover dns takeover --targets https://example.com,subdomain.example.com
-```
-
-##### Help Text
-```bash
-Analyze the provided targets to identify DNS records that may be vulnerable to subdomain takeover attacks, using known fingerprints and heuristics.
-
-Usage:
-  osintscan discover dns takeover [flags]
-
-Flags:
-      --fingerprints-file string   Path to the JSON file containing service fingerprints for takeover detection
-  -h, --help                       help for takeover
-      --successful-only            Show only confirmed successful takeovers in the results
-      --target-files strings       File paths containing lists of targets to analyze for takeover vulnerabilities
-      --targets strings            A list of URLs or domains to analyze for takeover vulnerabilities
-      --timeout int                Timeout in seconds for each takeover check request (default 180)
-      --verify-tls                 Verify TLS certificates when making HTTPS requests during takeover analysis
 
 Global Flags:
   -o, --output string        Output format (signal, json, yaml). Default value is signal (default "signal")

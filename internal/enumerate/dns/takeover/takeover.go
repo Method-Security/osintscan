@@ -6,14 +6,14 @@ import (
 	"net/http"
 	"strings"
 
-	dnsfern "github.com/Method-Security/osintscan/generated/go/discover/dns"
+	dnsfern "github.com/Method-Security/osintscan/generated/go/enumerate/dns"
 	osintConfig "github.com/Method-Security/osintscan/internal/config"
 	"github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
 // DetectDomainTakeover checks a list of targets for potential subdomain takeover vulnerabilities.
 // Returns a report containing the results for each target and any errors encountered.
-func DetectDomainTakeover(ctx context.Context, config dnsfern.DiscoverDomainTakeoverConfig, fingerprints []*dnsfern.DomainTakeoverFingerprint) (*dnsfern.DiscoverDomainTakeoverReport, error) {
+func DetectDomainTakeover(ctx context.Context, config dnsfern.EnumerateDomainTakeoverConfig, fingerprints []*dnsfern.DomainTakeoverFingerprint) (*dnsfern.EnumerateDomainTakeoverReport, error) {
 	log := svc1log.FromContext(ctx)
 	errs := []string{}
 
@@ -34,9 +34,9 @@ func DetectDomainTakeover(ctx context.Context, config dnsfern.DiscoverDomainTake
 	httpClient, err := createHTTPClient(ctx, config.VerifyTls, config.Timeout)
 	if err != nil {
 		errs = append(errs, err.Error())
-		return &dnsfern.DiscoverDomainTakeoverReport{
+		return &dnsfern.EnumerateDomainTakeoverReport{
 			Config: &config,
-			Result: &dnsfern.DiscoverDomainTakeoverResult{},
+			Result: &dnsfern.EnumerateDomainTakeoverResult{},
 			Errors: errs,
 		}, nil
 	}
@@ -87,9 +87,9 @@ func DetectDomainTakeover(ctx context.Context, config dnsfern.DiscoverDomainTake
 		}
 	}
 
-	report := dnsfern.DiscoverDomainTakeoverReport{
+	report := dnsfern.EnumerateDomainTakeoverReport{
 		Config: &config,
-		Result: &dnsfern.DiscoverDomainTakeoverResult{
+		Result: &dnsfern.EnumerateDomainTakeoverResult{
 			DomainTakeovers: takeoverResults,
 		},
 		Errors: errs,

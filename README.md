@@ -51,7 +51,7 @@ osintscan discover dns subdomain passive --domain example.com
 osintscan discover cdn --domain example.com
 
 # Test for subdomain takeover vulnerabilities
-osintscan discover dns takeover --targets subdomain.example.com
+osintscan enumerate dns takeover --targets subdomain.example.com
 
 # Search Shodan for hostname information
 osintscan discover shodan hostname --query nginx --hostname example.com

@@ -11,7 +11,7 @@ types:
       nxDomain: boolean
       service: string
   # Config for a domain takeover check
-  DiscoverDomainTakeoverConfig:
+  EnumerateDomainTakeoverConfig:
     properties:
       targets: list<string>
       targetFiles: optional<list<string>>
@@ -41,11 +41,11 @@ types:
       returnsNXDomain: boolean
       response: optional<DomainTakeoverResponse>
       hostingServices: optional<list<HostingService>>
-  DiscoverDomainTakeoverResult:
+  EnumerateDomainTakeoverResult:
     properties:
       domainTakeovers: optional<list<DomainTakeover>>
-  DiscoverDomainTakeoverReport:
+  EnumerateDomainTakeoverReport:
     properties:
-      config: DiscoverDomainTakeoverConfig
-      result: DiscoverDomainTakeoverResult
+      config: EnumerateDomainTakeoverConfig
+      result: EnumerateDomainTakeoverResult
       errors: optional<list<string>>

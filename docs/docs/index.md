@@ -3,6 +3,7 @@
 osintscan offers a variety of techniques that allow security teams to leverage open source intelligence (OSINT) capabilities to better understand their internet facing exposure. Each of the below pages offers you an in depth look at a osintscan capability related to a unique technique.
 
 - [Discover](./discover.md)
+- [Enumerate](./enumerate.md)
 
 
 ## Top Level Flags
@@ -22,7 +23,8 @@ Flags:
 
 osintscan provides the following main commands:
 
-- **discover**: Perform various discovery scans to gather OSINT data including DNS, ASN, CDN, IP, and Shodan intelligence, and detect DNS records vulnerable to subdomain takeover
+- **discover**: Perform various discovery scans to gather OSINT data including DNS, ASN, CDN, IP, and Shodan intelligence
+- **enumerate**: Actively enumerate deeper detail about discovered assets, such as subdomain takeover exposure
 - **completion**: Generate autocompletion scripts for various shells
 - **help**: Get help about any command
 - **version**: Display version information
