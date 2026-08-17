@@ -445,19 +445,14 @@ func (t *liteTable[V]) UnionPersist(o *liteTable[V]) *liteTable[V] {
 // It ensures both trees (IPv4-based and IPv6-based) have the same sizes and
 // recursively compares their root nodes.
 //
-// Value comparisons use reflect.DeepEqual by default. To avoid the potentially
-// expensive reflect.DeepEqual, the payload type V can provide custom equality
-// by implementing the following method:
+// If V implements an `Equal(V) bool` method, its custom equality logic is used.
+// Otherwise, values are compared directly using the == operator.
 //
-//	Equal(other V) bool
+// Note: If V implements `Equal(V) bool` with a pointer receiver, the Equal
+// method should handle nil receivers gracefully.
 //
-// Example:
-//
-//	type MyValue struct { ID int }
-//	func (v MyValue) Equal(other MyValue) bool { return v.ID == other.ID }
-//
-// The bart package will automatically detect and use this method via Go's
-// structural typing.
+// ATTENTION: If V is not comparable at runtime (such as a slice or map without an `Equal`
+// method), a runtime panic will occur.
 func (t *liteTable[V]) Equal(o *liteTable[V]) bool {
 	if t.size4 != o.size4 || t.size6 != o.size6 {
 		return false
@@ -484,6 +479,9 @@ func (t *liteTable[V]) Equal(o *liteTable[V]) bool {
 //
 // The bart package will automatically detect and use this method via Go's
 // structural typing.
+//
+// Note: If V implements Clone() V with a pointer receiver, the Clone
+// method should handle nil receivers gracefully.
 func (t *liteTable[V]) Clone() *liteTable[V] {
 	c := new(liteTable[V])
 
@@ -515,30 +513,12 @@ func (t *liteTable[V]) Size6() int {
 
 // All returns an iterator over all prefix–value pairs in the table.
 //
-// The entries from both IPv4 and IPv6 subtries are yielded using an internal recursive traversal.
-// The iteration order is unspecified and may vary between calls; for a stable order, use AllSorted.
+// The iteration order is unspecified and may vary between calls; for a stable order,
+// use [liteTable.AllSorted].
 //
-// You can use All directly in a for-range loop without providing a yield function.
-// The Go compiler automatically synthesizes the yield callback for you:
-//
-//	for prefix, value := range t.All() {
-//	    fmt.Println(prefix, value)
-//	}
-//
-// Under the hood, the loop body is passed as a yield function to the iterator.
-// If you break or return from the loop, iteration stops early as expected.
-//
-// IMPORTANT: Modifying or deleting entries during iteration is not allowed,
+// IMPORTANT: Modifying the table during iteration is not allowed,
 // as this would interfere with the internal traversal and may corrupt or
-// prematurely terminate the iteration. If mutation of the table during
-// traversal is required use persistent table methods, e.g.
-//
-//	pt := t // shallow copy of t
-//	for pfx, val := range t.All() {
-//		if cond(pfx, val) {
-//		  pt = pt.DeletePersist(pfx)
-//	  }
-//	}
+// prematurely terminate the iteration.
 func (t *liteTable[V]) All() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
 		_ = t.root4.AllRec(stridePath{}, 0, true, yield) && t.root6.AllRec(stridePath{}, 0, false, yield)
@@ -559,23 +539,8 @@ func (t *liteTable[V]) All6() iter.Seq2[netip.Prefix, V] {
 	}
 }
 
-// AllSorted returns an iterator over all prefix–value pairs in the table,
-// ordered in canonical CIDR prefix sort order.
-//
-// This can be used directly with a for-range loop;
-// the Go compiler provides the yield function implicitly:
-//
-//	for prefix, value := range t.AllSorted() {
-//	    fmt.Println(prefix, value)
-//	}
-//
-// The traversal is stable and predictable across calls.
-// Iteration stops early if you break out of the loop.
-//
-// IMPORTANT: Deleting entries during iteration is not allowed,
-// as this would interfere with the internal traversal and may corrupt or
-// prematurely terminate the iteration. If mutation of the table during
-// traversal is required use persistent table methods.
+// AllSorted is like [liteTable.All] but the iteration is ordered in canonical
+// CIDR prefix sort order.
 func (t *liteTable[V]) AllSorted() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
 		_ = t.root4.AllRecSorted(stridePath{}, 0, true, yield) &&

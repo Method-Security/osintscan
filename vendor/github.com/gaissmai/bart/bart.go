@@ -281,10 +281,10 @@ func (t *Table[V]) lookupPrefixLPM(pfx netip.Prefix, withLPM bool) (lpmPfx netip
 	pfx = pfx.Masked()
 
 	ip := pfx.Addr()
-	bits := pfx.Bits()
+	pfxLen := pfx.Bits()
 	is4 := ip.Is4()
 	octets := ip.AsSlice()
-	lastOctetPlusOne, lastBits := nodes.LastOctetPlusOneAndLastBits(pfx)
+	strideCount, modBits := nodes.DivMod8(pfxLen)
 
 	n := t.rootNodeByVersion(is4)
 
@@ -300,7 +300,7 @@ LOOP:
 		depth &= nodes.DepthMask // BCE
 
 		// stepped one past the last stride of interest; back up to last and break
-		if depth > lastOctetPlusOne {
+		if depth > strideCount {
 			depth--
 			break
 		}
@@ -321,7 +321,7 @@ LOOP:
 
 		case *nodes.LeafNode[V]:
 			// reached a path compressed prefix, stop traversing
-			if kid.Prefix.Bits() > bits || !kid.Prefix.Contains(ip) {
+			if kid.Prefix.Bits() > pfxLen || !kid.Prefix.Contains(ip) {
 				break LOOP
 			}
 			return kid.Prefix, kid.Value, true
@@ -330,7 +330,7 @@ LOOP:
 			// the bits of the fringe are defined by the depth
 			// maybe the LPM isn't needed, saves some cycles
 			fringeBits := (depth + 1) << 3
-			if fringeBits > bits {
+			if fringeBits > pfxLen {
 				break LOOP
 			}
 
@@ -357,15 +357,13 @@ LOOP:
 			continue
 		}
 
-		// only the lastOctet may have a different prefix len
-		// all others are just host routes
 		var idx uint8
 		octet = octets[depth]
-		// Last “octet” from prefix, update/insert prefix into node.
-		// Note: For /32 and /128, depth never reaches lastOctetPlusOne (4 or 16),
-		// so those are handled below via the fringe/leaf path.
-		if depth == lastOctetPlusOne {
-			idx = art.PfxToIdx(octet, lastBits)
+
+		// only the final stride may have a different prefix len
+		// all others are just host routes
+		if depth == strideCount {
+			idx = art.PfxToIdx(octet, modBits)
 		} else {
 			idx = art.OctetToIdx(octet)
 		}

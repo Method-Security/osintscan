@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Karl Gaissmaier
+// Copyright (c) 2026 Karl Gaissmaier
 // SPDX-License-Identifier: MIT
 
 package nodes
@@ -8,30 +8,13 @@ import (
 
 	"github.com/gaissmai/bart/internal/lpm"
 	"github.com/gaissmai/bart/internal/sparse"
-	"github.com/gaissmai/bart/internal/value"
 )
 
-// Each FastNode contains three conceptually different arrays:
-//
-//   - Prefixes stores routing entries (prefix -> value),
-//     laid out as a complete binary tree using the baseIndex()
-//     function from the ART algorithm.
-//
-//   - Children: holding subtries or path-compressed leaves/fringes with
-//     a branching factor of 256 (8 bits per stride).
-//
-//   - childRankCache for cached rank values for fast trie traversal.
-//
-// Entries in Children may be:
-//   - *FastNode[V]   -> internal child node for further traversal
-//   - *LeafNode[V]   -> path-comp. node (depth < maxDepth - 1)
-//   - *FringeNode[V] -> path-comp. node (depth == maxDepth - 1, stride-aligned: /8, /16, ... /128)
-//
 // FastNode is based on [BartNode], but it also uses a cache ([256]uint8)
-// per node to speed up traversal of the multi-bit trie. Lookups become
-// faster, but this requires more memory per prefix,
-// and updates (insertions/deletions) also become slower due to the overhead
-// of managing the cache.
+// per node to speed up traversal of the multi-bit trie.
+// Lookups become faster, but this requires more memory per prefix,
+// and updates (insertions/deletions) also become slower due to the
+// overhead of managing the cache.
 type FastNode[V any] struct {
 	Prefixes sparse.Array256[V]
 	Children sparse.Array256[any]
@@ -226,7 +209,7 @@ func (n *FastNode[V]) Lookup(idx uint8) (val V, ok bool) {
 //
 // Note: The returned node is a new instance with copied slices but only shallow copies of nested nodes,
 // except for LeafNode and FringeNode children which are cloned according to cloneFn.
-func (n *FastNode[V]) CloneFlat(cloneFn value.CloneFunc[V]) *FastNode[V] {
+func (n *FastNode[V]) CloneFlat(cloneFn func(V) V) *FastNode[V] {
 	if n == nil {
 		return nil
 	}
@@ -284,7 +267,7 @@ func (n *FastNode[V]) CloneFlat(cloneFn value.CloneFunc[V]) *FastNode[V] {
 //
 // Returns a new instance of FastNode[V] which is a complete deep clone of the
 // receiver node with all descendants.
-func (n *FastNode[V]) CloneRec(cloneFn value.CloneFunc[V]) *FastNode[V] {
+func (n *FastNode[V]) CloneRec(cloneFn func(V) V) *FastNode[V] {
 	if n == nil {
 		return nil
 	}
