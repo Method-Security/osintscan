@@ -166,11 +166,12 @@ func (l *Lite) Modify(pfx netip.Prefix, cb func(exists bool) (del bool)) {
 // ModifyPersist is similar to Modify but the receiver isn't modified and
 // a new *Lite is returned.
 func (l *Lite) ModifyPersist(pfx netip.Prefix, cb func(exists bool) (del bool)) *Lite {
-	wrappedFn := func(_ struct{}, exists bool) (_ struct{}, del bool) {
+	// wrap callback to match the signature of liteTable.ModifyPersist
+	cbWrapper := func(_ struct{}, exists bool) (_ struct{}, del bool) {
 		return struct{}{}, cb(exists)
 	}
 
-	lp := l.liteTable.ModifyPersist(pfx, wrappedFn)
+	lp := l.liteTable.ModifyPersist(pfx, cbWrapper)
 	//nolint:govet // copy of *lp is here by intention
 	return &Lite{*lp}
 }
@@ -212,30 +213,12 @@ func (l *Lite) UnionPersist(o *Lite) *Lite {
 
 // All returns an iterator over all prefixes in the table.
 //
-// The entries from both IPv4 and IPv6 subtries are yielded using an internal recursive traversal.
-// The iteration order is unspecified and may vary between calls; for a stable order, use AllSorted.
+// The iteration order is unspecified and may vary between calls; for a stable order,
+// use [Lite.AllSorted].
 //
-// You can use All directly in a for-range loop without providing a yield function.
-// The Go compiler automatically synthesizes the yield callback for you:
-//
-//	for prefix := range t.All() {
-//	    fmt.Println(prefix)
-//	}
-//
-// Under the hood, the loop body is passed as a yield function to the iterator.
-// If you break or return from the loop, iteration stops early as expected.
-//
-// IMPORTANT: Modifying or deleting entries during iteration is not allowed,
+// IMPORTANT: Modifying the table during iteration is not allowed,
 // as this would interfere with the internal traversal and may corrupt or
-// prematurely terminate the iteration. If mutation of the table during
-// traversal is required use persistent table methods, e.g.
-// 	pl := l
-// 	for pfx := range l.All() {
-// 		if cond(pfx) {
-// 			pl = pl.DeletePersist(pfx)
-// 		}
-// 	}
-
+// prematurely terminate the iteration.
 func (l *Lite) All() iter.Seq[netip.Prefix] {
 	return dropSeq2(l.liteTable.All())
 }
@@ -250,23 +233,8 @@ func (l *Lite) All6() iter.Seq[netip.Prefix] {
 	return dropSeq2(l.liteTable.All6())
 }
 
-// AllSorted returns an iterator over all prefixes in the table,
-// ordered in canonical CIDR prefix sort order.
-//
-// This can be used directly with a for-range loop;
-// the Go compiler provides the yield function implicitly.
-//
-//	for prefix := range t.AllSorted() {
-//	    fmt.Println(prefix)
-//	}
-//
-// The traversal is stable and predictable across calls.
-// Iteration stops early if you break out of the loop.
-//
-// IMPORTANT: Deleting entries during iteration is not allowed,
-// as this would interfere with the internal traversal and may corrupt or
-// prematurely terminate the iteration. If mutation of the table during
-// traversal is required use persistent table methods.
+// AllSorted is like [Lite.All] but the iteration is ordered in canonical
+// CIDR prefix sort order.
 func (l *Lite) AllSorted() iter.Seq[netip.Prefix] {
 	return dropSeq2(l.liteTable.AllSorted())
 }
@@ -600,10 +568,10 @@ func (l *liteTable[V]) lookupPrefixLPM(pfx netip.Prefix, withLPM bool) (lpmPfx n
 	pfx = pfx.Masked()
 
 	ip := pfx.Addr()
-	bits := pfx.Bits()
+	pfxLen := pfx.Bits()
 	is4 := ip.Is4()
 	octets := ip.AsSlice()
-	lastOctetPlusOne, lastBits := nodes.LastOctetPlusOneAndLastBits(pfx)
+	strideCount, modBits := nodes.DivMod8(pfxLen)
 
 	n := l.rootNodeByVersion(is4)
 
@@ -619,7 +587,7 @@ LOOP:
 		depth &= nodes.DepthMask // BCE
 
 		// stepped one past the last stride of interest; back up to last and break
-		if depth > lastOctetPlusOne {
+		if depth > strideCount {
 			depth--
 			break
 		}
@@ -640,7 +608,7 @@ LOOP:
 
 		case *nodes.LeafNode[V]:
 			// reached a path compressed prefix, stop traversing
-			if kid.Prefix.Bits() > bits || !kid.Prefix.Contains(ip) {
+			if kid.Prefix.Bits() > pfxLen || !kid.Prefix.Contains(ip) {
 				break LOOP
 			}
 			return kid.Prefix, true
@@ -649,7 +617,7 @@ LOOP:
 			// the bits of the fringe are defined by the depth
 			// maybe the LPM isn't needed, saves some cycles
 			fringeBits := (depth + 1) << 3
-			if fringeBits > bits {
+			if fringeBits > pfxLen {
 				break LOOP
 			}
 
@@ -676,15 +644,13 @@ LOOP:
 			continue
 		}
 
-		// only the lastOctet may have a different prefix len
-		// all others are just host routes
 		var idx uint8
 		octet = octets[depth]
-		// Last “octet” from prefix, update/insert prefix into node.
-		// Note: For /32 and /128, depth never reaches lastOctetPlusOne (4 or 16),
-		// so those are handled below via the fringe/leaf path.
-		if depth == lastOctetPlusOne {
-			idx = art.PfxToIdx(octet, lastBits)
+
+		// only the final stride may have a different prefix len
+		// all others are just host routes
+		if depth == strideCount {
+			idx = art.PfxToIdx(octet, modBits)
 		} else {
 			idx = art.OctetToIdx(octet)
 		}
