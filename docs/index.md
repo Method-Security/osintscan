@@ -49,6 +49,6 @@ For more information, visit us [here](https://method.security)
 
 osintscan is a Method Security open source project.
 
-Learn more about Method's open source source work by checking out our other projects [here](https://github.com/Method-Security) or our organization wide documentation [here](https://method-security.github.io).
+Learn more about Method's open source work by checking out our other projects [here](https://github.com/Method-Security) or our organization wide documentation [here](https://method-security.github.io).
 
 Have an idea for a Tool to contribute? Open a Discussion [here](https://github.com/Method-Security/Method-Security.github.io/discussions).
