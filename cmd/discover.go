@@ -164,6 +164,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
+			dnsResolvers = utils.TrimDNSServerAddresses(dnsResolvers)
 
 			useTCP, err := cmd.Flags().GetBool("use-tcp")
 			if err != nil {
@@ -215,6 +216,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
+			dnsResolvers = utils.TrimDNSServerAddresses(dnsResolvers)
 
 			config := getDiscoverDNSForwardConfig(domain, dnsResolvers)
 
@@ -261,6 +263,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
+			dnsResolvers = utils.TrimDNSServerAddresses(dnsResolvers)
 			threads, err := cmd.Flags().GetInt("threads")
 			if err != nil {
 				a.OutputSignal.AddError(err)
@@ -392,6 +395,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
+			dnsResolvers = utils.TrimDNSServerAddresses(dnsResolvers)
 			for _, dnsResolver := range dnsResolvers {
 				err = utils.ValidateDNSServerAddress(dnsResolver)
 				if err != nil {
@@ -458,6 +462,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
+			dnsResolvers = utils.TrimDNSServerAddresses(dnsResolvers)
 
 			// Create config
 			config := getDiscoverDNSCorrelationSubdomainConfig(domains, threads, timeout, dnsResolvers)
@@ -523,6 +528,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
+			dnsResolvers = utils.TrimDNSServerAddresses(dnsResolvers)
 			for _, dnsResolver := range dnsResolvers {
 				err = utils.ValidateDNSServerAddress(dnsResolver)
 				if err != nil {
@@ -626,6 +632,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
+			dnsResolvers = utils.TrimDNSServerAddresses(dnsResolvers)
 			for _, dnsResolver := range dnsResolvers {
 				err = utils.ValidateDNSServerAddress(dnsResolver)
 				if err != nil {
@@ -784,6 +791,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
+			dnsResolvers = utils.TrimDNSServerAddresses(dnsResolvers)
 			for _, dnsResolver := range dnsResolvers {
 				err = utils.ValidateDNSServerAddress(dnsResolver)
 				if err != nil {
@@ -848,6 +856,7 @@ func (a *OsintScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
+			dnsResolvers = utils.TrimDNSServerAddresses(dnsResolvers)
 
 			// Validate that either ip or cidr is provided
 			if len(ips) == 0 && cidr == "" {
