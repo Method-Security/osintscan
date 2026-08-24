@@ -11,15 +11,6 @@ import (
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
-// TrimDNSServerAddresses removes leading and trailing whitespace from each DNS server address.
-func TrimDNSServerAddresses(addresses []string) []string {
-	trimmed := make([]string, len(addresses))
-	for i, address := range addresses {
-		trimmed[i] = strings.TrimSpace(address)
-	}
-	return trimmed
-}
-
 // ValidateDNSServerAddress checks if the DNS server address is valid.
 // Accepts IP, IP:PORT, HOSTNAME, or HOSTNAME:PORT formats. Port 53 is assumed when omitted.
 func ValidateDNSServerAddress(address string) error {
@@ -54,6 +45,7 @@ func ValidateDNSServerAddress(address string) error {
 // If no port is specified, port 53 is assumed.
 func GetResolver(dnsServerAddress string, log svc1log.Logger) *net.Resolver {
 	var resolver *net.Resolver
+	dnsServerAddress = strings.TrimSpace(dnsServerAddress)
 	if dnsServerAddress == "" {
 		log.Info("Using system default DNS resolver")
 		resolver = &net.Resolver{}

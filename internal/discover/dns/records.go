@@ -4,13 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
 	"slices"
 	"strings"
 	"time"
 
 	common "github.com/Method-Security/osintscan/generated/go/common"
 	dnsfern "github.com/Method-Security/osintscan/generated/go/discover/dns"
+	"github.com/Method-Security/osintscan/utils"
 	"github.com/miekg/dns"
 	"github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 	"github.com/projectdiscovery/dnsx/libs/dnsx"
@@ -40,24 +40,27 @@ func normalizeDnsxResolvers(resolvers []string, useTCP bool) []string {
 		resolvers = defaultTCPResolvers
 	}
 	normalized := make([]string, 0, len(resolvers))
-	for _, r := range resolvers {
-		hasPrefix := strings.HasPrefix(r, "udp:") || strings.HasPrefix(r, "tcp:")
-		// Respect an explicit per-resolver transport only when not globally
-		// forcing TCP. When useTCP is set, the override must win even over a
-		// resolver already prefixed with udp:.
-		if hasPrefix && !useTCP {
-			normalized = append(normalized, r)
-			continue
+	for _, resolver := range resolvers {
+		resolver = strings.TrimSpace(resolver)
+		resolverProto := proto
+		explicitProto, resolver := splitDnsxResolverProto(resolver)
+		if !useTCP && explicitProto != "" {
+			resolverProto = explicitProto
 		}
-		r = strings.TrimPrefix(r, "udp:")
-		r = strings.TrimPrefix(r, "tcp:")
-		// Add default port if missing
-		if _, _, err := net.SplitHostPort(r); err != nil {
-			r = net.JoinHostPort(r, "53")
-		}
-		normalized = append(normalized, proto+r)
+		normalized = append(normalized, resolverProto+utils.NormalizeDNSAddress(resolver))
 	}
 	return normalized
+}
+
+func splitDnsxResolverProto(resolver string) (string, string) {
+	switch {
+	case strings.HasPrefix(resolver, "udp:"):
+		return "udp:", strings.TrimPrefix(resolver, "udp:")
+	case strings.HasPrefix(resolver, "tcp:"):
+		return "tcp:", strings.TrimPrefix(resolver, "tcp:")
+	default:
+		return "", resolver
+	}
 }
 
 // filterDNSRecordsByType filters DNS records based on the requested record types
