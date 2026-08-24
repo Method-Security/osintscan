@@ -164,7 +164,6 @@ func (a *OsintScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-
 			useTCP, err := cmd.Flags().GetBool("use-tcp")
 			if err != nil {
 				a.OutputSignal.AddError(err)
@@ -215,7 +214,6 @@ func (a *OsintScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-
 			config := getDiscoverDNSForwardConfig(domain, dnsResolvers)
 
 			report := dns.GetForwardDNSLookup(cmd.Context(), config)

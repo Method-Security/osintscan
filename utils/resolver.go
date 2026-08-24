@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+	"strings"
 	"time"
 
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
@@ -44,6 +45,7 @@ func ValidateDNSServerAddress(address string) error {
 // If no port is specified, port 53 is assumed.
 func GetResolver(dnsServerAddress string, log svc1log.Logger) *net.Resolver {
 	var resolver *net.Resolver
+	dnsServerAddress = strings.TrimSpace(dnsServerAddress)
 	if dnsServerAddress == "" {
 		log.Info("Using system default DNS resolver")
 		resolver = &net.Resolver{}
@@ -79,6 +81,7 @@ func GetResolvers(dnsServerAddresses []string, log svc1log.Logger) []*net.Resolv
 // NormalizeDNSAddress ensures a DNS server address includes a port.
 // If no port is specified, it defaults to port 53.
 func NormalizeDNSAddress(address string) string {
+	address = strings.TrimSpace(address)
 	_, _, err := net.SplitHostPort(address)
 	if err != nil {
 		return net.JoinHostPort(address, "53")

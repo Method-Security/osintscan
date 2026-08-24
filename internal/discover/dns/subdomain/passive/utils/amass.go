@@ -6,6 +6,7 @@ import (
 	"time"
 
 	dnsfern "github.com/Method-Security/osintscan/generated/go/discover/dns"
+	rootutils "github.com/Method-Security/osintscan/utils"
 	"github.com/owasp-amass/amass/v4/datasrcs"
 	"github.com/owasp-amass/amass/v4/enum"
 	"github.com/owasp-amass/amass/v4/systems"
@@ -22,7 +23,11 @@ func buildAmassConfig(cfg dnsfern.DiscoverDnsSubdomainPassiveConfig, log svc1log
 	amassCfg.AddDomain(cfg.Domain)
 	amassCfg.Recursive = false
 	amassCfg.Verbose = false
-	amassCfg.AddResolvers(cfg.DnsResolvers...)
+	resolvers := make([]string, 0, len(cfg.DnsResolvers))
+	for _, resolver := range cfg.DnsResolvers {
+		resolvers = append(resolvers, rootutils.NormalizeDNSAddress(resolver))
+	}
+	amassCfg.AddResolvers(resolvers...)
 
 	// Configure parallelism and performance
 	// Increase concurrent DNS queries for faster resolution
