@@ -91,7 +91,6 @@ func (a *OsintScan) InitDiscoverCommand() {
 	// - reverse
 	// - subdomain
 	//   - active
-	//   - correlation
 	//   - passive
 	discoverDNSCmd := &cobra.Command{
 		Use:   "dns",
@@ -286,7 +285,6 @@ func (a *OsintScan) InitDiscoverCommand() {
 	// subdomain Cmd
 	// Subcommands:
 	//  - active
-	//  - correlation
 	//  - passive
 	discoverDNSSubdomainCmd := &cobra.Command{
 		Use:   "subdomain",
@@ -427,60 +425,6 @@ func (a *OsintScan) InitDiscoverCommand() {
 
 	// Add command to 'subdomain' command
 	discoverDNSSubdomainCmd.AddCommand(discoverDNSSubdomainActiveCmd)
-
-	// Correlation Command
-	discoverDNSSubdomainCorrelationCmd := &cobra.Command{
-		Use:   "correlation",
-		Short: "Correlate subdomains across multiple domains",
-		Long:  `Correlate subdomains across multiple domains using active data sources (no direct interaction with the target).`,
-		Run: func(cmd *cobra.Command, args []string) {
-			// Grab Domains
-			domains, err := cmd.Flags().GetStringSlice("domains")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-			// Config Flags
-			threads, err := cmd.Flags().GetInt("threads")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-			timeout, err := cmd.Flags().GetInt("timeout")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-			dnsResolvers, err := cmd.Flags().GetStringSlice("dns-resolvers")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-
-			// Create config
-			config := getDiscoverDNSCorrelationSubdomainConfig(domains, threads, timeout, dnsResolvers)
-
-			// Create report
-			report, err := subdomain.GetDomainSubdomainsCorrelation(cmd.Context(), config)
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-			a.OutputSignal.Content = report
-		},
-	}
-
-	// Target Flags
-	discoverDNSSubdomainCorrelationCmd.Flags().StringSlice("domains", []string{}, "The domains to test")
-	discoverDNSSubdomainCorrelationCmd.Flags().Int("threads", 10, "Number of parallel threads to use for testing")
-	discoverDNSSubdomainCorrelationCmd.Flags().Int("timeout", 0, "Maximum time (in seconds) to spend on each lookup")
-	discoverDNSSubdomainCorrelationCmd.Flags().StringSlice("dns-resolvers", []string{}, "Custom DNS resolvers (e.g. 10.0.0.1).")
-
-	// Mark Required Flags
-	_ = discoverDNSSubdomainCorrelationCmd.MarkFlagRequired("domains")
-
-	// Add command to 'subdomain' command
-	discoverDNSSubdomainCmd.AddCommand(discoverDNSSubdomainCorrelationCmd)
 
 	// Passive Command
 	discoverDNSSubdomainPassiveCmd := &cobra.Command{
@@ -966,19 +910,6 @@ func getDiscoverDNSActiveSubdomainConfig(domain string, wordlistSize *dnsfern.Wo
 			Sleep:          sleep,
 			WildcardChecks: wildcardChecks,
 			DnsResolvers:   dnsResolvers,
-		},
-	}
-}
-
-// getDiscoverDNSCorrelationSubdomainConfig creates and returns a configuration for correlation subdomain discovery
-func getDiscoverDNSCorrelationSubdomainConfig(domains []string, threads int, timeout int, dnsResolvers []string) dnsfern.DiscoverDnsSubdomainConfig {
-	return dnsfern.DiscoverDnsSubdomainConfig{
-		DiscoveryType: strings.ToLower(string(dnsfern.DiscoverDnsSubdomainTypeCorrelation)),
-		Correlation: &dnsfern.DiscoverDnsSubdomainCorrelationConfig{
-			Domains:      domains,
-			Threads:      threads,
-			Timeout:      timeout,
-			DnsResolvers: dnsResolvers,
 		},
 	}
 }
