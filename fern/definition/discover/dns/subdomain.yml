@@ -3,7 +3,6 @@ types:
   DiscoverDnsSubdomainType:
     enum:
       - ACTIVE
-      - CORRELATION
       - PASSIVE
   DiscoverDnsSubdomainModule:
     enum:
@@ -28,12 +27,6 @@ types:
       sleep: integer
       wildcardChecks: integer
       dnsResolvers: optional<list<string>>
-  DiscoverDnsSubdomainCorrelationConfig:
-    properties:
-      domains: list<string>
-      threads: integer
-      timeout: integer
-      dnsResolvers: optional<list<string>>
   DiscoverDnsSubdomainPassiveConfig:
     properties:
       domain: string
@@ -50,7 +43,6 @@ types:
     discriminant: discoveryType
     union:
       active: DiscoverDnsSubdomainActiveConfig
-      correlation: DiscoverDnsSubdomainCorrelationConfig
       passive: DiscoverDnsSubdomainPassiveConfig
   DiscoverDnsSubdomainResult:
     properties:
