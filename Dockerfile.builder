@@ -1,5 +1,6 @@
 # Dockerfile used for the compilation of the statically compiled osintscan binary
-FROM golang:1.26.3-alpine3.22 AS base
+ARG GO_VERSION=1.26
+FROM golang:${GO_VERSION}-alpine AS base
 ARG GORELEASER_VERSION="v2.0.1"
 ARG CLI_NAME="osintscan"
 ARG TARGETARCH

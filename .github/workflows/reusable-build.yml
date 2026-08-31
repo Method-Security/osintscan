@@ -13,7 +13,7 @@ on:
         type: string
 
 env:
-  GO_VERSION: "1.26.3"
+  GO_VERSION: "1.26"
 
 jobs:
   prepare-linux-arm:
@@ -80,7 +80,10 @@ jobs:
         env:
           FERN_TOKEN: ${{ secrets.FERN_TOKEN }}
       - name: Build AMD64 Builder Image
-        run: docker buildx build . --platform linux/amd64 --load --tag amdbuilder -f Dockerfile.builder
+        run: >
+          docker buildx build . --platform linux/amd64 --load --tag amdbuilder
+          -f Dockerfile.builder
+          --build-arg GO_VERSION=$(awk '/^go /{print $2}' go.mod)
       - name: Build AMD64 Image
         run: |
           docker run -v $PWD:/app/osintscan \
