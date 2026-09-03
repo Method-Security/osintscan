@@ -1,6 +1,6 @@
 module github.com/Method-Security/osintscan
 
-go 1.26.5
+go 1.26.8
 
 require (
 	github.com/Method-Security/pkg v0.1.1
@@ -22,7 +22,7 @@ require (
 
 require (
 	aead.dev/minisign v0.3.0 // indirect
-	filippo.io/edwards25519 v1.1.0 // indirect
+	filippo.io/edwards25519 v1.1.1 // indirect
 	github.com/Masterminds/semver/v3 v3.4.0 // indirect
 	github.com/Mzack9999/gcache v0.0.0-20230410081825-519e28eab057 // indirect
 	github.com/Mzack9999/go-http-digest-auth-client v0.6.1-0.20220414142836-eb8883508809 // indirect
@@ -95,7 +95,7 @@ require (
 	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/klauspost/compress v1.18.2 // indirect
+	github.com/klauspost/compress v1.18.7 // indirect
 	github.com/lib/pq v1.10.9 // indirect
 	github.com/logrusorgru/aurora/v4 v4.0.0 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
@@ -168,7 +168,7 @@ require (
 	github.com/tylertreat/BoomFilters v0.0.0-20210315201527-1a82519a3e43 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	github.com/yl2chen/cidranger v1.0.2 // indirect
-	github.com/yuin/goldmark v1.7.13 // indirect
+	github.com/yuin/goldmark v1.7.17 // indirect
 	github.com/yuin/goldmark-emoji v1.0.6 // indirect
 	github.com/yuin/gopher-lua v1.1.0 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
@@ -178,7 +178,7 @@ require (
 	go.etcd.io/bbolt v1.4.2 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/ratelimit v0.3.0 // indirect
-	golang.org/x/crypto v0.55.0 // indirect
+	golang.org/x/crypto v0.56.0 // indirect
 	golang.org/x/exp v0.0.0-20260112195511-716be5621a96 // indirect
 	golang.org/x/mod v0.38.0 // indirect
 	golang.org/x/oauth2 v0.30.0 // indirect
